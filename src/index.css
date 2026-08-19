@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+@keyframes fadein {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Clean, athletic scoreboard-style wordmark — matches the app's teal brand color. */
+.wordmark {
+  font-family: "Barlow Condensed", "Arial Narrow", sans-serif;
+  font-weight: 700;
+  font-style: italic;
+  letter-spacing: 0.02em;
+  color: #0f766e; /* teal-700, same as primary buttons/badges */
+}

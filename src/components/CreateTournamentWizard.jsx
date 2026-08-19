@@ -1,0 +1,153 @@
+import React, { useState } from "react";
+import { MapPin, Calendar, Check, ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
+import { cx, fmtDateRange, inr, CATEGORY_META } from "../lib/engines";
+import { Modal, Field, Btn, Badge, Card, inputCls } from "./ui/primitives";
+
+export default function CreateTournamentWizard({ open, onClose, onSubmit }) {
+  const [step, setStep] = useState(1);
+  const [basics, setBasics] = useState({
+    name: "", description: "", organizerName: "", venue: "", location: "",
+    startDate: "", endDate: "", registrationDeadline: "", contactEmail: "", contactPhone: "",
+  });
+  const [selectedCats, setSelectedCats] = useState({ MS: true });
+  const [catConfig, setCatConfig] = useState({ MS: { maxEntries: 16, feeINR: 300 } });
+  const [settings, setSettings] = useState({ courtsCount: 2, matchDurationMins: 40, startTime: "09:00", rules: "BWF rally-point scoring, best of 3 games to 21." });
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  if (!open) return null;
+
+  const toggleCat = (c) => {
+    setSelectedCats((s) => ({ ...s, [c]: !s[c] }));
+    setCatConfig((s) => ({ ...s, [c]: s[c] || { maxEntries: CATEGORY_META[c].kind === "SINGLES" ? 16 : 8, feeINR: CATEGORY_META[c].kind === "SINGLES" ? 300 : 500 } }));
+  };
+
+  const categories = Object.keys(selectedCats).filter((c) => selectedCats[c]).map((c) => ({ category: c, ...catConfig[c] }));
+
+  const canNext = () => {
+    if (step === 1) return basics.name && basics.venue && basics.startDate && basics.endDate;
+    if (step === 2) return categories.length > 0;
+    return true;
+  };
+
+  const handlePublishNow = async (publish) => {
+    setError("");
+    setSaving(true);
+    try {
+      await onSubmit({ basics, categories, settings, publish });
+      setStep(1);
+      setBasics({ name: "", description: "", organizerName: "", venue: "", location: "", startDate: "", endDate: "", registrationDeadline: "", contactEmail: "", contactPhone: "" });
+      setSelectedCats({ MS: true });
+      setCatConfig({ MS: { maxEntries: 16, feeINR: 300 } });
+      onClose();
+    } catch (e) { setError(e.message); } finally { setSaving(false); }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="Create tournament" width="max-w-2xl">
+      <div className="mb-5 flex items-center gap-1.5">
+        {["Basics", "Categories", "Settings", "Review"].map((label, i) => (
+          <React.Fragment key={label}>
+            <div className={cx("flex items-center gap-1.5 text-xs font-medium", step === i + 1 ? "text-teal-700" : step > i + 1 ? "text-stone-500" : "text-stone-300")}>
+              <span className={cx("flex h-5 w-5 items-center justify-center rounded-full border text-[10px]", step === i + 1 ? "border-teal-700 bg-teal-700 text-white" : step > i + 1 ? "border-stone-300 bg-stone-100" : "border-stone-200")}>
+                {step > i + 1 ? <Check size={11} /> : i + 1}
+              </span>
+              {label}
+            </div>
+            {i < 3 && <div className="h-px flex-1 bg-stone-200" />}
+          </React.Fragment>
+        ))}
+      </div>
+
+      {step === 1 && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2"><Field label="Tournament name" required><input className={inputCls} value={basics.name} onChange={(e) => setBasics({ ...basics, name: e.target.value })} placeholder="e.g. Coimbatore Winter Open 2026" /></Field></div>
+          <div className="col-span-2"><Field label="Description"><textarea className={cx(inputCls, "resize-none")} rows={2} value={basics.description} onChange={(e) => setBasics({ ...basics, description: e.target.value })} /></Field></div>
+          <Field label="Organizer"><input className={inputCls} value={basics.organizerName} onChange={(e) => setBasics({ ...basics, organizerName: e.target.value })} /></Field>
+          <Field label="Venue" required><input className={inputCls} value={basics.venue} onChange={(e) => setBasics({ ...basics, venue: e.target.value })} /></Field>
+          <Field label="Location"><input className={inputCls} value={basics.location} onChange={(e) => setBasics({ ...basics, location: e.target.value })} placeholder="City, State" /></Field>
+          <Field label="Registration deadline"><input type="date" className={inputCls} value={basics.registrationDeadline} onChange={(e) => setBasics({ ...basics, registrationDeadline: e.target.value })} /></Field>
+          <Field label="Start date" required><input type="date" className={inputCls} value={basics.startDate} onChange={(e) => setBasics({ ...basics, startDate: e.target.value })} /></Field>
+          <Field label="End date" required><input type="date" className={inputCls} value={basics.endDate} onChange={(e) => setBasics({ ...basics, endDate: e.target.value })} /></Field>
+          <Field label="Contact email"><input className={inputCls} value={basics.contactEmail} onChange={(e) => setBasics({ ...basics, contactEmail: e.target.value })} /></Field>
+          <Field label="Contact phone"><input className={inputCls} value={basics.contactPhone} onChange={(e) => setBasics({ ...basics, contactPhone: e.target.value })} /></Field>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="space-y-2">
+          <p className="mb-3 text-xs text-stone-500">Choose the categories this tournament will run. Each gets its own draw, schedule and results.</p>
+          {Object.entries(CATEGORY_META).map(([code, meta]) => (
+            <div key={code} className={cx("rounded-md border px-3 py-2.5", selectedCats[code] ? "border-teal-300 bg-teal-50/50" : "border-stone-200")}>
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-sm font-medium text-stone-800">
+                  <input type="checkbox" checked={!!selectedCats[code]} onChange={() => toggleCat(code)} className="h-4 w-4 accent-teal-700" />
+                  {meta.label} <span className="text-[11px] font-normal text-stone-400">({meta.kind === "SINGLES" ? "1 vs 1" : "2 vs 2"})</span>
+                </label>
+              </div>
+              {selectedCats[code] && (
+                <div className="mt-2 grid grid-cols-2 gap-2 pl-6">
+                  <Field label={meta.kind === "SINGLES" ? "Max players" : "Max teams"}>
+                    <input type="number" min={2} className={inputCls} value={catConfig[code]?.maxEntries ?? ""} onChange={(e) => setCatConfig((s) => ({ ...s, [code]: { ...s[code], maxEntries: Number(e.target.value) } }))} />
+                  </Field>
+                  <Field label="Entry fee (₹)">
+                    <input type="number" min={0} className={inputCls} value={catConfig[code]?.feeINR ?? ""} onChange={(e) => setCatConfig((s) => ({ ...s, [code]: { ...s[code], feeINR: Number(e.target.value) } }))} />
+                  </Field>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Number of courts" hint="Used by the scheduling engine to spread matches across courts.">
+            <input type="number" min={1} className={inputCls} value={settings.courtsCount} onChange={(e) => setSettings({ ...settings, courtsCount: Number(e.target.value) })} />
+          </Field>
+          <Field label="Match duration (minutes)"><input type="number" min={15} className={inputCls} value={settings.matchDurationMins} onChange={(e) => setSettings({ ...settings, matchDurationMins: Number(e.target.value) })} /></Field>
+          <Field label="Daily start time"><input type="time" className={inputCls} value={settings.startTime} onChange={(e) => setSettings({ ...settings, startTime: e.target.value })} /></Field>
+          <div className="col-span-2"><Field label="Rules / notes"><textarea className={cx(inputCls, "resize-none")} rows={2} value={settings.rules} onChange={(e) => setSettings({ ...settings, rules: e.target.value })} /></Field></div>
+        </div>
+      )}
+
+      {step === 4 && (
+        <div className="space-y-4">
+          <Card className="p-4">
+            <div className="text-base font-semibold text-stone-900">{basics.name || "Untitled tournament"}</div>
+            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-500">
+              <span className="flex items-center gap-1"><MapPin size={12} />{basics.venue}{basics.location ? `, ${basics.location}` : ""}</span>
+              <span className="flex items-center gap-1"><Calendar size={12} />{fmtDateRange(basics.startDate, basics.endDate)}</span>
+            </div>
+          </Card>
+          <div>
+            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-stone-500">Categories</div>
+            <div className="flex flex-wrap gap-1.5">
+              {categories.map((c) => (
+                <Badge key={c.category} tone="teal">{CATEGORY_META[c.category].label} · {inr(c.feeINR)} · max {c.maxEntries}</Badge>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3 text-xs text-stone-500">
+            <div><div className="font-semibold text-stone-700">{settings.courtsCount}</div>Courts</div>
+            <div><div className="font-semibold text-stone-700">{settings.matchDurationMins}m</div>Per match</div>
+            <div><div className="font-semibold text-stone-700">{settings.startTime}</div>Daily start</div>
+          </div>
+          {error && <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}
+        </div>
+      )}
+
+      <div className="mt-6 flex items-center justify-between border-t border-stone-100 pt-4">
+        <Btn variant="ghost" size="sm" icon={ChevronLeft} onClick={() => (step === 1 ? onClose() : setStep(step - 1))}>{step === 1 ? "Cancel" : "Back"}</Btn>
+        {step < 4 ? (
+          <Btn size="sm" icon={ChevronRight} disabled={!canNext()} onClick={() => setStep(step + 1)}>Continue</Btn>
+        ) : (
+          <div className="flex gap-2">
+            <Btn variant="secondary" size="sm" disabled={saving} onClick={() => handlePublishNow(false)}>Save as draft</Btn>
+            <Btn size="sm" icon={ArrowRight} disabled={saving} onClick={() => handlePublishNow(true)}>Publish now</Btn>
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
