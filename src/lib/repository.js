@@ -250,6 +250,13 @@ export async function getPlayer(playerId) {
   return data;
 }
 
+export async function getPlayersByIds(ids) {
+  if (!ids?.length) return [];
+  const { data, error } = await supabase.from("public_players").select("*").in("id", ids);
+  if (error) throw error;
+  return data;
+}
+
 export async function searchPlayers(query) {
   const q = (query || "").trim();
   if (q.length < 2) return [];
@@ -257,6 +264,52 @@ export async function searchPlayers(query) {
     .from("public_players").select("*").ilike("name", `%${q}%`).limit(20);
   if (error) throw error;
   return data;
+}
+
+// Site-wide leaderboard from every completed match in every published
+// tournament. RLS on `matches` already restricts anon reads to published
+// events, so no extra filtering is needed here. Pulls all completed matches
+// client-side and aggregates — fine at today's scale; if match volume grows
+// into the thousands this should move into a Postgres view instead.
+export async function getLeaderboard(limit = 50) {
+  const { data: matches, error } = await supabase
+    .from("matches").select("entry_a, entry_b, winner_entry_id")
+    .in("status", ["COMPLETED", "WALKOVER"]);
+  if (error) throw error;
+  if (!matches?.length) return [];
+
+  const entryIds = [...new Set(matches.flatMap((m) => [m.entry_a, m.entry_b]).filter(Boolean))];
+  if (!entryIds.length) return [];
+
+  const { data: links, error: lErr } = await supabase
+    .from("public_entry_names").select("entry_id, player_id").in("entry_id", entryIds);
+  if (lErr) throw lErr;
+  const entryToPlayer = Object.fromEntries((links || []).filter((l) => l.player_id).map((l) => [l.entry_id, l.player_id]));
+
+  const stats = {};
+  for (const m of matches) {
+    for (const [entryId, won] of [[m.entry_a, m.winner_entry_id === m.entry_a], [m.entry_b, m.winner_entry_id === m.entry_b]]) {
+      const playerId = entryToPlayer[entryId];
+      if (!playerId) continue;
+      stats[playerId] = stats[playerId] || { played: 0, won: 0 };
+      stats[playerId].played++;
+      if (won) stats[playerId].won++;
+    }
+  }
+
+  const playerIds = Object.keys(stats);
+  if (!playerIds.length) return [];
+  const { data: players, error: pErr } = await supabase.from("public_players").select("*").in("id", playerIds);
+  if (pErr) throw pErr;
+
+  return players
+    .map((p) => {
+      const s = stats[p.id];
+      return { ...p, played: s.played, won: s.won, winPct: s.played ? Math.round((s.won / s.played) * 100) : 0 };
+    })
+    .filter((p) => p.played >= 2) // one lucky match shouldn't top the board
+    .sort((a, b) => b.won - a.won || b.winPct - a.winPct)
+    .slice(0, limit);
 }
 
 // Every match this player has appeared in, with enough context to render a
@@ -267,7 +320,7 @@ export async function searchPlayers(query) {
 // shared profile look empty to everyone but the organizer. The view exposes
 // only entry_id/name/player_id, and only for published tournaments.
 export async function getPlayerHistory(playerId) {
-  const empty = { matches: [], entries: [], entryIds: [] };
+  const empty = { matches: [], entries: [], entryIds: [], entryToPlayer: {} };
 
   const { data: links, error } = await supabase
     .from("public_entry_names").select("entry_id").eq("player_id", playerId);
@@ -288,9 +341,16 @@ export async function getPlayerHistory(playerId) {
     .from("matches").select("*, games(*)").in("event_id", eventIds);
   if (mErr) throw mErr;
 
+  // Resolve opponents' entries to player ids too, so a "rivals" section can
+  // link to them — not just this player's own entries.
+  const allEntryIds = [...new Set((matches || []).flatMap((m) => [m.entry_a, m.entry_b]).filter(Boolean))];
+  const { data: allLinks } = await supabase
+    .from("public_entry_names").select("entry_id, player_id").in("entry_id", allEntryIds);
+  const entryToPlayer = Object.fromEntries((allLinks || []).filter((l) => l.player_id).map((l) => [l.entry_id, l.player_id]));
+
   // Shape kept compatible with the profile page: [{ entry_id, entries: {...} }]
   const appearances = (entries || []).map((e) => ({ entry_id: e.id, entries: e }));
-  return { matches: matches || [], entries: appearances, entryIds };
+  return { matches: matches || [], entries: appearances, entryIds, entryToPlayer };
 }
 
 export async function updateEntryStatus(entryId, regStatus) {

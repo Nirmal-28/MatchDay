@@ -328,3 +328,35 @@ export function currentStreak(matches, entryIds) {
   }
   return kind ? { kind, count: n } : null;
 }
+
+// Achievement badges, computed purely from stats already on hand — no schema
+// or extra queries needed. Cheap gamification layer (Cricheroes' badges are
+// the closest analogue): a reason for a player to come back and share.
+export function computeBadges(stats, streak, titleCount) {
+  const badges = [];
+  if (titleCount > 0) badges.push({ key: "champion", label: titleCount > 1 ? `${titleCount}x Champion` : "Champion", tone: "yellow" });
+  if (streak && streak.kind === "W" && streak.count >= 3) badges.push({ key: "streak", label: `${streak.count}-match win streak`, tone: "teal" });
+  if (stats.played >= 3 && stats.lost === 0) badges.push({ key: "undefeated", label: "Undefeated", tone: "purple" });
+  if (stats.played >= 10) badges.push({ key: "veteran", label: "10+ matches played", tone: "blue" });
+  if (stats.played >= 5 && stats.winPct >= 70) badges.push({ key: "sharp", label: `${stats.winPct}% win rate`, tone: "pink" });
+  return badges;
+}
+
+// Opponents played most often, for a "rivals" section on a player profile.
+export function topRivals(matches, entryIds, entryToPlayer, limit = 3) {
+  const mine = new Set(entryIds);
+  const rivals = {};
+  for (const m of matches) {
+    if (m.status !== "COMPLETED" && m.status !== "WALKOVER") continue;
+    const iAmA = mine.has(m.entry_a), iAmB = mine.has(m.entry_b);
+    if (!iAmA && !iAmB) continue;
+    const oppEntry = iAmA ? m.entry_b : m.entry_a;
+    const oppPlayer = entryToPlayer[oppEntry];
+    if (!oppPlayer) continue;
+    const iWon = m.winner_entry_id && mine.has(m.winner_entry_id);
+    rivals[oppPlayer] = rivals[oppPlayer] || { playerId: oppPlayer, played: 0, won: 0, lost: 0 };
+    rivals[oppPlayer].played++;
+    if (iWon) rivals[oppPlayer].won++; else rivals[oppPlayer].lost++;
+  }
+  return Object.values(rivals).sort((a, b) => b.played - a.played).slice(0, limit);
+}

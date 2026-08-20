@@ -20,9 +20,10 @@ export function Reveal({ children, delay = 0, className, as: As = motion.div, ..
 // Wrap a list of children to stagger their entrance. Children should be
 // plain elements — this only supplies the stagger timing to the container;
 // each child still needs the fade/slide, so pair with <StaggerItem>.
-export function StaggerList({ children, className, stagger = 0.06 }) {
+export function StaggerList({ children, className, stagger = 0.06, as = "div" }) {
+  const As = motion[as] || motion.div;
   return (
-    <motion.div
+    <As
       initial="hidden"
       whileInView="show"
       viewport={{ once: true, margin: "-40px" }}
@@ -30,19 +31,20 @@ export function StaggerList({ children, className, stagger = 0.06 }) {
       className={className}
     >
       {children}
-    </motion.div>
+    </As>
   );
 }
 
-export function StaggerItem({ children, className }) {
+export function StaggerItem({ children, className, as = "div" }) {
+  const As = motion[as] || motion.div;
   return (
-    <motion.div
+    <As
       variants={{ hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0 } }}
       transition={{ duration: 0.35, ease: "easeOut" }}
       className={className}
     >
       {children}
-    </motion.div>
+    </As>
   );
 }
 

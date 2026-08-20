@@ -7,6 +7,7 @@ import { signOut } from "./lib/repository";
 import PublicDiscovery from "./pages/PublicDiscovery";
 import PublicTournamentPage from "./pages/PublicTournamentPage";
 import PlayerProfile from "./pages/PlayerProfile";
+import Leaderboard from "./pages/Leaderboard";
 import OrganizerDashboard from "./pages/OrganizerDashboard";
 import TournamentControlCenter from "./pages/TournamentControlCenter";
 import SignIn from "./pages/auth/SignIn";
@@ -39,6 +40,7 @@ function Header() {
           <span className="wordmark text-2xl uppercase leading-none">Matchday</span>
         </Link>
         <div className="flex items-center gap-3">
+          <Link to="/leaderboard" className={cx("hidden text-xs font-medium sm:inline", location.pathname === "/leaderboard" ? "text-teal-700" : "text-stone-500 hover:text-stone-800")}>Leaderboard</Link>
           <div className="relative hidden items-center gap-0.5 rounded-md border border-stone-200 bg-stone-100 p-0.5 sm:flex">
             <motion.div
               className="absolute inset-y-0.5 left-0.5 w-[calc(50%-2px)] rounded bg-white shadow-sm"
@@ -74,6 +76,7 @@ function AnimatedRoutes() {
           <Route path="/" element={<PublicDiscovery />} />
           <Route path="/t/:slug" element={<PublicTournamentPage />} />
           <Route path="/p/:id" element={<PlayerProfile />} />
+          <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/login" element={<SignIn />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/organizer" element={<RequireAuth><OrganizerDashboard /></RequireAuth>} />

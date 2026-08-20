@@ -2,11 +2,16 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "motion/react";
 import { ChevronLeft, MapPin, Trophy, Share2, Building2 } from "lucide-react";
-import { cx, fmtDate, computeCareerStats, currentStreak, divisionLabel, BadmintonScoringEngine, toAB } from "../lib/engines";
-import { getPlayer, getPlayerHistory } from "../lib/repository";
+import { cx, fmtDate, computeCareerStats, currentStreak, computeBadges, topRivals, divisionLabel, BadmintonScoringEngine, toAB } from "../lib/engines";
+import { getPlayer, getPlayerHistory, getPlayersByIds } from "../lib/repository";
 import { Card, Badge, Btn, EmptyState } from "../components/ui/primitives";
 import { BrandLoader, Reveal } from "../components/ui/motion";
 import { CourtGeometry } from "../components/ui/atmosphere";
+
+const BADGE_TONES = {
+  yellow: "text-accent-yellow", teal: "text-accent-teal", purple: "text-accent-purple",
+  blue: "text-accent-blue", pink: "text-accent-pink",
+};
 
 function StatTile({ label, value, accent }) {
   return (
@@ -21,6 +26,7 @@ export default function PlayerProfile() {
   const { id } = useParams();
   const [player, setPlayer] = useState(null);
   const [history, setHistory] = useState(null);
+  const [rivals, setRivals] = useState([]);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -28,7 +34,15 @@ export default function PlayerProfile() {
     (async () => {
       try {
         const [p, h] = await Promise.all([getPlayer(id), getPlayerHistory(id)]);
-        if (!cancelled) { setPlayer(p); setHistory(h); }
+        if (cancelled) return;
+        setPlayer(p); setHistory(h);
+
+        const rivalRows = topRivals(h.matches, h.entryIds, h.entryToPlayer);
+        if (rivalRows.length) {
+          const rivalPlayers = await getPlayersByIds(rivalRows.map((r) => r.playerId));
+          const byId = Object.fromEntries(rivalPlayers.map((rp) => [rp.id, rp]));
+          if (!cancelled) setRivals(rivalRows.map((r) => ({ ...r, player: byId[r.playerId] })).filter((r) => r.player));
+        }
       } catch (e) {
         if (!cancelled) setError(e.message);
       }
@@ -56,6 +70,8 @@ export default function PlayerProfile() {
       .filter(Boolean)
       .map((ev) => [ev.id, ev])
   );
+
+  const badges = computeBadges(stats, streak, titles.length);
 
   const tournaments = [...new Map(
     (history.entries || [])
@@ -114,6 +130,19 @@ export default function PlayerProfile() {
           <StatTile label="Win %" value={`${stats.winPct}%`} />
           <StatTile label="Titles" value={titles.length} accent="text-accent-yellow" />
         </div>
+
+        {badges.length > 0 && (
+          <div className="relative mt-4 flex flex-wrap gap-1.5">
+            {badges.map((b) => (
+              <span key={b.key} className={cx(
+                "inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] font-semibold",
+                BADGE_TONES[b.tone] || "text-white"
+              )}>
+                🏅 {b.label}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {stats.played === 0 ? (
@@ -166,18 +195,33 @@ export default function PlayerProfile() {
             </div>
           </Reveal>
 
-          <Reveal delay={0.1}>
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">Tournaments</h2>
-            <div className="space-y-2">
-              {tournaments.length === 0 && <p className="text-sm text-stone-400">None yet.</p>}
-              {tournaments.map((t) => (
-                <Card key={t.id} className="p-3">
-                  <Link to={`/t/${t.slug}`} className="text-sm font-medium text-stone-800 hover:text-teal-700">{t.name}</Link>
-                  <div className="text-xs text-stone-500">{fmtDate(t.start_date)}</div>
-                </Card>
-              ))}
-            </div>
-          </Reveal>
+          <div className="space-y-5">
+            {rivals.length > 0 && (
+              <Reveal delay={0.1}>
+                <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">Rivals</h2>
+                <div className="space-y-2">
+                  {rivals.map((r) => (
+                    <Card key={r.playerId} className="flex items-center justify-between p-3">
+                      <Link to={`/p/${r.playerId}`} className="text-sm font-medium text-stone-800 hover:text-teal-700">{r.player.name}</Link>
+                      <span className="font-mono text-xs text-stone-500">{r.won}–{r.lost}</span>
+                    </Card>
+                  ))}
+                </div>
+              </Reveal>
+            )}
+            <Reveal delay={0.15}>
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">Tournaments</h2>
+              <div className="space-y-2">
+                {tournaments.length === 0 && <p className="text-sm text-stone-400">None yet.</p>}
+                {tournaments.map((t) => (
+                  <Card key={t.id} className="p-3">
+                    <Link to={`/t/${t.slug}`} className="text-sm font-medium text-stone-800 hover:text-teal-700">{t.name}</Link>
+                    <div className="text-xs text-stone-500">{fmtDate(t.start_date)}</div>
+                  </Card>
+                ))}
+              </div>
+            </Reveal>
+          </div>
         </div>
       )}
     </div>
