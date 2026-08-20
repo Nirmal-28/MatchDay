@@ -182,6 +182,29 @@ export async function listEntries(eventId) {
   return data;
 }
 
+// Same shape as listEntries(), but for anonymous public pages. entry_players
+// has no anon SELECT policy (it holds phone/email), so entries().select("*,
+// entry_players(*)") silently comes back with entry_players: [] for anyone
+// who isn't the organizer — every name on the public schedule/bracket/results
+// pages would render as "TBD" for a real visitor. Fetch names separately
+// through public_entry_names (name-only, published tournaments only) and
+// merge them into the same entry_players shape entryName()/entryShort() read.
+export async function listEntriesPublic(eventId) {
+  const { data: entries, error } = await supabase
+    .from("entries").select("*").eq("event_id", eventId).order("created_at");
+  if (error) throw error;
+  if (!entries?.length) return [];
+
+  const entryIds = entries.map((e) => e.id);
+  const { data: names, error: nErr } = await supabase
+    .from("public_entry_names").select("id, entry_id, name, player_id").in("entry_id", entryIds);
+  if (nErr) throw nErr;
+
+  const byEntry = {};
+  (names || []).forEach((n) => { (byEntry[n.entry_id] = byEntry[n.entry_id] || []).push(n); });
+  return entries.map((e) => ({ ...e, entry_players: byEntry[e.id] || [] }));
+}
+
 // Public registration — works for anon visitors because of the
 // "public_register_entries" / "public_insert_entry_players" RLS policies,
 // gated to REGISTRATION_OPEN events only. The capacity trigger on entries
@@ -680,9 +703,28 @@ export async function scorePoint(matchId, side, delta) {
     if (next?.entry_a && next?.entry_b && next?.scheduled_at) {
       await supabase.from("matches").update({ status: "READY" }).eq("id", next.id);
     }
-  } else {
+  } else if (!match.group_label) {
+    // Only a true knockout final has no next_match_id. Round-robin and group
+    // matches never have one either (nothing to advance into), so without this
+    // guard the FIRST round-robin match to finish would falsely crown its
+    // winner "champion" and mark the whole division complete.
     await supabase.from("tournament_events")
       .update({ status: "COMPLETED", champion_entry_id: winnerEntryId }).eq("id", match.event_id);
+  } else if (match.group_label === "RR") {
+    // Pure round robin (not groups->knockout) has no final match to hang a
+    // champion declaration off, so declare one here once every RR match in
+    // the division is done: the top of the standings table.
+    const { data: rrMatches } = await supabase
+      .from("matches").select("*, games(*)").eq("event_id", match.event_id).eq("group_label", "RR");
+    const allDone = rrMatches.every((m) => m.status === "COMPLETED" || m.status === "WALKOVER");
+    if (allDone) {
+      const ids = [...new Set(rrMatches.flatMap((m) => [m.entry_a, m.entry_b]).filter(Boolean))];
+      const standings = computeStandings(ids, rrMatches);
+      if (standings[0]) {
+        await supabase.from("tournament_events")
+          .update({ status: "COMPLETED", champion_entry_id: standings[0].entryId }).eq("id", match.event_id);
+      }
+    }
   }
 }
 

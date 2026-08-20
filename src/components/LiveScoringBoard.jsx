@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { ChevronLeft, Radio, Trophy } from "lucide-react";
-import { entryName, entryShort, roundLabel, BadmintonScoringEngine, toAB, CATEGORY_META } from "../lib/engines";
+import { entryName, entryShort, matchStageLabel, BadmintonScoringEngine, toAB, CATEGORY_META } from "../lib/engines";
 import { Badge, EmptyState } from "./ui/primitives";
 import { LivePulse } from "./ui/motion";
 import ScorerPanel from "./ScorerPanel";
@@ -69,7 +69,7 @@ export default function LiveScoringBoard({ matches, events, entriesById, onStart
               <Badge tone="slate">{m.court || "Court —"}</Badge>
               {m.status === "LIVE" ? <LivePulse /> : <Badge tone="teal">Ready</Badge>}
             </div>
-            <div className="text-[11px] uppercase tracking-wide text-stone-400">{CATEGORY_META[ev.category].label} · {roundLabel(m.round, ev.total_rounds)}</div>
+            <div className="text-[11px] uppercase tracking-wide text-stone-400">{CATEGORY_META[ev.category].label} · {matchStageLabel(m, ev)}</div>
             <div className="mt-1.5 space-y-1 text-sm">
               <div className="flex items-center justify-between"><span className="truncate font-medium text-stone-800">{entryShort(a)}</span><span className="font-mono text-stone-500">{tally.a}</span></div>
               <div className="flex items-center justify-between"><span className="truncate font-medium text-stone-800">{entryShort(b)}</span><span className="font-mono text-stone-500">{tally.b}</span></div>

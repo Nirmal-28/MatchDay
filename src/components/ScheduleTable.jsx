@@ -1,5 +1,5 @@
 import { Clock } from "lucide-react";
-import { fmtDateTime, roundLabel, entryShort, MATCH_STATUS_META } from "../lib/engines";
+import { fmtDateTime, matchStageLabel, entryShort, MATCH_STATUS_META } from "../lib/engines";
 import { Badge, EmptyState } from "./ui/primitives";
 
 export default function ScheduleTable({ matches, entriesById, event }) {
@@ -22,7 +22,7 @@ export default function ScheduleTable({ matches, entriesById, event }) {
             <tr key={m.id}>
               <td className="px-3 py-2 font-mono text-xs text-stone-600">{fmtDateTime(m.scheduled_at)}</td>
               <td className="px-3 py-2"><Badge tone="slate">{m.court || "—"}</Badge></td>
-              <td className="px-3 py-2 text-stone-500">{roundLabel(m.round, event.total_rounds)}</td>
+              <td className="px-3 py-2 text-stone-500">{matchStageLabel(m, event)}</td>
               <td className="px-3 py-2 text-stone-800">{entryShort(entriesById[m.entry_a])} <span className="text-stone-300">vs</span> {entryShort(entriesById[m.entry_b])}</td>
               <td className="px-3 py-2"><Badge tone={MATCH_STATUS_META[m.status].tone}>{MATCH_STATUS_META[m.status].label}</Badge></td>
             </tr>

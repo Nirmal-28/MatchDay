@@ -1,5 +1,5 @@
 import { Trophy, ClipboardList } from "lucide-react";
-import { cx, entryName, entryShort, roundLabel, CATEGORY_META } from "../lib/engines";
+import { cx, entryName, entryShort, matchStageLabel, CATEGORY_META } from "../lib/engines";
 import { Card, EmptyState } from "./ui/primitives";
 
 export default function ResultsPanel({ event, matches, entriesById }) {
@@ -31,7 +31,7 @@ export default function ResultsPanel({ event, matches, entriesById }) {
                 const games = [...(m.games || [])].sort((x, y) => x.game_number - y.game_number);
                 return (
                   <tr key={m.id}>
-                    <td className="px-3 py-2 text-stone-500">{roundLabel(m.round, event.total_rounds)}</td>
+                    <td className="px-3 py-2 text-stone-500">{matchStageLabel(m, event)}</td>
                     <td className="px-3 py-2">
                       {m.is_bye ? <span className="text-stone-500">{entryShort(a)} advances (bye)</span> : (
                         <span>

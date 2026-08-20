@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, MapPin, Calendar, Building2, Radio, Share2 } from "lucide-react";
-import { cx, fmtDateRange, inr, entryShort, roundLabel, BadmintonScoringEngine, toAB, CATEGORY_META, divisionLabel, EVENT_STATUS_META, TOURNAMENT_STATUS_META } from "../lib/engines";
-import { getTournament, getTournamentBySlug, listEvents, listEntries, listMatches, registerEntry, subscribeToEvent } from "../lib/repository";
+import { cx, fmtDateRange, inr, entryShort, matchStageLabel, BadmintonScoringEngine, toAB, CATEGORY_META, divisionLabel, EVENT_STATUS_META, TOURNAMENT_STATUS_META } from "../lib/engines";
+import { getTournament, getTournamentBySlug, listEvents, listEntriesPublic, listMatches, registerEntry, subscribeToEvent } from "../lib/repository";
 import { Badge, Btn, Card, EmptyState } from "../components/ui/primitives";
 import { BrandLoader, LivePulse } from "../components/ui/motion";
 import RegistrationModal from "../components/RegistrationModal";
@@ -34,7 +34,7 @@ export default function PublicTournamentPage() {
 
   const loadEventData = useCallback(async (evs) => {
     const results = await Promise.all(evs.map(async (e) => ({
-      id: e.id, entries: await listEntries(e.id), matches: await listMatches(e.id),
+      id: e.id, entries: await listEntriesPublic(e.id), matches: await listMatches(e.id),
     })));
     const eb = {}, mb = {};
     results.forEach((r) => { eb[r.id] = r.entries; mb[r.id] = r.matches; });
@@ -190,7 +190,7 @@ export default function PublicTournamentPage() {
                     <Badge tone="slate">{m.court}</Badge>
                     <LivePulse />
                   </div>
-                  <div className="mb-2 text-[11px] uppercase tracking-wide text-stone-400">{CATEGORY_META[ev.category].label} · {roundLabel(m.round, ev.total_rounds)}</div>
+                  <div className="mb-2 text-[11px] uppercase tracking-wide text-stone-400">{CATEGORY_META[ev.category].label} · {matchStageLabel(m, ev)}</div>
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-sm"><span className="font-medium text-stone-800">{entryShort(a)}</span><span className="font-mono text-lg font-bold">{current?.score_a ?? 0}</span></div>
                     <div className="flex items-center justify-between text-sm"><span className="font-medium text-stone-800">{entryShort(b)}</span><span className="font-mono text-lg font-bold">{current?.score_b ?? 0}</span></div>

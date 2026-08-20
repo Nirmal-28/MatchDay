@@ -138,6 +138,16 @@ export function roundLabel(round, totalRounds) {
   return `Round of ${Math.pow(2, totalRounds - round + 1)}`;
 }
 
+// roundLabel() assumes knockout terminology (Semifinal, Quarterfinal...),
+// which is wrong for a round-robin or group-stage match — "Round 2 of 5" in
+// a round robin has nothing to do with how close it is to a final. Use this
+// wherever a match could be from either kind of stage.
+export function matchStageLabel(match, event) {
+  if (!match.group_label) return roundLabel(match.round, event?.total_rounds);
+  if (match.group_label === "RR") return `Round ${match.round}`;
+  return `Group ${match.group_label} · Round ${match.round}`;
+}
+
 export function entryName(entry) {
   if (!entry) return "TBD";
   return (entry.entry_players || []).map((p) => p.name).join(" / ");

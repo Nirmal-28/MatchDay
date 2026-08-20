@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { Play, Minus, Plus, RotateCcw } from "lucide-react";
-import { entryName, entryShort, roundLabel, BadmintonScoringEngine, toAB, CATEGORY_META } from "../lib/engines";
+import { entryName, entryShort, matchStageLabel, BadmintonScoringEngine, toAB, CATEGORY_META } from "../lib/engines";
 import { Badge, Btn, Card } from "./ui/primitives";
 import { LivePulse } from "./ui/motion";
 
@@ -21,7 +21,7 @@ export default function ScorerPanel({ match, event, entriesById, onScore, onUndo
       <div className={isLive ? "flex items-center justify-between border-b border-white/10 px-4 py-2.5" : "flex items-center justify-between border-b border-stone-200 bg-stone-50 px-4 py-2.5"}>
         <div className={isLive ? "flex items-center gap-2 text-xs text-stone-300" : "flex items-center gap-2 text-xs text-stone-500"}>
           <Badge tone={isLive ? undefined : "slate"} className={isLive ? "border-white/20 bg-white/10 text-white" : undefined}>{match.court || "Court —"}</Badge>
-          <span>{CATEGORY_META[event.category].label} · {roundLabel(match.round, event.total_rounds)}</span>
+          <span>{CATEGORY_META[event.category].label} · {matchStageLabel(match, event)}</span>
         </div>
         {isLive && <LivePulse />}
       </div>
