@@ -4,6 +4,7 @@ import { ChevronLeft, MapPin, Calendar, Building2, Radio } from "lucide-react";
 import { cx, fmtDateRange, inr, entryShort, roundLabel, BadmintonScoringEngine, toAB, CATEGORY_META, EVENT_STATUS_META, TOURNAMENT_STATUS_META } from "../lib/engines";
 import { getTournament, getTournamentBySlug, listEvents, listEntries, listMatches, registerEntry, subscribeToEvent } from "../lib/repository";
 import { Badge, Btn, Card, EmptyState } from "../components/ui/primitives";
+import { BrandLoader, LivePulse } from "../components/ui/motion";
 import RegistrationModal from "../components/RegistrationModal";
 import BracketView from "../components/BracketView";
 import ScheduleTable from "../components/ScheduleTable";
@@ -92,7 +93,7 @@ export default function PublicTournamentPage() {
   };
 
   if (notFound) return <EmptyState icon={MapPin} title="Tournament not found" hint="This link may be wrong or the tournament isn't published yet." />;
-  if (!tournament) return <div className="py-14 text-center text-sm text-stone-400">Loading…</div>;
+  if (!tournament) return <BrandLoader />;
 
   return (
     <div>
@@ -177,7 +178,7 @@ export default function PublicTournamentPage() {
                 <Card key={m.id} className="p-4">
                   <div className="mb-2 flex items-center justify-between">
                     <Badge tone="slate">{m.court}</Badge>
-                    <span className="flex items-center gap-1 text-[11px] font-semibold text-red-600"><Radio size={10} className="animate-pulse" />LIVE</span>
+                    <LivePulse />
                   </div>
                   <div className="mb-2 text-[11px] uppercase tracking-wide text-stone-400">{CATEGORY_META[ev.category].label} · {roundLabel(m.round, ev.total_rounds)}</div>
                   <div className="space-y-1.5">

@@ -14,6 +14,7 @@ import {
   subscribeToEvent,
 } from "../lib/repository";
 import { Btn, Badge, Card, Field, inputCls, useToasts, Toasts } from "../components/ui/primitives";
+import { BrandLoader, LivePulse } from "../components/ui/motion";
 import ParticipantsPanel from "../components/ParticipantsPanel";
 import BracketView from "../components/BracketView";
 import ScheduleTable from "../components/ScheduleTable";
@@ -21,10 +22,6 @@ import CourtsPanel from "../components/CourtsPanel";
 import LiveScoringBoard from "../components/LiveScoringBoard";
 import ResultsPanel from "../components/ResultsPanel";
 import NotificationBell from "../components/NotificationBell";
-
-function TournamentStatCard({ label, value }) {
-  return <div><div className="font-mono text-xl font-bold text-stone-900">{value}</div><div className="text-[11px] uppercase tracking-wide text-stone-400">{label}</div></div>;
-}
 
 const ORG_TABS = [
   { key: "overview", label: "Overview", icon: Home },
@@ -91,7 +88,7 @@ export default function TournamentControlCenter() {
     return m;
   }, [entriesByEvent]);
 
-  if (!tournament) return <div className="py-14 text-center text-sm text-stone-400">Loading…</div>;
+  if (!tournament) return <BrandLoader />;
 
   const event = events.find((e) => e.id === eventId);
   const eventEntries = entriesByEvent[eventId] || [];
@@ -106,31 +103,48 @@ export default function TournamentControlCenter() {
         <NotificationBell notifications={notifications} onMarkRead={() => guarded(async () => { await markNotificationsRead(id); setNotifications((n) => n.map((x) => ({ ...x, read: true }))); })} />
       </div>
 
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-stone-900">{tournament.name}</h1>
-            <Badge tone={TOURNAMENT_STATUS_META[tournament.status].tone}>{TOURNAMENT_STATUS_META[tournament.status].label}</Badge>
+      <div className="relative mb-5 overflow-hidden rounded-2xl bg-navy-900 p-5 sm:p-6">
+        <div className="relative flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-widest text-accent-teal">Matchday control center</div>
+            <div className="mt-1 flex items-center gap-2">
+              <h1 className="text-xl font-bold text-white">{tournament.name}</h1>
+              <Badge tone={TOURNAMENT_STATUS_META[tournament.status].tone}>{TOURNAMENT_STATUS_META[tournament.status].label}</Badge>
+              {tournament.status === "LIVE" && <LivePulse />}
+            </div>
+            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-stone-400">
+              <span className="flex items-center gap-1"><MapPin size={11} />{tournament.venue}</span>
+              <span className="flex items-center gap-1"><Calendar size={11} />{fmtDateRange(tournament.start_date, tournament.end_date)}</span>
+              {tournament.slug && <span className="flex items-center gap-1 text-accent-teal">/t/{tournament.slug}</span>}
+            </div>
           </div>
-          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-stone-500">
-            <span className="flex items-center gap-1"><MapPin size={11} />{tournament.venue}</span>
-            <span className="flex items-center gap-1"><Calendar size={11} />{fmtDateRange(tournament.start_date, tournament.end_date)}</span>
-            {tournament.slug && <span className="flex items-center gap-1 text-teal-700">/t/{tournament.slug}</span>}
+          <div className="flex flex-wrap gap-2">
+            {tournament.status === "DRAFT" && (
+              <Btn size="sm" icon={ArrowRight} onClick={() => guarded(async () => {
+                await publishTournament(tournament.id, tournament.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
+                await loadAll();
+              }, "Published.")}>Publish</Btn>
+            )}
+            {tournament.status === "REGISTRATION_OPEN" && (
+              <Btn size="sm" variant="secondary" onClick={() => guarded(async () => { await closeRegistration(tournament.id); await loadAll(); })}>Close registration</Btn>
+            )}
+            {tournament.status === "REGISTRATION_CLOSED" && (
+              <Btn size="sm" icon={Play} onClick={() => guarded(async () => { await startTournament(tournament.id); await loadAll(); })}>Start tournament</Btn>
+            )}
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {tournament.status === "DRAFT" && (
-            <Btn size="sm" icon={ArrowRight} onClick={() => guarded(async () => {
-              await publishTournament(tournament.id, tournament.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
-              await loadAll();
-            }, "Published.")}>Publish</Btn>
-          )}
-          {tournament.status === "REGISTRATION_OPEN" && (
-            <Btn size="sm" variant="secondary" onClick={() => guarded(async () => { await closeRegistration(tournament.id); await loadAll(); })}>Close registration</Btn>
-          )}
-          {tournament.status === "REGISTRATION_CLOSED" && (
-            <Btn size="sm" icon={Play} onClick={() => guarded(async () => { await startTournament(tournament.id); await loadAll(); })}>Start tournament</Btn>
-          )}
+        <div className="relative mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            { label: "Entries", value: Object.values(entriesByEvent).flat().length },
+            { label: "Matches", value: allMatches.length },
+            { label: "Courts", value: courts.length },
+            { label: "Live now", value: allMatches.filter((m) => m.status === "LIVE").length },
+          ].map((s) => (
+            <div key={s.label} className="rounded-lg border border-white/10 bg-white/5 p-3 text-center sm:text-left">
+              <div className="font-display text-3xl font-bold text-white">{s.value}</div>
+              <div className="text-[11px] uppercase tracking-wide text-stone-400">{s.label}</div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -156,12 +170,6 @@ export default function TournamentControlCenter() {
 
           {tab === "overview" && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <Card className="p-3"><TournamentStatCard label="Entries" value={Object.values(entriesByEvent).flat().length} /></Card>
-                <Card className="p-3"><TournamentStatCard label="Matches" value={allMatches.length} /></Card>
-                <Card className="p-3"><TournamentStatCard label="Courts" value={courts.length} /></Card>
-                <Card className="p-3"><TournamentStatCard label="Live now" value={allMatches.filter((m) => m.status === "LIVE").length} /></Card>
-              </div>
               <div>
                 <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">Categories</div>
                 <div className="grid gap-2 sm:grid-cols-2">

@@ -32,7 +32,7 @@ export default function ParticipantsPanel({ event, entries, onApprove, onReject,
       </div>
 
       {filtered.length === 0 ? (
-        <EmptyState icon={Users} title="No participants yet" hint="Registrations for this category will appear here." />
+        <EmptyState icon={Users} title="Your tournament is waiting for its first competitor" hint="Registrations for this category will appear here." />
       ) : (
         <div className="overflow-x-auto rounded-md border border-stone-200">
           <table className="w-full text-left text-sm">

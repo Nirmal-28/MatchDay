@@ -1,3 +1,4 @@
+import { motion } from "motion/react";
 import { Radio, Swords } from "lucide-react";
 import { cx, roundLabel, entryShort, BadmintonScoringEngine, toAB, MATCH_STATUS_META } from "../lib/engines";
 import { Badge, EmptyState } from "./ui/primitives";
@@ -29,17 +30,34 @@ function BracketMatch({ match, entriesById }) {
   const tally = BadmintonScoringEngine.gameTally(games);
   const meta = MATCH_STATUS_META[match.status];
   return (
-    <div className="rounded-md border border-stone-200 bg-white shadow-sm">
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className="rounded-md border border-stone-200 bg-white shadow-sm"
+    >
       <div className="flex items-center justify-between border-b border-stone-100 px-2 py-1">
         <span className="font-mono text-[10px] text-stone-400">#{match.match_number}</span>
         <Badge tone={meta.tone}>{match.status === "LIVE" ? <><Radio size={10} className="animate-pulse" /> Live</> : meta.label}</Badge>
       </div>
-      {[["A", a], ["B", b]].map(([side, e]) => (
-        <div key={side} className={cx("flex items-center justify-between gap-2 px-2.5 py-1.5 text-sm", match.winner_entry_id && match.winner_entry_id === e?.id ? "bg-teal-50/60 font-semibold text-teal-800" : "text-stone-700")}>
-          <span className="truncate">{e ? entryShort(e) : match.is_bye ? "—" : "TBD"}</span>
-          {games.length > 0 && <span className="font-mono text-xs text-stone-400">{side === "A" ? tally.a : tally.b}</span>}
-        </div>
-      ))}
-    </div>
+      {[["A", a], ["B", b]].map(([side, e]) => {
+        const isWinner = match.winner_entry_id && match.winner_entry_id === e?.id;
+        return (
+          <motion.div
+            key={side}
+            animate={{ backgroundColor: isWinner ? "rgba(20,184,166,0.08)" : "rgba(0,0,0,0)" }}
+            transition={{ duration: 0.5 }}
+            className={cx("flex items-center justify-between gap-2 px-2.5 py-1.5 text-sm", isWinner ? "font-semibold text-teal-800" : "text-stone-700")}
+          >
+            <span className="flex items-center gap-1.5 truncate">
+              {isWinner && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent-teal" />}
+              {e ? entryShort(e) : match.is_bye ? "—" : "TBD"}
+            </span>
+            {games.length > 0 && <span className="font-mono text-xs text-stone-400">{side === "A" ? tally.a : tally.b}</span>}
+          </motion.div>
+        );
+      })}
+    </motion.div>
   );
 }
