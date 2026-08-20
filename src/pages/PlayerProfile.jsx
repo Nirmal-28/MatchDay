@@ -49,6 +49,14 @@ export default function PlayerProfile() {
     (a) => a.entries?.tournament_events?.champion_entry_id &&
            a.entries.tournament_events.champion_entry_id === a.entry_id
   );
+  // event_id -> division, so each match row can name the division it was in
+  const eventById = Object.fromEntries(
+    (history.entries || [])
+      .map((a) => a.entries?.tournament_events)
+      .filter(Boolean)
+      .map((ev) => [ev.id, ev])
+  );
+
   const tournaments = [...new Map(
     (history.entries || [])
       .map((a) => a.entries?.tournament_events?.tournaments)
@@ -120,6 +128,7 @@ export default function PlayerProfile() {
                   <tr>
                     <th className="px-3 py-2 font-medium">Result</th>
                     <th className="px-3 py-2 font-medium">Division</th>
+                    <th className="px-3 py-2 font-medium">Games</th>
                     <th className="px-3 py-2 font-medium">Score</th>
                     <th className="px-3 py-2 font-medium">Date</th>
                   </tr>
@@ -136,7 +145,10 @@ export default function PlayerProfile() {
                           <Badge tone={iWon ? "emerald" : "slate"}>{iWon ? "Won" : "Lost"}</Badge>
                         </td>
                         <td className="px-3 py-2 text-xs text-stone-500">
-                          {tally.a}–{tally.b} games
+                          {eventById[m.event_id] ? divisionLabel(eventById[m.event_id]) : "—"}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-stone-500">
+                          {iAmA ? `${tally.a}–${tally.b}` : `${tally.b}–${tally.a}`}
                         </td>
                         <td className="px-3 py-2 font-mono text-xs text-stone-600">
                           {games.map((g, i) => (

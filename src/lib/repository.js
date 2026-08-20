@@ -260,26 +260,36 @@ export async function searchPlayers(query) {
 }
 
 // Every match this player has appeared in, with enough context to render a
-// career profile (opponent, tournament, division, score).
+// career profile (division, tournament, score).
+//
+// Reads through public_entry_names rather than entry_players: the base table is
+// organizer-only because it holds phone/email, so querying it directly made a
+// shared profile look empty to everyone but the organizer. The view exposes
+// only entry_id/name/player_id, and only for published tournaments.
 export async function getPlayerHistory(playerId) {
-  const { data: appearances, error } = await supabase
-    .from("entry_players")
-    .select("entry_id, entries(id, event_id, tournament_events(id, category, age_group, skill_grade, champion_entry_id, total_rounds, tournament_id, tournaments(id, name, slug, start_date)))")
-    .eq("player_id", playerId);
-  if (error) throw error;
-  if (!appearances?.length) return { matches: [], entries: [] };
+  const empty = { matches: [], entries: [], entryIds: [] };
 
-  const entryIds = appearances.map((a) => a.entry_id);
-  const eventIds = [...new Set(appearances.map((a) => a.entries?.event_id).filter(Boolean))];
-  if (!eventIds.length) return { matches: [], entries: [] };
+  const { data: links, error } = await supabase
+    .from("public_entry_names").select("entry_id").eq("player_id", playerId);
+  if (error) throw error;
+  const entryIds = [...new Set((links || []).map((l) => l.entry_id))];
+  if (!entryIds.length) return empty;
+
+  const { data: entries, error: eErr } = await supabase
+    .from("entries")
+    .select("id, event_id, tournament_events(id, category, age_group, skill_grade, format, champion_entry_id, total_rounds, tournaments(id, name, slug, start_date))")
+    .in("id", entryIds);
+  if (eErr) throw eErr;
+
+  const eventIds = [...new Set((entries || []).map((e) => e.event_id).filter(Boolean))];
+  if (!eventIds.length) return empty;
 
   const { data: matches, error: mErr } = await supabase
-    .from("matches")
-    .select("*, games(*)")
-    .in("event_id", eventIds)
-    .or(entryIds.map((id) => `entry_a.eq.${id},entry_b.eq.${id}`).join(","));
+    .from("matches").select("*, games(*)").in("event_id", eventIds);
   if (mErr) throw mErr;
 
+  // Shape kept compatible with the profile page: [{ entry_id, entries: {...} }]
+  const appearances = (entries || []).map((e) => ({ entry_id: e.id, entries: e }));
   return { matches: matches || [], entries: appearances, entryIds };
 }
 

@@ -63,6 +63,7 @@ alter table public.players enable row level security;
 drop policy if exists "public_insert_players" on public.players;
 drop policy if exists "select_players" on public.players;
 drop policy if exists "owner_update_players" on public.players;
+drop policy if exists "update_players" on public.players;
 
 -- Registration is open to anon (same posture as entry_players), so anon must
 -- be able to create/lookup its own player row. Sensitive columns are kept out
