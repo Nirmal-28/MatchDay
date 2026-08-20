@@ -3,19 +3,21 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft, MapPin, Calendar, Home, Users, Swords, LayoutGrid, Radio, Trophy, Settings, Play, ArrowRight,
 } from "lucide-react";
-import { fmtDateRange, inr, CATEGORY_META, TOURNAMENT_STATUS_META, EVENT_STATUS_META } from "../lib/engines";
+import { fmtDateRange, inr, CATEGORY_META, TOURNAMENT_STATUS_META, EVENT_STATUS_META, FORMAT_META, divisionLabel } from "../lib/engines";
 import {
   getTournament, listEvents, listCourts, listEntries, listMatches, listNotifications, markNotificationsRead,
   publishTournament, closeRegistration, startTournament, completeTournament, cancelTournament, updateTournament,
   addCourt, updateCourt, removeCourt,
   updateEntryStatus, removeEntry, devSimulatePayment, markRefunded, registerEntry,
-  generateDraw, generateSchedule,
+  generateDraw, generateSchedule, generateRoundRobin, generateGroupStage, generateKnockoutFromGroups, setSeeds,
   startMatch, scorePoint, undoLastGame, retireMatch,
   subscribeToEvent,
 } from "../lib/repository";
 import { Btn, Badge, Card, Field, inputCls, useToasts, Toasts } from "../components/ui/primitives";
 import { BrandLoader, LivePulse } from "../components/ui/motion";
 import ParticipantsPanel from "../components/ParticipantsPanel";
+import SeedingPanel from "../components/SeedingPanel";
+import StandingsPanel from "../components/StandingsPanel";
 import BracketView from "../components/BracketView";
 import ScheduleTable from "../components/ScheduleTable";
 import CourtsPanel from "../components/CourtsPanel";
@@ -162,7 +164,7 @@ export default function TournamentControlCenter() {
             <div className="mb-3 flex flex-wrap gap-1.5">
               {events.map((e) => (
                 <button key={e.id} onClick={() => setEventId(e.id)} className={`rounded-full border px-3 py-1 text-xs font-medium ${eventId === e.id ? "border-teal-600 bg-teal-600 text-white" : "border-stone-200 text-stone-600 hover:bg-stone-50"}`}>
-                  {CATEGORY_META[e.category].label}
+                  {divisionLabel(e)}
                 </button>
               ))}
             </div>
@@ -178,7 +180,7 @@ export default function TournamentControlCenter() {
                     return (
                       <Card key={e.id} className="flex items-center justify-between p-3">
                         <div>
-                          <div className="text-sm font-medium text-stone-800">{CATEGORY_META[e.category].label}</div>
+                          <div className="text-sm font-medium text-stone-800">{divisionLabel(e)}</div>
                           <div className="text-xs text-stone-500">{c} / {e.max_entries} registered · {inr(e.fee_inr)}</div>
                         </div>
                         <Badge tone={EVENT_STATUS_META[e.status].tone}>{EVENT_STATUS_META[e.status].label}</Badge>
@@ -202,20 +204,73 @@ export default function TournamentControlCenter() {
             />
           )}
 
-          {tab === "draw" && event && (
-            <div>
-              {!event.total_rounds ? (
-                <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-stone-300 px-6 py-14 text-center">
-                  <div className="text-sm font-semibold text-stone-700">Generate the draw</div>
-                  <div className="max-w-sm text-sm text-stone-500">{confirmedCount} confirmed {confirmedCount === 1 ? "entry" : "entries"}. Registration must be closed first.</div>
-                  <Btn size="sm" className="mt-2" disabled={tournament.status === "REGISTRATION_OPEN" || tournament.status === "DRAFT" || confirmedCount < 2}
-                    onClick={() => guarded(async () => { await generateDraw(eventId); await loadAll(); }, "Draw generated.")}>Generate draw</Btn>
+          {tab === "draw" && event && (() => {
+            const format = event.format || "SINGLE_ELIM";
+            const hasDraw = eventMatches.length > 0;
+            const regLocked = tournament.status !== "REGISTRATION_OPEN" && tournament.status !== "DRAFT";
+            const groupMatches = eventMatches.filter((m) => m.group_label && m.group_label !== "RR");
+            const groupsDone = groupMatches.length > 0 &&
+              groupMatches.every((m) => m.status === "COMPLETED" || m.status === "WALKOVER");
+            const koExists = eventMatches.some((m) => !m.group_label);
+
+            const generate = () => guarded(async () => {
+              if (format === "ROUND_ROBIN") await generateRoundRobin(eventId);
+              else if (format === "GROUP_KO") await generateGroupStage(eventId, event.group_count || 2, event.advance_per_group || 2);
+              else await generateDraw(eventId);
+              await loadAll();
+            }, "Draw generated.");
+
+            if (!hasDraw) {
+              const minEntries = format === "ROUND_ROBIN" ? 3 : format === "GROUP_KO" ? (event.group_count || 2) * 2 : 2;
+              return (
+                <div className="space-y-4">
+                  <SeedingPanel
+                    entries={eventEntries}
+                    disabled={hasDraw}
+                    onSave={(map) => guarded(async () => { await setSeeds(map); await loadEventData(events); }, "Seeds saved.")}
+                  />
+                  <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-stone-300 px-6 py-10 text-center">
+                    <Badge tone="teal">{FORMAT_META[format].label}</Badge>
+                    <div className="text-sm font-semibold text-stone-700">Generate the draw</div>
+                    <div className="max-w-sm text-sm text-stone-500">
+                      {confirmedCount} confirmed {confirmedCount === 1 ? "entry" : "entries"}
+                      {confirmedCount < minEntries && ` — need at least ${minEntries}`}.
+                      {!regLocked && " Registration must be closed first."}
+                    </div>
+                    <Btn size="sm" className="mt-2" disabled={!regLocked || confirmedCount < minEntries} onClick={generate}>
+                      Generate draw
+                    </Btn>
+                  </div>
                 </div>
-              ) : (
-                <BracketView event={event} matches={eventMatches} entriesById={entriesById} />
-              )}
-            </div>
-          )}
+              );
+            }
+
+            return (
+              <div className="space-y-5">
+                {format === "GROUP_KO" && !koExists && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-stone-200 bg-stone-50 px-3 py-2.5">
+                    <span className="text-xs text-stone-600">
+                      {groupsDone ? "All group matches are done — build the knockout." : "Knockout unlocks once every group match is played."}
+                    </span>
+                    <Btn size="sm" disabled={!groupsDone}
+                      onClick={() => guarded(async () => { await generateKnockoutFromGroups(eventId); await loadAll(); }, "Knockout generated.")}>
+                      Generate knockout
+                    </Btn>
+                  </div>
+                )}
+                {(format === "ROUND_ROBIN" || format === "GROUP_KO") && (
+                  <StandingsPanel event={event} matches={eventMatches} entriesById={entriesById} />
+                )}
+                {format !== "ROUND_ROBIN" && event.total_rounds && (
+                  <BracketView
+                    event={event}
+                    matches={eventMatches.filter((m) => !m.group_label)}
+                    entriesById={entriesById}
+                  />
+                )}
+              </div>
+            );
+          })()}
 
           {tab === "schedule" && event && (
             <div>

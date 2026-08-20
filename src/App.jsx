@@ -6,6 +6,7 @@ import logo from "./assets/logo.png";
 import { signOut } from "./lib/repository";
 import PublicDiscovery from "./pages/PublicDiscovery";
 import PublicTournamentPage from "./pages/PublicTournamentPage";
+import PlayerProfile from "./pages/PlayerProfile";
 import OrganizerDashboard from "./pages/OrganizerDashboard";
 import TournamentControlCenter from "./pages/TournamentControlCenter";
 import SignIn from "./pages/auth/SignIn";
@@ -72,6 +73,7 @@ function AnimatedRoutes() {
         <Routes location={location}>
           <Route path="/" element={<PublicDiscovery />} />
           <Route path="/t/:slug" element={<PublicTournamentPage />} />
+          <Route path="/p/:id" element={<PlayerProfile />} />
           <Route path="/login" element={<SignIn />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/organizer" element={<RequireAuth><OrganizerDashboard /></RequireAuth>} />

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Search, UserPlus, Check, X, CreditCard, Trash2, Users } from "lucide-react";
 import { cx, fmtDate, entryName, REG_STATUS_META, PAY_STATUS_META } from "../lib/engines";
 import { Badge, Btn, EmptyState, inputCls } from "./ui/primitives";
@@ -48,7 +49,17 @@ export default function ParticipantsPanel({ event, entries, onApprove, onReject,
             <tbody className="divide-y divide-stone-100">
               {filtered.map((e) => (
                 <tr key={e.id}>
-                  <td className="px-3 py-2 font-medium text-stone-800">{entryName(e)}</td>
+                  <td className="px-3 py-2 font-medium text-stone-800">
+                    {(e.entry_players || []).map((p, i) => (
+                      <span key={p.id ?? i}>
+                        {i > 0 && <span className="text-stone-300"> / </span>}
+                        {p.player_id
+                          ? <Link to={`/p/${p.player_id}`} className="hover:text-teal-700 hover:underline">{p.name}</Link>
+                          : p.name}
+                      </span>
+                    ))}
+                    {(e.entry_players || []).length === 0 && entryName(e)}
+                  </td>
                   <td className="px-3 py-2 text-stone-500">{fmtDate(e.created_at)}</td>
                   <td className="px-3 py-2"><Badge tone={REG_STATUS_META[e.reg_status].tone}>{REG_STATUS_META[e.reg_status].label}</Badge></td>
                   <td className="px-3 py-2"><Badge tone={PAY_STATUS_META[e.payment_status].tone}>{PAY_STATUS_META[e.payment_status].label}</Badge></td>

@@ -1,4 +1,7 @@
 import { supabase } from "./supabaseClient";
+import {
+  nextPow2, bracketSeedOrder, roundRobinRounds, snakeIntoGroups, groupLetter, computeStandings,
+} from "./engines";
 
 /* ==========================================================================
    Courtside — Supabase repository layer.
@@ -88,7 +91,13 @@ export async function createTournament(basics, categories, settings) {
   if (cErr) throw cErr;
 
   const eventRows = categories.map((c) => ({
-    tournament_id: tournament.id, category: c.category, max_entries: c.maxEntries, fee_inr: c.feeINR,
+    tournament_id: tournament.id, category: c.category,
+    max_entries: c.maxEntries, fee_inr: c.feeINR,
+    format: c.format || "SINGLE_ELIM",
+    age_group: c.ageGroup || "OPEN",
+    skill_grade: c.skillGrade || null,
+    group_count: c.format === "GROUP_KO" ? (c.groupCount || 2) : null,
+    advance_per_group: c.format === "GROUP_KO" ? (c.advancePerGroup || 2) : 2,
   }));
   const { error: eErr } = await supabase.from("tournament_events").insert(eventRows);
   if (eErr) throw eErr;
@@ -186,10 +195,92 @@ export async function registerEntry(eventId, players, feeINR) {
     .single();
   if (eErr) throw eErr;
 
-  const rows = players.map((p) => ({ entry_id: entry.id, name: p.name, phone: p.phone, email: p.email }));
+  // Link each entrant to a persistent player row (keyed on phone) so results
+  // accumulate into a career profile across tournaments instead of being
+  // stranded as loose text on this one entry.
+  const linked = await Promise.all(players.map((p) => upsertPlayer(p)));
+
+  const rows = players.map((p, i) => ({
+    entry_id: entry.id, name: p.name, phone: p.phone, email: p.email,
+    player_id: linked[i]?.id ?? null,
+  }));
   const { error: pErr } = await supabase.from("entry_players").insert(rows);
   if (pErr) throw pErr;
   return entry;
+}
+
+/* ---------------------------- PLAYERS -------------------------------------- */
+
+const normPhone = (phone) => (phone || "").replace(/[^\d]/g, "").slice(-10);
+
+// Find-or-create a player by phone. Returns null when no usable phone was
+// given, in which case the entry simply stays unlinked rather than failing.
+export async function upsertPlayer({ name, phone, email }) {
+  const key = normPhone(phone);
+  if (!key) return null;
+
+  const { data: existing } = await supabase
+    .from("players").select("*").eq("phone", key).maybeSingle();
+  if (existing) {
+    // Keep the freshest name/email we've seen, but never blank out a value.
+    const patch = {};
+    if (name && name !== existing.name) patch.name = name;
+    if (email && email !== existing.email) patch.email = email;
+    if (Object.keys(patch).length) {
+      await supabase.from("players").update(patch).eq("id", existing.id);
+    }
+    return existing;
+  }
+
+  const { data, error } = await supabase
+    .from("players").insert({ phone: key, name: name || "Unknown", email: email || null })
+    .select().single();
+  if (error) {
+    // Lost a race against a concurrent registration for the same phone.
+    const { data: raced } = await supabase.from("players").select("*").eq("phone", key).maybeSingle();
+    if (raced) return raced;
+    throw error;
+  }
+  return data;
+}
+
+export async function getPlayer(playerId) {
+  const { data, error } = await supabase.from("players").select("*").eq("id", playerId).single();
+  if (error) throw error;
+  return data;
+}
+
+export async function searchPlayers(query) {
+  const q = (query || "").trim();
+  if (q.length < 2) return [];
+  const { data, error } = await supabase
+    .from("public_players").select("*").ilike("name", `%${q}%`).limit(20);
+  if (error) throw error;
+  return data;
+}
+
+// Every match this player has appeared in, with enough context to render a
+// career profile (opponent, tournament, division, score).
+export async function getPlayerHistory(playerId) {
+  const { data: appearances, error } = await supabase
+    .from("entry_players")
+    .select("entry_id, entries(id, event_id, tournament_events(id, category, age_group, skill_grade, champion_entry_id, total_rounds, tournament_id, tournaments(id, name, slug, start_date)))")
+    .eq("player_id", playerId);
+  if (error) throw error;
+  if (!appearances?.length) return { matches: [], entries: [] };
+
+  const entryIds = appearances.map((a) => a.entry_id);
+  const eventIds = [...new Set(appearances.map((a) => a.entries?.event_id).filter(Boolean))];
+  if (!eventIds.length) return { matches: [], entries: [] };
+
+  const { data: matches, error: mErr } = await supabase
+    .from("matches")
+    .select("*, games(*)")
+    .in("event_id", eventIds)
+    .or(entryIds.map((id) => `entry_a.eq.${id},entry_b.eq.${id}`).join(","));
+  if (mErr) throw mErr;
+
+  return { matches: matches || [], entries: appearances, entryIds };
 }
 
 export async function updateEntryStatus(entryId, regStatus) {
@@ -216,77 +307,197 @@ export async function devSimulatePayment(entryId, succeeded = true) {
 
 /* ----------------------------- DRAW ---------------------------------------- */
 
-const nextPow2 = (n) => { let p = 1; while (p < n) p *= 2; return p; };
+// Manually set seeds before generating a draw. seedMap: { entryId: seedNumber }
+export async function setSeeds(seedMap) {
+  const results = await Promise.all(
+    Object.entries(seedMap).map(([entryId, seed]) =>
+      supabase.from("entries").update({ seed: seed ?? null }).eq("id", entryId)
+    )
+  );
+  const failed = results.find((r) => r.error);
+  if (failed) throw failed.error;
+}
 
-export async function generateDraw(eventId) {
-  const { data: entries, error: enErr } = await supabase
-    .from("entries").select("id, created_at").eq("event_id", eventId).eq("reg_status", "CONFIRMED").order("created_at");
-  if (enErr) throw enErr;
-  if (entries.length < 2) throw new Error("At least 2 confirmed entries are required to generate a draw.");
-
-  const seeded = entries.map((e, i) => ({ id: e.id, seed: i + 1 }));
-  const n = seeded.length;
-  const size = nextPow2(n);
-  const totalRounds = Math.log2(size);
-  const byeCount = size - n;
-  const byeSeeds = seeded.slice(0, byeCount);
-  const playSeeds = seeded.slice(byeCount);
-  const playMatchesCount = playSeeds.length / 2;
-
-  let matchNumber = 1;
-  const round1 = [];
-  byeSeeds.forEach((s) => {
-    round1.push({
-      id: crypto.randomUUID(), event_id: eventId, round: 1, match_number: matchNumber++,
-      entry_a: s.id, entry_b: null, is_bye: true, status: "WALKOVER",
-      winner_entry_id: s.id, completed_at: new Date().toISOString(),
-    });
+async function confirmedEntries(eventId) {
+  // Seeded entries first (seed 1, 2, 3...), then unseeded by registration time.
+  // Previously this ordered purely by created_at, which meant the first person
+  // to register was treated as the top seed and handed a free bye.
+  const { data, error } = await supabase
+    .from("entries").select("id, seed, created_at")
+    .eq("event_id", eventId).eq("reg_status", "CONFIRMED");
+  if (error) throw error;
+  return [...data].sort((a, b) => {
+    if (a.seed != null && b.seed != null) return a.seed - b.seed;
+    if (a.seed != null) return -1;
+    if (b.seed != null) return 1;
+    return (a.created_at || "").localeCompare(b.created_at || "");
   });
-  for (let i = 0; i < playMatchesCount; i++) {
-    const a = playSeeds[i], b = playSeeds[playSeeds.length - 1 - i];
+}
+
+function blankMatch(eventId, round, matchNumber) {
+  return {
+    id: crypto.randomUUID(), event_id: eventId, round, match_number: matchNumber,
+    entry_a: null, entry_b: null, is_bye: false, status: "PENDING",
+  };
+}
+
+// Builds a single-elimination bracket over `ordered` entry ids (index 0 = top
+// seed). Round-1 slots follow the standard bracket seed order so seeds 1 and 2
+// can only meet in the final, and byes fall to the top seeds rather than to
+// whoever happened to register first.
+function buildKnockout(eventId, ordered, startRound = 1, startMatchNumber = 1) {
+  const size = nextPow2(ordered.length);
+  const totalRounds = Math.log2(size);
+  const slots = bracketSeedOrder(size).map((seedNo) => ordered[seedNo - 1] ?? null);
+
+  let matchNumber = startMatchNumber;
+  const round1 = [];
+  for (let i = 0; i < size; i += 2) {
+    const a = slots[i], b = slots[i + 1];
+    const isBye = (a && !b) || (!a && b);
+    const only = a || b;
     round1.push({
-      id: crypto.randomUUID(), event_id: eventId, round: 1, match_number: matchNumber++,
-      entry_a: a.id, entry_b: b.id, is_bye: false, status: "PENDING",
+      id: crypto.randomUUID(), event_id: eventId, round: startRound, match_number: matchNumber++,
+      entry_a: a, entry_b: b, is_bye: isBye,
+      status: isBye ? "WALKOVER" : "PENDING",
+      winner_entry_id: isBye ? only : null,
+      completed_at: isBye ? new Date().toISOString() : null,
     });
   }
 
   const rounds = [round1];
   let prev = round1;
-  for (let r = 2; r <= totalRounds; r++) {
+  for (let r = startRound + 1; r < startRound + totalRounds; r++) {
     const roundMatches = [];
-    for (let i = 0; i < prev.length / 2; i++) {
-      roundMatches.push({
-        id: crypto.randomUUID(), event_id: eventId, round: r, match_number: matchNumber++,
-        entry_a: null, entry_b: null, is_bye: false, status: "PENDING",
-      });
-    }
+    for (let i = 0; i < prev.length / 2; i++) roundMatches.push(blankMatch(eventId, r, matchNumber++));
     prev.forEach((m, idx) => {
-      const target = roundMatches[Math.floor(idx / 2)];
-      m.next_match_id = target.id;
+      m.next_match_id = roundMatches[Math.floor(idx / 2)].id;
       m.next_slot = idx % 2 === 0 ? "A" : "B";
     });
     rounds.push(roundMatches);
     prev = roundMatches;
   }
 
-  // All match ids are already known client-side (crypto.randomUUID()), so
-  // round-1 rows can point at round-2 rows in the SAME insert — Postgres
-  // checks non-deferred foreign keys at end-of-statement, not per-row.
+  // Propagate bye winners into the next round immediately. All ids are known
+  // client-side, so round-1 rows can reference round-2 rows in the same insert
+  // (Postgres checks non-deferred FKs at end-of-statement, not per row).
   const all = rounds.flat();
-  all.filter((m) => m.is_bye).forEach((bm) => {
-    if (!bm.next_match_id) return;
+  all.filter((m) => m.is_bye && m.next_match_id).forEach((bm) => {
     const target = all.find((m) => m.id === bm.next_match_id);
-    if (bm.next_slot === "A") target.entry_a = bm.winner_entry_id; else target.entry_b = bm.winner_entry_id;
+    if (bm.next_slot === "A") target.entry_a = bm.winner_entry_id;
+    else target.entry_b = bm.winner_entry_id;
   });
 
-  const { error: insErr } = await supabase.from("matches").insert(all);
-  if (insErr) throw insErr;
+  return { matches: all, totalRounds };
+}
 
+export async function generateDraw(eventId) {
+  const entries = await confirmedEntries(eventId);
+  if (entries.length < 2) throw new Error("At least 2 confirmed entries are required to generate a draw.");
+
+  const { matches, totalRounds } = buildKnockout(eventId, entries.map((e) => e.id));
+
+  const { error: insErr } = await supabase.from("matches").insert(matches);
+  if (insErr) throw insErr;
   const { error: updErr } = await supabase.from("tournament_events")
     .update({ status: "DRAW_READY", total_rounds: totalRounds }).eq("id", eventId);
   if (updErr) throw updErr;
 }
 
+// Round robin: everyone plays everyone once. Best for small divisions, where a
+// knockout would send half the paying entrants home after a single match.
+export async function generateRoundRobin(eventId) {
+  const entries = await confirmedEntries(eventId);
+  if (entries.length < 3) throw new Error("At least 3 confirmed entries are required for a round robin.");
+
+  const rounds = roundRobinRounds(entries.map((e) => e.id));
+  let matchNumber = 1;
+  const matches = rounds.flatMap((pairs, ri) =>
+    pairs.map(([a, b]) => ({
+      id: crypto.randomUUID(), event_id: eventId, round: ri + 1, match_number: matchNumber++,
+      entry_a: a, entry_b: b, is_bye: false, status: "PENDING", group_label: "RR",
+    }))
+  );
+
+  const { error: insErr } = await supabase.from("matches").insert(matches);
+  if (insErr) throw insErr;
+  const { error: updErr } = await supabase.from("tournament_events")
+    .update({ status: "DRAW_READY", total_rounds: rounds.length }).eq("id", eventId);
+  if (updErr) throw updErr;
+}
+
+// Groups -> knockout. Group matches are created now; the knockout bracket is
+// built later by generateKnockoutFromGroups(), once results are in and we
+// actually know who advanced.
+export async function generateGroupStage(eventId, groupCount, advancePerGroup = 2) {
+  const entries = await confirmedEntries(eventId);
+  if (entries.length < groupCount * 2) {
+    throw new Error(`At least ${groupCount * 2} confirmed entries are required for ${groupCount} groups.`);
+  }
+
+  const groups = snakeIntoGroups(entries.map((e) => e.id), groupCount);
+  let matchNumber = 1;
+  const matches = groups.flatMap((ids, gi) =>
+    roundRobinRounds(ids).flatMap((pairs, ri) =>
+      pairs.map(([a, b]) => ({
+        id: crypto.randomUUID(), event_id: eventId, round: ri + 1, match_number: matchNumber++,
+        entry_a: a, entry_b: b, is_bye: false, status: "PENDING", group_label: groupLetter(gi),
+      }))
+    )
+  );
+
+  const { error: insErr } = await supabase.from("matches").insert(matches);
+  if (insErr) throw insErr;
+  const { error: updErr } = await supabase.from("tournament_events")
+    .update({ status: "DRAW_READY", group_count: groupCount, advance_per_group: advancePerGroup, total_rounds: null })
+    .eq("id", eventId);
+  if (updErr) throw updErr;
+}
+
+// After all group matches are done, seed the knockout from group standings.
+export async function generateKnockoutFromGroups(eventId) {
+  const { data: event, error: evErr } = await supabase
+    .from("tournament_events").select("*").eq("id", eventId).single();
+  if (evErr) throw evErr;
+
+  const { data: matches, error: mErr } = await supabase
+    .from("matches").select("*, games(*)").eq("event_id", eventId);
+  if (mErr) throw mErr;
+
+  const groupMatches = matches.filter((m) => m.group_label && m.group_label !== "RR");
+  if (groupMatches.length === 0) throw new Error("No group stage found for this event.");
+  if (matches.some((m) => !m.group_label)) throw new Error("The knockout stage has already been generated.");
+  const unfinished = groupMatches.filter((m) => m.status !== "COMPLETED" && m.status !== "WALKOVER");
+  if (unfinished.length > 0) throw new Error(`${unfinished.length} group match(es) still to be played.`);
+
+  const advance = event.advance_per_group || 2;
+  const labels = [...new Set(groupMatches.map((m) => m.group_label))].sort();
+  const qualifiersByGroup = labels.map((label) => {
+    const gm = groupMatches.filter((m) => m.group_label === label);
+    const ids = [...new Set(gm.flatMap((m) => [m.entry_a, m.entry_b]).filter(Boolean))];
+    return computeStandings(ids, gm).slice(0, advance).map((r) => r.entryId);
+  });
+
+  // Interleave by finishing position (all group winners, then all runners-up,
+  // reversed) so same-group qualifiers stay apart in the early knockout rounds.
+  const ordered = [];
+  for (let pos = 0; pos < advance; pos++) {
+    const slice = qualifiersByGroup.map((q) => q[pos]).filter(Boolean);
+    if (pos % 2 === 1) slice.reverse();
+    ordered.push(...slice);
+  }
+  if (ordered.length < 2) throw new Error("Not enough qualifiers to build a knockout.");
+
+  const startRound = Math.max(...groupMatches.map((m) => m.round)) + 1;
+  const startNumber = Math.max(...matches.map((m) => m.match_number)) + 1;
+  const { matches: koMatches, totalRounds } = buildKnockout(eventId, ordered, startRound, startNumber);
+
+  const { error: insErr } = await supabase.from("matches").insert(koMatches);
+  if (insErr) throw insErr;
+  const { error: updErr } = await supabase.from("tournament_events")
+    .update({ total_rounds: startRound - 1 + totalRounds }).eq("id", eventId);
+  if (updErr) throw updErr;
+}
 /* --------------------------- SCHEDULE --------------------------------------- */
 
 export async function generateSchedule(eventId) {

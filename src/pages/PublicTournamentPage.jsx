@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ChevronLeft, MapPin, Calendar, Building2, Radio } from "lucide-react";
-import { cx, fmtDateRange, inr, entryShort, roundLabel, BadmintonScoringEngine, toAB, CATEGORY_META, EVENT_STATUS_META, TOURNAMENT_STATUS_META } from "../lib/engines";
+import { ChevronLeft, MapPin, Calendar, Building2, Radio, Share2 } from "lucide-react";
+import { cx, fmtDateRange, inr, entryShort, roundLabel, BadmintonScoringEngine, toAB, CATEGORY_META, divisionLabel, EVENT_STATUS_META, TOURNAMENT_STATUS_META } from "../lib/engines";
 import { getTournament, getTournamentBySlug, listEvents, listEntries, listMatches, registerEntry, subscribeToEvent } from "../lib/repository";
 import { Badge, Btn, Card, EmptyState } from "../components/ui/primitives";
 import { BrandLoader, LivePulse } from "../components/ui/motion";
 import RegistrationModal from "../components/RegistrationModal";
 import BracketView from "../components/BracketView";
+import StandingsPanel from "../components/StandingsPanel";
 import ScheduleTable from "../components/ScheduleTable";
 import ResultsPanel from "../components/ResultsPanel";
 
@@ -113,6 +114,15 @@ export default function PublicTournamentPage() {
               <span className="flex items-center gap-1"><Building2 size={12} />{tournament.organizer_name}</span>
             </div>
           </div>
+          <Btn
+            size="sm" variant="secondary" icon={Share2}
+            onClick={() => {
+              const text = `${tournament.name} — ${tournament.venue}, ${fmtDateRange(tournament.start_date, tournament.end_date)}. Live draws, schedule and scores on MatchDay: ${window.location.href}`;
+              window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+            }}
+          >
+            Share
+          </Btn>
         </div>
       </div>
 
@@ -125,7 +135,7 @@ export default function PublicTournamentPage() {
       {["categories", "schedule", "bracket", "results"].includes(tab) && events.length > 1 && (
         <div className="mb-3 flex flex-wrap gap-1.5">
           {events.map((e) => (
-            <button key={e.id} onClick={() => setEventId(e.id)} className={cx("rounded-full border px-3 py-1 text-xs font-medium", eventId === e.id ? "border-teal-600 bg-teal-600 text-white" : "border-stone-200 text-stone-600 hover:bg-stone-50")}>{CATEGORY_META[e.category].label}</button>
+            <button key={e.id} onClick={() => setEventId(e.id)} className={cx("rounded-full border px-3 py-1 text-xs font-medium", eventId === e.id ? "border-teal-600 bg-teal-600 text-white" : "border-stone-200 text-stone-600 hover:bg-stone-50")}>{divisionLabel(e)}</button>
           ))}
         </div>
       )}
@@ -152,7 +162,7 @@ export default function PublicTournamentPage() {
             return (
               <Card key={e.id} className="p-4">
                 <div className="mb-1 flex items-center justify-between">
-                  <div className="font-medium text-stone-900">{CATEGORY_META[e.category].label}</div>
+                  <div className="font-medium text-stone-900">{divisionLabel(e)}</div>
                   <Badge tone={EVENT_STATUS_META[e.status].tone}>{EVENT_STATUS_META[e.status].label}</Badge>
                 </div>
                 <div className="mb-3 text-xs text-stone-500">{count} / {e.max_entries} registered · {inr(e.fee_inr)} entry fee</div>
@@ -193,7 +203,16 @@ export default function PublicTournamentPage() {
         )
       )}
 
-      {tab === "bracket" && event && <BracketView event={event} matches={eventMatches} entriesById={entriesById} />}
+      {tab === "bracket" && event && (
+        <div className="space-y-5">
+          {eventMatches.some((m) => m.group_label) && (
+            <StandingsPanel event={event} matches={eventMatches} entriesById={entriesById} />
+          )}
+          {event.format !== "ROUND_ROBIN" && event.total_rounds && (
+            <BracketView event={event} matches={eventMatches.filter((m) => !m.group_label)} entriesById={entriesById} />
+          )}
+        </div>
+      )}
       {tab === "results" && event && <ResultsPanel event={event} matches={eventMatches} entriesById={entriesById} />}
 
       <RegistrationModal open={!!regEvent} onClose={() => setRegEvent(null)} event={regEvent} onSubmit={handleRegister} />

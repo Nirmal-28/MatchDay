@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { MapPin, Calendar, Check, ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
-import { cx, fmtDateRange, inr, CATEGORY_META } from "../lib/engines";
+import { cx, fmtDateRange, inr, CATEGORY_META, AGE_GROUPS, SKILL_GRADES, FORMAT_META } from "../lib/engines";
 import { Modal, Field, Btn, Badge, Card, inputCls } from "./ui/primitives";
 
 export default function CreateTournamentWizard({ open, onClose, onSubmit }) {
@@ -19,7 +19,15 @@ export default function CreateTournamentWizard({ open, onClose, onSubmit }) {
 
   const toggleCat = (c) => {
     setSelectedCats((s) => ({ ...s, [c]: !s[c] }));
-    setCatConfig((s) => ({ ...s, [c]: s[c] || { maxEntries: CATEGORY_META[c].kind === "SINGLES" ? 16 : 8, feeINR: CATEGORY_META[c].kind === "SINGLES" ? 300 : 500 } }));
+    setCatConfig((s) => ({
+      ...s,
+      [c]: s[c] || {
+        maxEntries: CATEGORY_META[c].kind === "SINGLES" ? 16 : 8,
+        feeINR: CATEGORY_META[c].kind === "SINGLES" ? 300 : 500,
+        format: "SINGLE_ELIM", ageGroup: "OPEN", skillGrade: null,
+        groupCount: 2, advancePerGroup: 2,
+      },
+    }));
   };
 
   const categories = Object.keys(selectedCats).filter((c) => selectedCats[c]).map((c) => ({ category: c, ...catConfig[c] }));
@@ -86,13 +94,46 @@ export default function CreateTournamentWizard({ open, onClose, onSubmit }) {
                 </label>
               </div>
               {selectedCats[code] && (
-                <div className="mt-2 grid grid-cols-2 gap-2 pl-6">
-                  <Field label={meta.kind === "SINGLES" ? "Max players" : "Max teams"}>
-                    <input type="number" min={2} className={inputCls} value={catConfig[code]?.maxEntries ?? ""} onChange={(e) => setCatConfig((s) => ({ ...s, [code]: { ...s[code], maxEntries: Number(e.target.value) } }))} />
-                  </Field>
-                  <Field label="Entry fee (₹)">
-                    <input type="number" min={0} className={inputCls} value={catConfig[code]?.feeINR ?? ""} onChange={(e) => setCatConfig((s) => ({ ...s, [code]: { ...s[code], feeINR: Number(e.target.value) } }))} />
-                  </Field>
+                <div className="mt-2 space-y-2 pl-6">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Field label={meta.kind === "SINGLES" ? "Max players" : "Max teams"}>
+                      <input type="number" min={2} className={inputCls} value={catConfig[code]?.maxEntries ?? ""} onChange={(e) => setCatConfig((s) => ({ ...s, [code]: { ...s[code], maxEntries: Number(e.target.value) } }))} />
+                    </Field>
+                    <Field label="Entry fee (₹)">
+                      <input type="number" min={0} className={inputCls} value={catConfig[code]?.feeINR ?? ""} onChange={(e) => setCatConfig((s) => ({ ...s, [code]: { ...s[code], feeINR: Number(e.target.value) } }))} />
+                    </Field>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <Field label="Age group">
+                      <select className={inputCls} value={catConfig[code]?.ageGroup ?? "OPEN"} onChange={(e) => setCatConfig((s) => ({ ...s, [code]: { ...s[code], ageGroup: e.target.value } }))}>
+                        {AGE_GROUPS.map((a) => <option key={a} value={a}>{a === "OPEN" ? "Open" : a}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="Grade">
+                      <select className={inputCls} value={catConfig[code]?.skillGrade ?? ""} onChange={(e) => setCatConfig((s) => ({ ...s, [code]: { ...s[code], skillGrade: e.target.value || null } }))}>
+                        <option value="">None</option>
+                        {SKILL_GRADES.map((g) => <option key={g} value={g}>Grade {g}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="Format">
+                      <select className={inputCls} value={catConfig[code]?.format ?? "SINGLE_ELIM"} onChange={(e) => setCatConfig((s) => ({ ...s, [code]: { ...s[code], format: e.target.value } }))}>
+                        {Object.entries(FORMAT_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                      </select>
+                    </Field>
+                  </div>
+                  <p className="text-[11px] text-stone-400">
+                    {FORMAT_META[catConfig[code]?.format ?? "SINGLE_ELIM"].hint}
+                  </p>
+                  {catConfig[code]?.format === "GROUP_KO" && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <Field label="Number of groups">
+                        <input type="number" min={2} max={8} className={inputCls} value={catConfig[code]?.groupCount ?? 2} onChange={(e) => setCatConfig((s) => ({ ...s, [code]: { ...s[code], groupCount: Number(e.target.value) } }))} />
+                      </Field>
+                      <Field label="Advance per group">
+                        <input type="number" min={1} max={4} className={inputCls} value={catConfig[code]?.advancePerGroup ?? 2} onChange={(e) => setCatConfig((s) => ({ ...s, [code]: { ...s[code], advancePerGroup: Number(e.target.value) } }))} />
+                      </Field>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -124,7 +165,12 @@ export default function CreateTournamentWizard({ open, onClose, onSubmit }) {
             <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-stone-500">Categories</div>
             <div className="flex flex-wrap gap-1.5">
               {categories.map((c) => (
-                <Badge key={c.category} tone="teal">{CATEGORY_META[c.category].label} · {inr(c.feeINR)} · max {c.maxEntries}</Badge>
+                <Badge key={`${c.category}-${c.ageGroup}-${c.skillGrade ?? ""}`} tone="teal">
+                  {CATEGORY_META[c.category].label}
+                  {c.ageGroup && c.ageGroup !== "OPEN" ? ` · ${c.ageGroup}` : ""}
+                  {c.skillGrade ? ` · ${c.skillGrade}` : ""}
+                  {" · "}{FORMAT_META[c.format ?? "SINGLE_ELIM"].label} · {inr(c.feeINR)} · max {c.maxEntries}
+                </Badge>
               ))}
             </div>
           </div>
