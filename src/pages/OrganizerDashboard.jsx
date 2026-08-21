@@ -44,7 +44,7 @@ export default function OrganizerDashboard() {
       <Reveal className="mb-5 flex items-center justify-between">
         <div>
           <Eyebrow>Organizer</Eyebrow>
-          <h1 className="text-2xl font-bold text-stone-900">Command center</h1>
+          <h1 className="text-2xl font-bold text-ink">Command center</h1>
         </div>
         <Btn icon={Plus} onClick={() => setWizardOpen(true)}>Create tournament</Btn>
       </Reveal>
@@ -54,12 +54,12 @@ export default function OrganizerDashboard() {
         <StaggerList className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {tournaments.map((t) => (
             <StaggerItem key={t.id}>
-              <button onClick={() => navigate(`/organizer/${t.id}`)} className="w-full rounded-lg border border-stone-200 bg-white p-4 text-left shadow-sm transition-all hover:border-teal-300 hover:shadow-md">
+              <button onClick={() => navigate(`/organizer/${t.id}`)} className="w-full rounded-lg border border-line bg-surface p-4 text-left shadow-sm transition-all hover:border-accent-teal/50 hover:shadow-md">
                 <div className="mb-2 flex items-start justify-between gap-2">
-                  <div className="font-semibold text-stone-900">{t.name}</div>
+                  <div className="font-semibold text-ink">{t.name}</div>
                   <Badge tone={TOURNAMENT_STATUS_META[t.status].tone}>{TOURNAMENT_STATUS_META[t.status].label}</Badge>
                 </div>
-                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-stone-500">
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-2">
                   <span className="flex items-center gap-1"><MapPin size={11} />{t.venue}</span>
                   <span className="flex items-center gap-1"><Calendar size={11} />{fmtDateRange(t.start_date, t.end_date)}</span>
                 </div>

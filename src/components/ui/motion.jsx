@@ -74,7 +74,7 @@ export function BrandLoader({ label = "Loading…" }) {
         animate={{ scale: [1, 1.08, 1], opacity: [0.7, 1, 0.7] }}
         transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
       />
-      <div className="text-sm text-stone-400">{label}</div>
+      <div className="text-sm text-ink-3">{label}</div>
     </div>
   );
 }
@@ -134,13 +134,66 @@ export function LogoAssembly({ size = 160, className = "" }) {
   );
 }
 
-// One glyph per real sport in the data model today (badminton only —
-// extend this map, not the UI shape, when more sports are added).
-export function SportIcon({ className = "" }) {
+/* Sport glyphs. MatchDay runs badminton today but is built to cover every
+   sport, so this is a map keyed by sport rather than a single hardcoded icon:
+   adding a sport is a new entry here, and every consumer (cards, filters,
+   nav, the sports-universe section) picks it up automatically. All glyphs
+   share a 24x24 box, 1.5 stroke weight and round caps so they sit together
+   as one family. */
+const SPORT_GLYPHS = {
+  badminton: (
+    <>
+      <circle cx="17.5" cy="6.5" r="3" strokeWidth="1.5" />
+      <path d="M15 9L6 18M6 18L4 20M6 18L4 16M6 18L8 20M6 18L8 16" strokeWidth="1.5" strokeLinecap="round" />
+    </>
+  ),
+  tennis: (
+    <>
+      <circle cx="12" cy="12" r="8.5" strokeWidth="1.5" />
+      <path d="M4.5 6.5C7 9 8.5 12.5 8 19M19.5 6.5C17 9 15.5 12.5 16 19" strokeWidth="1.5" strokeLinecap="round" />
+    </>
+  ),
+  tableTennis: (
+    <>
+      <circle cx="9.5" cy="9" r="6" strokeWidth="1.5" />
+      <path d="M7 14.5L4.5 20.5" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="18" cy="16.5" r="2.2" strokeWidth="1.5" />
+    </>
+  ),
+  basketball: (
+    <>
+      <circle cx="12" cy="12" r="8.5" strokeWidth="1.5" />
+      <path d="M12 3.5v17M3.5 12h17M5.5 6C8 8.5 8 15.5 5.5 18M18.5 6C16 8.5 16 15.5 18.5 18" strokeWidth="1.5" strokeLinecap="round" />
+    </>
+  ),
+  football: (
+    <>
+      <circle cx="12" cy="12" r="8.5" strokeWidth="1.5" />
+      <path d="M12 7.5l3.5 2.5-1.3 4h-4.4l-1.3-4L12 7.5z" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M12 3.5v4M4.3 9.7l3.9 2.9M19.7 9.7l-3.9 2.9M8 20l1.8-6M16 20l-1.8-6" strokeWidth="1.5" strokeLinecap="round" />
+    </>
+  ),
+  volleyball: (
+    <>
+      <circle cx="12" cy="12" r="8.5" strokeWidth="1.5" />
+      <path d="M12 3.5c-3 4-3.5 9 1 17M20.4 10c-4.6 1.4-9 4.2-11.7 10M3.6 13.5c4.5-2 8-5.5 9.8-9.8" strokeWidth="1.5" strokeLinecap="round" />
+    </>
+  ),
+  cricket: (
+    <>
+      <path d="M14.5 3.5l6 6-9 9-6-6 9-9z" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M6.5 15.5L3 19l2 2 3.5-3.5" strokeWidth="1.5" strokeLinejoin="round" />
+      <circle cx="18.5" cy="18" r="2.5" strokeWidth="1.5" />
+    </>
+  ),
+};
+
+export const SPORT_KEYS = Object.keys(SPORT_GLYPHS);
+
+export function SportIcon({ sport = "badminton", className = "" }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <circle cx="17.5" cy="6.5" r="3" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M15 9L6 18M6 18L4 20M6 18L4 16M6 18L8 20M6 18L8 16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={className} aria-hidden="true">
+      {SPORT_GLYPHS[sport] || SPORT_GLYPHS.badminton}
     </svg>
   );
 }

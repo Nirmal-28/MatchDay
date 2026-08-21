@@ -22,7 +22,7 @@ export default function ParticipantsPanel({ event, entries, onApprove, onReject,
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[180px]">
-          <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+          <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-3" />
           <input className={cx(inputCls, "pl-8")} placeholder="Search participants" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <select className={cx(inputCls, "w-auto")} value={filter} onChange={(e) => setFilter(e.target.value)}>
@@ -35,9 +35,9 @@ export default function ParticipantsPanel({ event, entries, onApprove, onReject,
       {filtered.length === 0 ? (
         <EmptyState icon={Users} title="Your tournament is waiting for its first competitor" hint="Registrations for this category will appear here." />
       ) : (
-        <div className="overflow-x-auto rounded-md border border-stone-200">
+        <div className="overflow-x-auto rounded-md border border-line">
           <table className="w-full text-left text-sm">
-            <thead className="bg-stone-50 text-[11px] uppercase tracking-wide text-stone-500">
+            <thead className="bg-surface-2 text-[11px] uppercase tracking-wide text-ink-2">
               <tr>
                 <th className="px-3 py-2 font-medium">Name</th>
                 <th className="px-3 py-2 font-medium">Registered</th>
@@ -46,21 +46,21 @@ export default function ParticipantsPanel({ event, entries, onApprove, onReject,
                 <th className="px-3 py-2 font-medium text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-100">
+            <tbody className="divide-y divide-line-soft">
               {filtered.map((e) => (
                 <tr key={e.id}>
-                  <td className="px-3 py-2 font-medium text-stone-800">
+                  <td className="px-3 py-2 font-medium text-ink">
                     {(e.entry_players || []).map((p, i) => (
                       <span key={p.id ?? i}>
-                        {i > 0 && <span className="text-stone-300"> / </span>}
+                        {i > 0 && <span className="text-ink-3"> / </span>}
                         {p.player_id
-                          ? <Link to={`/p/${p.player_id}`} className="hover:text-teal-700 hover:underline">{p.name}</Link>
+                          ? <Link to={`/p/${p.player_id}`} className="hover:text-accent-teal hover:underline">{p.name}</Link>
                           : p.name}
                       </span>
                     ))}
                     {(e.entry_players || []).length === 0 && entryName(e)}
                   </td>
-                  <td className="px-3 py-2 text-stone-500">{fmtDate(e.created_at)}</td>
+                  <td className="px-3 py-2 text-ink-2">{fmtDate(e.created_at)}</td>
                   <td className="px-3 py-2"><Badge tone={REG_STATUS_META[e.reg_status].tone}>{REG_STATUS_META[e.reg_status].label}</Badge></td>
                   <td className="px-3 py-2"><Badge tone={PAY_STATUS_META[e.payment_status].tone}>{PAY_STATUS_META[e.payment_status].label}</Badge></td>
                   <td className="px-3 py-2">

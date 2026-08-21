@@ -14,7 +14,7 @@ export default function SeedingPanel({ entries, onSave, disabled }) {
   const [saving, setSaving] = useState(false);
 
   if (confirmed.length === 0) {
-    return <p className="text-sm text-stone-500">Confirm some entries first — only confirmed entries can be seeded.</p>;
+    return <p className="text-sm text-ink-2">Confirm some entries first — only confirmed entries can be seeded.</p>;
   }
 
   const used = Object.values(seeds).filter((v) => v !== "" && v != null).map(Number);
@@ -32,8 +32,8 @@ export default function SeedingPanel({ entries, onSave, disabled }) {
 
   return (
     <Card className="p-4">
-      <div className="mb-3 flex items-start gap-2 rounded-md bg-stone-50 px-3 py-2 text-xs text-stone-600">
-        <Info size={14} className="mt-0.5 shrink-0 text-stone-400" />
+      <div className="mb-3 flex items-start gap-2 rounded-md bg-surface-2 px-3 py-2 text-xs text-ink-2">
+        <Info size={14} className="mt-0.5 shrink-0 text-ink-3" />
         <span>
           Seeds decide bracket placement. Seed 1 and 2 land in opposite halves, and any
           byes go to the top seeds. Leave blank to place an entry by registration order.
@@ -42,9 +42,9 @@ export default function SeedingPanel({ entries, onSave, disabled }) {
 
       <div className="space-y-1.5">
         {confirmed.map((e) => (
-          <div key={e.id} className="flex items-center gap-3 rounded-md border border-stone-200 px-3 py-2">
-            <Trophy size={13} className="shrink-0 text-stone-300" />
-            <span className="min-w-0 flex-1 truncate text-sm text-stone-800">{entryName(e)}</span>
+          <div key={e.id} className="flex items-center gap-3 rounded-md border border-line px-3 py-2">
+            <Trophy size={13} className="shrink-0 text-ink-3" />
+            <span className="min-w-0 flex-1 truncate text-sm text-ink">{entryName(e)}</span>
             <input
               type="number" min={1} max={confirmed.length} placeholder="—"
               className={`${inputCls} w-20 text-center`}
@@ -56,7 +56,7 @@ export default function SeedingPanel({ entries, onSave, disabled }) {
       </div>
 
       {dupes.length > 0 && (
-        <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+        <div className="mt-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
           Duplicate seed{dupes.length > 1 ? "s" : ""}: {[...new Set(dupes)].join(", ")}. Each seed must be unique.
         </div>
       )}

@@ -98,17 +98,17 @@ export default function PublicTournamentPage() {
 
   return (
     <div>
-      <button className="mb-3 flex items-center gap-1 text-xs font-medium text-stone-500 hover:text-stone-800" onClick={() => navigate("/")}><ChevronLeft size={14} /> All tournaments</button>
+      <button className="mb-3 flex items-center gap-1 text-xs font-medium text-ink-2 hover:text-ink" onClick={() => navigate("/")}><ChevronLeft size={14} /> All tournaments</button>
 
-      <div className="mb-5 rounded-lg border border-stone-200 bg-white p-5">
+      <div className="mb-5 rounded-lg border border-line bg-surface p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-stone-900">{tournament.name}</h1>
+              <h1 className="text-2xl font-bold text-ink">{tournament.name}</h1>
               <Badge tone={TOURNAMENT_STATUS_META[tournament.status].tone}>{tournament.status === "LIVE" ? <><Radio size={10} className="animate-pulse" /> Live</> : TOURNAMENT_STATUS_META[tournament.status].label}</Badge>
             </div>
-            <p className="mt-1 max-w-xl text-sm text-stone-500">{tournament.description}</p>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-500">
+            <p className="mt-1 max-w-xl text-sm text-ink-2">{tournament.description}</p>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2">
               <span className="flex items-center gap-1"><MapPin size={12} />{tournament.venue}{tournament.location ? `, ${tournament.location}` : ""}</span>
               <span className="flex items-center gap-1"><Calendar size={12} />{fmtDateRange(tournament.start_date, tournament.end_date)}</span>
               <span className="flex items-center gap-1"><Building2 size={12} />{tournament.organizer_name}</span>
@@ -126,16 +126,16 @@ export default function PublicTournamentPage() {
         </div>
       </div>
 
-      <div className="mb-4 flex gap-1 overflow-x-auto border-b border-stone-200">
+      <div className="mb-4 flex gap-1 overflow-x-auto border-b border-line">
         {PUB_TABS.map((t) => (
-          <button key={t.key} onClick={() => setTab(t.key)} className={cx("flex-shrink-0 border-b-2 px-3 py-2 text-sm font-medium", tab === t.key ? "border-teal-700 text-teal-800" : "border-transparent text-stone-500 hover:text-stone-800")}>{t.label}</button>
+          <button key={t.key} onClick={() => setTab(t.key)} className={cx("flex-shrink-0 border-b-2 px-3 py-2 text-sm font-medium", tab === t.key ? "border-accent-teal text-accent-teal" : "border-transparent text-ink-2 hover:text-ink")}>{t.label}</button>
         ))}
       </div>
 
       {["categories", "schedule", "bracket", "results"].includes(tab) && events.length > 1 && (
         <div className="mb-3 flex flex-wrap gap-1.5">
           {events.map((e) => (
-            <button key={e.id} onClick={() => setEventId(e.id)} className={cx("rounded-full border px-3 py-1 text-xs font-medium", eventId === e.id ? "border-teal-600 bg-teal-600 text-white" : "border-stone-200 text-stone-600 hover:bg-stone-50")}>{divisionLabel(e)}</button>
+            <button key={e.id} onClick={() => setEventId(e.id)} className={cx("rounded-full border px-3 py-1 text-xs font-medium", eventId === e.id ? "border-accent-teal bg-accent-teal text-white" : "border-line text-ink-2 hover:bg-surface-2")}>{divisionLabel(e)}</button>
           ))}
         </div>
       )}
@@ -143,12 +143,12 @@ export default function PublicTournamentPage() {
       {tab === "overview" && (
         <div className="grid gap-4 sm:grid-cols-2">
           <Card className="p-4">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">Format</div>
-            <p className="text-sm text-stone-600">{tournament.settings?.rules}</p>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">Format</div>
+            <p className="text-sm text-ink-2">{tournament.settings?.rules}</p>
           </Card>
           <Card className="p-4">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">Contact</div>
-            <p className="text-sm text-stone-600">{tournament.contact_email}<br />{tournament.contact_phone}</p>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">Contact</div>
+            <p className="text-sm text-ink-2">{tournament.contact_email}<br />{tournament.contact_phone}</p>
           </Card>
         </div>
       )}
@@ -162,10 +162,10 @@ export default function PublicTournamentPage() {
             return (
               <Card key={e.id} className="p-4">
                 <div className="mb-1 flex items-center justify-between">
-                  <div className="font-medium text-stone-900">{divisionLabel(e)}</div>
+                  <div className="font-medium text-ink">{divisionLabel(e)}</div>
                   <Badge tone={EVENT_STATUS_META[e.status].tone}>{EVENT_STATUS_META[e.status].label}</Badge>
                 </div>
-                <div className="mb-3 text-xs text-stone-500">{count} / {e.max_entries} registered · {inr(e.fee_inr)} entry fee</div>
+                <div className="mb-3 text-xs text-ink-2">{count} / {e.max_entries} registered · {inr(e.fee_inr)} entry fee</div>
                 <Btn size="sm" disabled={!open || count >= e.max_entries} onClick={() => setRegEvent(e)}>{count >= e.max_entries ? "Category full" : "Register"}</Btn>
               </Card>
             );
@@ -190,12 +190,12 @@ export default function PublicTournamentPage() {
                     <Badge tone="slate">{m.court}</Badge>
                     <LivePulse />
                   </div>
-                  <div className="mb-2 text-[11px] uppercase tracking-wide text-stone-400">{CATEGORY_META[ev.category].label} · {matchStageLabel(m, ev)}</div>
+                  <div className="mb-2 text-[11px] uppercase tracking-wide text-ink-3">{CATEGORY_META[ev.category].label} · {matchStageLabel(m, ev)}</div>
                   <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-sm"><span className="font-medium text-stone-800">{entryShort(a)}</span><span className="font-mono text-lg font-bold">{current?.score_a ?? 0}</span></div>
-                    <div className="flex items-center justify-between text-sm"><span className="font-medium text-stone-800">{entryShort(b)}</span><span className="font-mono text-lg font-bold">{current?.score_b ?? 0}</span></div>
+                    <div className="flex items-center justify-between text-sm"><span className="font-medium text-ink">{entryShort(a)}</span><span className="font-mono text-lg font-bold">{current?.score_a ?? 0}</span></div>
+                    <div className="flex items-center justify-between text-sm"><span className="font-medium text-ink">{entryShort(b)}</span><span className="font-mono text-lg font-bold">{current?.score_b ?? 0}</span></div>
                   </div>
-                  <div className="mt-2 text-[11px] text-stone-400">Games {tally.a}–{tally.b}</div>
+                  <div className="mt-2 text-[11px] text-ink-3">Games {tally.a}–{tally.b}</div>
                 </Card>
               );
             })}

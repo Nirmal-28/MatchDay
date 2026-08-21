@@ -4,7 +4,11 @@
    Navy scale + accent colors sampled from the official logo (the
    multicolor "people in a circle" mark on navy). Accents are meant to be
    used sparingly — live indicators, category badges, active states,
-   gradients — not as the base palette of every surface. */
+   gradients — not as the base palette of every surface.
+
+   The semantic tokens below (surface/line/ink) are what components should
+   actually use. Flipping the theme means changing them here, not hunting
+   down bg-white across every file. */
 @theme {
   --color-navy-950: #05070d;
   --color-navy-900: #0a1120;
@@ -19,13 +23,43 @@
   --color-accent-orange: #f97316;
   --color-accent-yellow: #eab308;
 
+  /* Semantic surfaces — dark theme */
+  --color-canvas: #070b14;        /* page background */
+  --color-surface: #0e1626;     /* cards, panels */
+  --color-surface-2: #141e33;   /* table headers, elevated rows */
+  --color-surface-3: #1b2740;   /* hover states */
+  --color-line: #22304d;        /* borders */
+  --color-line-soft: #1a2438;   /* subtle dividers */
+
+  /* Semantic text */
+  --color-ink: #eef2f9;         /* primary text */
+  --color-ink-2: #a8b6cf;       /* secondary text */
+  --color-ink-3: #6b7d9c;       /* muted / metadata */
+
   --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
   --font-body: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
+html {
+  background: var(--color-canvas);
+  color-scheme: dark;
+}
+
+/* The base colour lives on <html> only. If <body> also painted an opaque
+   background it would cover the fixed -z-10 <SportsBackground/>: in CSS paint
+   order a block's own background is drawn *after* negative-z-index
+   descendants, so the artwork would render correctly and still be invisible. */
 body {
   margin: 0;
   font-family: var(--font-body);
+  background: transparent;
+  color: var(--color-ink);
+}
+
+/* Inputs/selects render with the OS light palette otherwise. */
+select option {
+  background: var(--color-surface-2);
+  color: var(--color-ink);
 }
 
 @keyframes fadein {
@@ -33,11 +67,18 @@ body {
   to { opacity: 1; transform: none; }
 }
 
-/* Clean, athletic scoreboard-style wordmark — matches the app's teal brand color. */
+/* Athletic scoreboard-style wordmark. Teal reads well on the dark base. */
 .wordmark {
   font-family: "Barlow Condensed", "Arial Narrow", sans-serif;
   font-weight: 700;
   font-style: italic;
   letter-spacing: 0.02em;
-  color: #0f766e; /* teal-700, same as primary buttons/badges */
+  color: var(--color-accent-teal);
+}
+
+/* Only elements the sports background actually animates get promoted. */
+.sb-arc,
+.sb-dot,
+.sb-court {
+  will-change: transform, opacity;
 }

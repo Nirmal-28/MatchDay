@@ -17,7 +17,7 @@ function StatTile({ label, value, accent }) {
   return (
     <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-center">
       <div className={cx("font-display text-3xl font-bold", accent || "text-white")}>{value}</div>
-      <div className="text-[11px] uppercase tracking-wide text-stone-400">{label}</div>
+      <div className="text-[11px] uppercase tracking-wide text-ink-3">{label}</div>
     </div>
   );
 }
@@ -92,7 +92,7 @@ export default function PlayerProfile() {
 
   return (
     <div>
-      <Link to="/" className="mb-3 inline-flex items-center gap-1 text-xs font-medium text-stone-500 hover:text-stone-800">
+      <Link to="/" className="mb-3 inline-flex items-center gap-1 text-xs font-medium text-ink-2 hover:text-ink">
         <ChevronLeft size={14} /> Back
       </Link>
 
@@ -109,11 +109,11 @@ export default function PlayerProfile() {
             </motion.div>
             <div>
               <h1 className="text-2xl font-bold text-white">{player.name}</h1>
-              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-stone-400">
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-3">
                 {player.city && <span className="flex items-center gap-1"><MapPin size={11} />{player.city}</span>}
                 {player.club && <span className="flex items-center gap-1"><Building2 size={11} />{player.club}</span>}
                 {streak && streak.count > 1 && (
-                  <span className={cx("font-semibold", streak.kind === "W" ? "text-accent-teal" : "text-stone-500")}>
+                  <span className={cx("font-semibold", streak.kind === "W" ? "text-accent-teal" : "text-ink-2")}>
                     {streak.count} {streak.kind === "W" ? "win" : "loss"} streak
                   </span>
                 )}
@@ -150,10 +150,10 @@ export default function PlayerProfile() {
       ) : (
         <div className="grid gap-5 lg:grid-cols-3">
           <Reveal className="lg:col-span-2">
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">Recent matches</h2>
-            <div className="overflow-x-auto rounded-md border border-stone-200">
+            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">Recent matches</h2>
+            <div className="overflow-x-auto rounded-md border border-line">
               <table className="w-full text-left text-sm">
-                <thead className="bg-stone-50 text-[11px] uppercase tracking-wide text-stone-500">
+                <thead className="bg-surface-2 text-[11px] uppercase tracking-wide text-ink-2">
                   <tr>
                     <th className="px-3 py-2 font-medium">Result</th>
                     <th className="px-3 py-2 font-medium">Division</th>
@@ -162,7 +162,7 @@ export default function PlayerProfile() {
                     <th className="px-3 py-2 font-medium">Date</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-stone-100">
+                <tbody className="divide-y divide-line-soft">
                   {recent.map((m) => {
                     const iAmA = mine.has(m.entry_a);
                     const iWon = m.winner_entry_id && mine.has(m.winner_entry_id);
@@ -173,20 +173,20 @@ export default function PlayerProfile() {
                         <td className="px-3 py-2">
                           <Badge tone={iWon ? "emerald" : "slate"}>{iWon ? "Won" : "Lost"}</Badge>
                         </td>
-                        <td className="px-3 py-2 text-xs text-stone-500">
+                        <td className="px-3 py-2 text-xs text-ink-2">
                           {eventById[m.event_id] ? divisionLabel(eventById[m.event_id]) : "—"}
                         </td>
-                        <td className="px-3 py-2 text-xs text-stone-500">
+                        <td className="px-3 py-2 text-xs text-ink-2">
                           {iAmA ? `${tally.a}–${tally.b}` : `${tally.b}–${tally.a}`}
                         </td>
-                        <td className="px-3 py-2 font-mono text-xs text-stone-600">
+                        <td className="px-3 py-2 font-mono text-xs text-ink-2">
                           {games.map((g, i) => (
                             <span key={i} className="mr-1.5">
                               {iAmA ? `${g.score_a}-${g.score_b}` : `${g.score_b}-${g.score_a}`}
                             </span>
                           ))}
                         </td>
-                        <td className="px-3 py-2 text-xs text-stone-500">{m.completed_at ? fmtDate(m.completed_at) : "—"}</td>
+                        <td className="px-3 py-2 text-xs text-ink-2">{m.completed_at ? fmtDate(m.completed_at) : "—"}</td>
                       </tr>
                     );
                   })}
@@ -198,25 +198,25 @@ export default function PlayerProfile() {
           <div className="space-y-5">
             {rivals.length > 0 && (
               <Reveal delay={0.1}>
-                <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">Rivals</h2>
+                <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">Rivals</h2>
                 <div className="space-y-2">
                   {rivals.map((r) => (
                     <Card key={r.playerId} className="flex items-center justify-between p-3">
-                      <Link to={`/p/${r.playerId}`} className="text-sm font-medium text-stone-800 hover:text-teal-700">{r.player.name}</Link>
-                      <span className="font-mono text-xs text-stone-500">{r.won}–{r.lost}</span>
+                      <Link to={`/p/${r.playerId}`} className="text-sm font-medium text-ink hover:text-accent-teal">{r.player.name}</Link>
+                      <span className="font-mono text-xs text-ink-2">{r.won}–{r.lost}</span>
                     </Card>
                   ))}
                 </div>
               </Reveal>
             )}
             <Reveal delay={0.15}>
-              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">Tournaments</h2>
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">Tournaments</h2>
               <div className="space-y-2">
-                {tournaments.length === 0 && <p className="text-sm text-stone-400">None yet.</p>}
+                {tournaments.length === 0 && <p className="text-sm text-ink-3">None yet.</p>}
                 {tournaments.map((t) => (
                   <Card key={t.id} className="p-3">
-                    <Link to={`/t/${t.slug}`} className="text-sm font-medium text-stone-800 hover:text-teal-700">{t.name}</Link>
-                    <div className="text-xs text-stone-500">{fmtDate(t.start_date)}</div>
+                    <Link to={`/t/${t.slug}`} className="text-sm font-medium text-ink hover:text-accent-teal">{t.name}</Link>
+                    <div className="text-xs text-ink-2">{fmtDate(t.start_date)}</div>
                   </Card>
                 ))}
               </div>

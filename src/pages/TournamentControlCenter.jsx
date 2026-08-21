@@ -101,7 +101,7 @@ export default function TournamentControlCenter() {
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
-        <button className="flex items-center gap-1 text-xs font-medium text-stone-500 hover:text-stone-800" onClick={() => navigate("/organizer")}><ChevronLeft size={14} /> All tournaments</button>
+        <button className="flex items-center gap-1 text-xs font-medium text-ink-2 hover:text-ink" onClick={() => navigate("/organizer")}><ChevronLeft size={14} /> All tournaments</button>
         <NotificationBell notifications={notifications} onMarkRead={() => guarded(async () => { await markNotificationsRead(id); setNotifications((n) => n.map((x) => ({ ...x, read: true }))); })} />
       </div>
 
@@ -114,7 +114,7 @@ export default function TournamentControlCenter() {
               <Badge tone={TOURNAMENT_STATUS_META[tournament.status].tone}>{TOURNAMENT_STATUS_META[tournament.status].label}</Badge>
               {tournament.status === "LIVE" && <LivePulse />}
             </div>
-            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-stone-400">
+            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-3">
               <span className="flex items-center gap-1"><MapPin size={11} />{tournament.venue}</span>
               <span className="flex items-center gap-1"><Calendar size={11} />{fmtDateRange(tournament.start_date, tournament.end_date)}</span>
               {tournament.slug && <span className="flex items-center gap-1 text-accent-teal">/t/{tournament.slug}</span>}
@@ -144,7 +144,7 @@ export default function TournamentControlCenter() {
           ].map((s) => (
             <div key={s.label} className="rounded-lg border border-white/10 bg-white/5 p-3 text-center sm:text-left">
               <div className="font-display text-3xl font-bold text-white">{s.value}</div>
-              <div className="text-[11px] uppercase tracking-wide text-stone-400">{s.label}</div>
+              <div className="text-[11px] uppercase tracking-wide text-ink-3">{s.label}</div>
             </div>
           ))}
         </div>
@@ -153,7 +153,7 @@ export default function TournamentControlCenter() {
       <div className="flex flex-col gap-5 lg:flex-row">
         <div className="flex gap-1 overflow-x-auto lg:w-48 lg:flex-none lg:flex-col lg:overflow-visible">
           {ORG_TABS.map((t) => (
-            <button key={t.key} onClick={() => setTab(t.key)} className={`flex flex-shrink-0 items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium transition-colors ${tab === t.key ? "bg-teal-50 text-teal-800" : "text-stone-600 hover:bg-stone-100"}`}>
+            <button key={t.key} onClick={() => setTab(t.key)} className={`flex flex-shrink-0 items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium transition-colors ${tab === t.key ? "bg-accent-teal/10 text-accent-teal" : "text-ink-2 hover:bg-surface-2"}`}>
               <t.icon size={15} />{t.label}
             </button>
           ))}
@@ -163,7 +163,7 @@ export default function TournamentControlCenter() {
           {["participants", "draw", "schedule", "results"].includes(tab) && events.length > 1 && (
             <div className="mb-3 flex flex-wrap gap-1.5">
               {events.map((e) => (
-                <button key={e.id} onClick={() => setEventId(e.id)} className={`rounded-full border px-3 py-1 text-xs font-medium ${eventId === e.id ? "border-teal-600 bg-teal-600 text-white" : "border-stone-200 text-stone-600 hover:bg-stone-50"}`}>
+                <button key={e.id} onClick={() => setEventId(e.id)} className={`rounded-full border px-3 py-1 text-xs font-medium ${eventId === e.id ? "border-accent-teal bg-accent-teal text-white" : "border-line text-ink-2 hover:bg-surface-2"}`}>
                   {divisionLabel(e)}
                 </button>
               ))}
@@ -173,15 +173,15 @@ export default function TournamentControlCenter() {
           {tab === "overview" && (
             <div className="space-y-4">
               <div>
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">Categories</div>
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">Categories</div>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {events.map((e) => {
                     const c = (entriesByEvent[e.id] || []).length;
                     return (
                       <Card key={e.id} className="flex items-center justify-between p-3">
                         <div>
-                          <div className="text-sm font-medium text-stone-800">{divisionLabel(e)}</div>
-                          <div className="text-xs text-stone-500">{c} / {e.max_entries} registered · {inr(e.fee_inr)}</div>
+                          <div className="text-sm font-medium text-ink">{divisionLabel(e)}</div>
+                          <div className="text-xs text-ink-2">{c} / {e.max_entries} registered · {inr(e.fee_inr)}</div>
                         </div>
                         <Badge tone={EVENT_STATUS_META[e.status].tone}>{EVENT_STATUS_META[e.status].label}</Badge>
                       </Card>
@@ -229,10 +229,10 @@ export default function TournamentControlCenter() {
                     disabled={hasDraw}
                     onSave={(map) => guarded(async () => { await setSeeds(map); await loadEventData(events); }, "Seeds saved.")}
                   />
-                  <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-stone-300 px-6 py-10 text-center">
+                  <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-line px-6 py-10 text-center">
                     <Badge tone="teal">{FORMAT_META[format].label}</Badge>
-                    <div className="text-sm font-semibold text-stone-700">Generate the draw</div>
-                    <div className="max-w-sm text-sm text-stone-500">
+                    <div className="text-sm font-semibold text-ink-2">Generate the draw</div>
+                    <div className="max-w-sm text-sm text-ink-2">
                       {confirmedCount} confirmed {confirmedCount === 1 ? "entry" : "entries"}
                       {confirmedCount < minEntries && ` — need at least ${minEntries}`}.
                       {!regLocked && " Registration must be closed first."}
@@ -248,8 +248,8 @@ export default function TournamentControlCenter() {
             return (
               <div className="space-y-5">
                 {format === "GROUP_KO" && !koExists && (
-                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-stone-200 bg-stone-50 px-3 py-2.5">
-                    <span className="text-xs text-stone-600">
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-line bg-surface-2 px-3 py-2.5">
+                    <span className="text-xs text-ink-2">
                       {groupsDone ? "All group matches are done — build the knockout." : "Knockout unlocks once every group match is played."}
                     </span>
                     <Btn size="sm" disabled={!groupsDone}
@@ -306,7 +306,7 @@ export default function TournamentControlCenter() {
                 <Field label="Contact email"><input className={inputCls} defaultValue={tournament.contact_email || ""} onBlur={(e) => e.target.value !== tournament.contact_email && guarded(async () => { await updateTournament(tournament.id, { contact_email: e.target.value }); await loadAll(); })} /></Field>
               </Card>
               <Card className="space-y-2 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-stone-500">Lifecycle</div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-ink-2">Lifecycle</div>
                 <div className="flex flex-wrap gap-2">
                   {tournament.status !== "COMPLETED" && tournament.status !== "CANCELLED" && events.length > 0 && events.every((e) => e.status === "COMPLETED") && (
                     <Btn size="sm" icon={Trophy} onClick={() => guarded(async () => { await completeTournament(tournament.id); await loadAll(); })}>Mark tournament completed</Btn>

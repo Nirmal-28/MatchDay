@@ -13,7 +13,7 @@ export default function BracketView({ event, matches, entriesById }) {
       <div className="flex min-w-max gap-8 px-1 py-2">
         {byRound.map((roundMatches, ri) => (
           <div key={ri} className="flex flex-col justify-around gap-6" style={{ minWidth: 210 }}>
-            <div className="mb-1 text-center text-[11px] font-semibold uppercase tracking-widest text-stone-400">{roundLabel(ri + 1, rounds)}</div>
+            <div className="mb-1 text-center text-[11px] font-semibold uppercase tracking-widest text-ink-3">{roundLabel(ri + 1, rounds)}</div>
             <div className="flex flex-1 flex-col justify-around gap-6">
               {roundMatches.map((m) => <BracketMatch key={m.id} match={m} entriesById={entriesById} />)}
             </div>
@@ -35,10 +35,10 @@ function BracketMatch({ match, entriesById }) {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className="rounded-md border border-stone-200 bg-white shadow-sm"
+      className="rounded-md border border-line bg-surface shadow-sm"
     >
-      <div className="flex items-center justify-between border-b border-stone-100 px-2 py-1">
-        <span className="font-mono text-[10px] text-stone-400">#{match.match_number}</span>
+      <div className="flex items-center justify-between border-b border-line-soft px-2 py-1">
+        <span className="font-mono text-[10px] text-ink-3">#{match.match_number}</span>
         <Badge tone={meta.tone}>{match.status === "LIVE" ? <><Radio size={10} className="animate-pulse" /> Live</> : meta.label}</Badge>
       </div>
       {[["A", a], ["B", b]].map(([side, e]) => {
@@ -48,13 +48,13 @@ function BracketMatch({ match, entriesById }) {
             key={side}
             animate={{ backgroundColor: isWinner ? "rgba(20,184,166,0.08)" : "rgba(0,0,0,0)" }}
             transition={{ duration: 0.5 }}
-            className={cx("flex items-center justify-between gap-2 px-2.5 py-1.5 text-sm", isWinner ? "font-semibold text-teal-800" : "text-stone-700")}
+            className={cx("flex items-center justify-between gap-2 px-2.5 py-1.5 text-sm", isWinner ? "font-semibold text-accent-teal" : "text-ink-2")}
           >
             <span className="flex items-center gap-1.5 truncate">
               {isWinner && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent-teal" />}
               {e ? entryShort(e) : match.is_bye ? "—" : "TBD"}
             </span>
-            {games.length > 0 && <span className="font-mono text-xs text-stone-400">{side === "A" ? tally.a : tally.b}</span>}
+            {games.length > 0 && <span className="font-mono text-xs text-ink-3">{side === "A" ? tally.a : tally.b}</span>}
           </motion.div>
         );
       })}

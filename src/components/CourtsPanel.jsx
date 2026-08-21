@@ -14,12 +14,12 @@ export default function CourtsPanel({ courts, onAdd, onUpdate, onRemove }) {
         {courts.map((c) => (
           <Card key={c.id} className="flex items-center justify-between px-3 py-2.5">
             <div>
-              <div className="text-sm font-medium text-stone-800">{c.name}</div>
+              <div className="text-sm font-medium text-ink">{c.name}</div>
               <Badge tone={c.status === "AVAILABLE" ? "emerald" : "slate"}>{c.status === "AVAILABLE" ? "Available" : "Unavailable"}</Badge>
             </div>
             <div className="flex gap-1">
-              <button className="rounded p-1 text-stone-400 hover:bg-stone-100" onClick={() => onUpdate(c.id, { status: c.status === "AVAILABLE" ? "UNAVAILABLE" : "AVAILABLE" })} title="Toggle availability"><RotateCcw size={14} /></button>
-              <button className="rounded p-1 text-stone-400 hover:bg-red-50 hover:text-red-500" onClick={() => onRemove(c.id)} title="Remove court"><Trash2 size={14} /></button>
+              <button className="rounded p-1 text-ink-3 hover:bg-surface-2" onClick={() => onUpdate(c.id, { status: c.status === "AVAILABLE" ? "UNAVAILABLE" : "AVAILABLE" })} title="Toggle availability"><RotateCcw size={14} /></button>
+              <button className="rounded p-1 text-ink-3 hover:bg-red-500/10 hover:text-red-400" onClick={() => onRemove(c.id)} title="Remove court"><Trash2 size={14} /></button>
             </div>
           </Card>
         ))}

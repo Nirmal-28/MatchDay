@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from "react
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import { AuthProvider, useAuth } from "./lib/AuthContext";
 import { BrandLoader } from "./components/ui/motion";
+import SportsBackground from "./components/ui/SportsBackground";
 import logo from "./assets/logo.png";
 import { signOut } from "./lib/repository";
 import PublicDiscovery from "./pages/PublicDiscovery";
@@ -28,7 +29,7 @@ function Header() {
   const inOrganizer = location.pathname.startsWith("/organizer");
 
   return (
-    <header className="sticky top-0 z-30 border-b border-stone-200 bg-white/90 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-line bg-canvas/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
         <Link to="/" className="flex items-center gap-2">
           <motion.img
@@ -40,20 +41,20 @@ function Header() {
           <span className="wordmark text-2xl uppercase leading-none">Matchday</span>
         </Link>
         <div className="flex items-center gap-3">
-          <Link to="/leaderboard" className={cx("hidden text-xs font-medium sm:inline", location.pathname === "/leaderboard" ? "text-teal-700" : "text-stone-500 hover:text-stone-800")}>Leaderboard</Link>
-          <div className="relative hidden items-center gap-0.5 rounded-md border border-stone-200 bg-stone-100 p-0.5 sm:flex">
+          <Link to="/leaderboard" className={cx("hidden text-xs font-medium sm:inline", location.pathname === "/leaderboard" ? "text-accent-teal" : "text-ink-2 hover:text-ink")}>Leaderboard</Link>
+          <div className="relative hidden items-center gap-0.5 rounded-md border border-line bg-surface p-0.5 sm:flex">
             <motion.div
-              className="absolute inset-y-0.5 left-0.5 w-[calc(50%-2px)] rounded bg-white shadow-sm"
+              className="absolute inset-y-0.5 left-0.5 w-[calc(50%-2px)] rounded bg-surface-3"
               animate={{ x: inOrganizer ? "100%" : "0%" }}
               transition={{ type: "spring", stiffness: 500, damping: 35 }}
             />
-            <Link to="/" className={cx("relative z-10 rounded px-3 py-1.5 text-xs font-medium", !inOrganizer ? "text-stone-900" : "text-stone-500")}>Public site</Link>
-            <Link to="/organizer" className={cx("relative z-10 rounded px-3 py-1.5 text-xs font-medium", inOrganizer ? "text-stone-900" : "text-stone-500")}>Organizer</Link>
+            <Link to="/" className={cx("relative z-10 rounded px-3 py-1.5 text-xs font-medium", !inOrganizer ? "text-ink" : "text-ink-3")}>Public site</Link>
+            <Link to="/organizer" className={cx("relative z-10 rounded px-3 py-1.5 text-xs font-medium", inOrganizer ? "text-ink" : "text-ink-3")}>Organizer</Link>
           </div>
           {session ? (
-            <button className="text-xs font-medium text-stone-500 hover:text-stone-800" onClick={() => signOut()}>Sign out</button>
+            <button className="text-xs font-medium text-ink-2 hover:text-ink" onClick={() => signOut()}>Sign out</button>
           ) : (
-            <Link to="/login" className="text-xs font-medium text-stone-500 hover:text-stone-800">Organizer sign in</Link>
+            <Link to="/login" className="text-xs font-medium text-ink-2 hover:text-ink">Organizer sign in</Link>
           )}
         </div>
       </div>
@@ -89,12 +90,13 @@ function AnimatedRoutes() {
 
 function Shell() {
   return (
-    <div className="min-h-screen bg-stone-50 text-stone-900">
+    <div className="relative min-h-screen text-ink">
+      <SportsBackground />
       <Header />
       <main className="mx-auto max-w-6xl px-4 py-6">
         <AnimatedRoutes />
       </main>
-      <footer className="mx-auto max-w-6xl px-4 pb-8 pt-4 text-center text-[11px] text-stone-400">
+      <footer className="mx-auto max-w-6xl px-4 pb-8 pt-4 text-center text-[11px] text-ink-3">
         Payments shown in this build are simulated — no real charge is made.
       </footer>
     </div>

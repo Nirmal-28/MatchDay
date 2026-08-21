@@ -32,13 +32,13 @@ export default function RegistrationModal({ open, onClose, event, onSubmit }) {
       {done ? (
         <div className="flex flex-col items-center gap-2 py-6 text-center">
           <CheckCircle2 className="text-emerald-600" size={32} />
-          <div className="font-semibold text-stone-900">Registration received</div>
-          <p className="max-w-sm text-sm text-stone-500">You're on the list as <span className="font-medium text-stone-700">Pending</span> until payment is completed. This tournament uses a simulated payment flow — no real charge will be made.</p>
+          <div className="font-semibold text-ink">Registration received</div>
+          <p className="max-w-sm text-sm text-ink-2">You're on the list as <span className="font-medium text-ink-2">Pending</span> until payment is completed. This tournament uses a simulated payment flow — no real charge will be made.</p>
           <Btn size="sm" variant="secondary" className="mt-2" onClick={onClose}>Close</Btn>
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-500">Entry fee <span className="font-semibold text-stone-700">{inr(event.fee_inr)}</span> · {kind === "DOUBLES" ? "Team of 2" : "Individual"}</div>
+          <div className="rounded-md border border-line bg-surface-2 px-3 py-2 text-xs text-ink-2">Entry fee <span className="font-semibold text-ink-2">{inr(event.fee_inr)}</span> · {kind === "DOUBLES" ? "Team of 2" : "Individual"}</div>
           <Field label={kind === "DOUBLES" ? "Player 1 name" : "Full name"} required><input className={inputCls} value={p1.name} onChange={(e) => setP1({ ...p1, name: e.target.value })} /></Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Phone" required><input className={inputCls} value={p1.phone} onChange={(e) => setP1({ ...p1, phone: e.target.value })} /></Field>
@@ -46,7 +46,7 @@ export default function RegistrationModal({ open, onClose, event, onSubmit }) {
           </div>
           {kind === "DOUBLES" && (
             <>
-              <div className="pt-1 text-xs font-semibold uppercase tracking-wide text-stone-500">Partner</div>
+              <div className="pt-1 text-xs font-semibold uppercase tracking-wide text-ink-2">Partner</div>
               <Field label="Player 2 name" required><input className={inputCls} value={p2.name} onChange={(e) => setP2({ ...p2, name: e.target.value })} /></Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Phone" required><input className={inputCls} value={p2.phone} onChange={(e) => setP2({ ...p2, phone: e.target.value })} /></Field>
@@ -54,7 +54,7 @@ export default function RegistrationModal({ open, onClose, event, onSubmit }) {
               </div>
             </>
           )}
-          {error && <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}
+          {error && <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div>}
           <Btn className="w-full" disabled={saving} onClick={submit}>Submit registration</Btn>
         </div>
       )}

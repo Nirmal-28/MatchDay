@@ -81,13 +81,15 @@ export const MATCH_STATUS_META = {
   WALKOVER: { label: "Walkover", tone: "amber" },
 };
 
+// Dark-theme badge tones: translucent fill + matching border so badges read
+// as tinted glass over the sports background rather than solid light chips.
 export const TONE_CLASSES = {
-  slate: "bg-slate-100 text-slate-600 border-slate-200",
-  emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  amber: "bg-amber-50 text-amber-700 border-amber-200",
-  red: "bg-red-50 text-red-700 border-red-200",
-  indigo: "bg-indigo-50 text-indigo-700 border-indigo-200",
-  teal: "bg-teal-50 text-teal-700 border-teal-200",
+  slate: "bg-slate-400/10 text-slate-300 border-slate-400/25",
+  emerald: "bg-emerald-400/10 text-emerald-300 border-emerald-400/30",
+  amber: "bg-amber-400/10 text-amber-300 border-amber-400/30",
+  red: "bg-red-400/10 text-red-300 border-red-400/30",
+  indigo: "bg-indigo-400/10 text-indigo-300 border-indigo-400/30",
+  teal: "bg-teal-400/10 text-teal-300 border-teal-400/30",
 };
 
 export const BadmintonScoringEngine = {

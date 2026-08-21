@@ -56,13 +56,13 @@ export default function CreateTournamentWizard({ open, onClose, onSubmit }) {
       <div className="mb-5 flex items-center gap-1.5">
         {["Basics", "Categories", "Settings", "Review"].map((label, i) => (
           <React.Fragment key={label}>
-            <div className={cx("flex items-center gap-1.5 text-xs font-medium", step === i + 1 ? "text-teal-700" : step > i + 1 ? "text-stone-500" : "text-stone-300")}>
-              <span className={cx("flex h-5 w-5 items-center justify-center rounded-full border text-[10px]", step === i + 1 ? "border-teal-700 bg-teal-700 text-white" : step > i + 1 ? "border-stone-300 bg-stone-100" : "border-stone-200")}>
+            <div className={cx("flex items-center gap-1.5 text-xs font-medium", step === i + 1 ? "text-accent-teal" : step > i + 1 ? "text-ink-2" : "text-ink-3")}>
+              <span className={cx("flex h-5 w-5 items-center justify-center rounded-full border text-[10px]", step === i + 1 ? "border-accent-teal bg-accent-teal text-navy-950" : step > i + 1 ? "border-line bg-surface-2" : "border-line")}>
                 {step > i + 1 ? <Check size={11} /> : i + 1}
               </span>
               {label}
             </div>
-            {i < 3 && <div className="h-px flex-1 bg-stone-200" />}
+            {i < 3 && <div className="h-px flex-1 bg-line" />}
           </React.Fragment>
         ))}
       </div>
@@ -84,13 +84,13 @@ export default function CreateTournamentWizard({ open, onClose, onSubmit }) {
 
       {step === 2 && (
         <div className="space-y-2">
-          <p className="mb-3 text-xs text-stone-500">Choose the categories this tournament will run. Each gets its own draw, schedule and results.</p>
+          <p className="mb-3 text-xs text-ink-2">Choose the categories this tournament will run. Each gets its own draw, schedule and results.</p>
           {Object.entries(CATEGORY_META).map(([code, meta]) => (
-            <div key={code} className={cx("rounded-md border px-3 py-2.5", selectedCats[code] ? "border-teal-300 bg-teal-50/50" : "border-stone-200")}>
+            <div key={code} className={cx("rounded-md border px-3 py-2.5", selectedCats[code] ? "border-accent-teal/50 bg-accent-teal/10" : "border-line")}>
               <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 text-sm font-medium text-stone-800">
-                  <input type="checkbox" checked={!!selectedCats[code]} onChange={() => toggleCat(code)} className="h-4 w-4 accent-teal-700" />
-                  {meta.label} <span className="text-[11px] font-normal text-stone-400">({meta.kind === "SINGLES" ? "1 vs 1" : "2 vs 2"})</span>
+                <label className="flex items-center gap-2 text-sm font-medium text-ink">
+                  <input type="checkbox" checked={!!selectedCats[code]} onChange={() => toggleCat(code)} className="h-4 w-4 accent-teal-500" />
+                  {meta.label} <span className="text-[11px] font-normal text-ink-3">({meta.kind === "SINGLES" ? "1 vs 1" : "2 vs 2"})</span>
                 </label>
               </div>
               {selectedCats[code] && (
@@ -121,7 +121,7 @@ export default function CreateTournamentWizard({ open, onClose, onSubmit }) {
                       </select>
                     </Field>
                   </div>
-                  <p className="text-[11px] text-stone-400">
+                  <p className="text-[11px] text-ink-3">
                     {FORMAT_META[catConfig[code]?.format ?? "SINGLE_ELIM"].hint}
                   </p>
                   {catConfig[code]?.format === "GROUP_KO" && (
@@ -155,14 +155,14 @@ export default function CreateTournamentWizard({ open, onClose, onSubmit }) {
       {step === 4 && (
         <div className="space-y-4">
           <Card className="p-4">
-            <div className="text-base font-semibold text-stone-900">{basics.name || "Untitled tournament"}</div>
-            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-500">
+            <div className="text-base font-semibold text-ink">{basics.name || "Untitled tournament"}</div>
+            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2">
               <span className="flex items-center gap-1"><MapPin size={12} />{basics.venue}{basics.location ? `, ${basics.location}` : ""}</span>
               <span className="flex items-center gap-1"><Calendar size={12} />{fmtDateRange(basics.startDate, basics.endDate)}</span>
             </div>
           </Card>
           <div>
-            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-stone-500">Categories</div>
+            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2">Categories</div>
             <div className="flex flex-wrap gap-1.5">
               {categories.map((c) => (
                 <Badge key={`${c.category}-${c.ageGroup}-${c.skillGrade ?? ""}`} tone="teal">
@@ -174,16 +174,16 @@ export default function CreateTournamentWizard({ open, onClose, onSubmit }) {
               ))}
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3 text-xs text-stone-500">
-            <div><div className="font-semibold text-stone-700">{settings.courtsCount}</div>Courts</div>
-            <div><div className="font-semibold text-stone-700">{settings.matchDurationMins}m</div>Per match</div>
-            <div><div className="font-semibold text-stone-700">{settings.startTime}</div>Daily start</div>
+          <div className="grid grid-cols-3 gap-3 text-xs text-ink-2">
+            <div><div className="font-semibold text-ink-2">{settings.courtsCount}</div>Courts</div>
+            <div><div className="font-semibold text-ink-2">{settings.matchDurationMins}m</div>Per match</div>
+            <div><div className="font-semibold text-ink-2">{settings.startTime}</div>Daily start</div>
           </div>
-          {error && <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}
+          {error && <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div>}
         </div>
       )}
 
-      <div className="mt-6 flex items-center justify-between border-t border-stone-100 pt-4">
+      <div className="mt-6 flex items-center justify-between border-t border-line-soft pt-4">
         <Btn variant="ghost" size="sm" icon={ChevronLeft} onClick={() => (step === 1 ? onClose() : setStep(step - 1))}>{step === 1 ? "Cancel" : "Back"}</Btn>
         {step < 4 ? (
           <Btn size="sm" icon={ChevronRight} disabled={!canNext()} onClick={() => setStep(step + 1)}>Continue</Btn>
