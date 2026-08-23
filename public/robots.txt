@@ -1,0 +1,13 @@
+# Matchday
+User-agent: *
+Allow: /
+
+# Nothing private is reachable without a session, but these paths are either
+# per-user or operational surfaces with no value in an index.
+Disallow: /me
+Disallow: /organizer
+Disallow: /officiate
+Disallow: /reset-password
+Disallow: /forgot-password
+
+Sitemap: /sitemap.xml

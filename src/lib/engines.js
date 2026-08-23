@@ -45,6 +45,7 @@ export const TOURNAMENT_STATUS_META = {
   LIVE: { label: "Live", tone: "red" },
   COMPLETED: { label: "Completed", tone: "indigo" },
   CANCELLED: { label: "Cancelled", tone: "slate" },
+  ARCHIVED: { label: "Archived", tone: "slate" },
 };
 
 export const EVENT_STATUS_META = {
@@ -371,4 +372,109 @@ export function topRivals(matches, entryIds, entryToPlayer, limit = 3) {
     if (iWon) rivals[oppPlayer].won++; else rivals[oppPlayer].lost++;
   }
   return Object.values(rivals).sort((a, b) => b.played - a.played).slice(0, limit);
+}
+
+/* ======================== PLAYER PROFILE VOCABULARY ====================== */
+
+export const SKILL_LEVELS = [
+  { key: "BEGINNER", label: "Beginner" },
+  { key: "INTERMEDIATE", label: "Intermediate" },
+  { key: "ADVANCED", label: "Advanced" },
+  { key: "PRO", label: "Professional" },
+];
+
+export const GENDERS = [
+  { key: "M", label: "Male" },
+  { key: "F", label: "Female" },
+  { key: "O", label: "Other / prefer not to say" },
+];
+
+export const CHECK_IN_META = {
+  NOT_CHECKED_IN: { label: "Not checked in", tone: "slate" },
+  CHECKED_IN: { label: "Checked in", tone: "emerald" },
+  LATE: { label: "Late", tone: "amber" },
+  NO_SHOW: { label: "No show", tone: "red" },
+};
+
+/* ========================== NOTIFICATIONS ================================ */
+
+// Presentation only — the notification types themselves are produced by
+// Postgres triggers (migration 008). An unknown type still renders, with a
+// neutral tone, rather than blowing up the list.
+// `group` is what the player filters by; `urgent` marks the ones that need
+// them to move — those are pulled to the top of the inbox and marked, because
+// "your court changed" and "your entry fee is recorded" must not read alike.
+export const NOTIFICATION_META = {
+  REGISTRATION_CONFIRMED: { tone: "emerald", label: "Registration", group: "REGISTRATION" },
+  REGISTRATION_REJECTED: { tone: "red", label: "Registration", group: "REGISTRATION" },
+  WAITLISTED: { tone: "amber", label: "Waitlist", group: "REGISTRATION" },
+  WAITLIST_PROMOTED: { tone: "emerald", label: "Waitlist", group: "REGISTRATION", urgent: true },
+  PAYMENT_PAID: { tone: "emerald", label: "Payment", group: "PAYMENT" },
+  PAYMENT_UNPAID: { tone: "slate", label: "Payment", group: "PAYMENT" },
+  PAYMENT_PENDING: { tone: "amber", label: "Payment", group: "PAYMENT" },
+  PAYMENT_FAILED: { tone: "red", label: "Payment", group: "PAYMENT", urgent: true },
+  PAYMENT_REFUNDED: { tone: "indigo", label: "Payment", group: "PAYMENT" },
+  CHECKED_IN: { tone: "emerald", label: "Check-in", group: "REGISTRATION" },
+  MATCH_SCHEDULED: { tone: "teal", label: "Schedule", group: "SCHEDULE" },
+  MATCH_TIME_CHANGED: { tone: "amber", label: "Schedule change", group: "SCHEDULE", urgent: true },
+  COURT_CHANGED: { tone: "amber", label: "Court change", group: "SCHEDULE", urgent: true },
+  OPPONENT_CHANGED: { tone: "amber", label: "Opponent change", group: "SCHEDULE", urgent: true },
+  MATCH_APPROACHING: { tone: "teal", label: "Report to court", group: "MATCH", urgent: true },
+  MATCH_STARTED: { tone: "red", label: "Match starting", group: "MATCH", urgent: true },
+  MATCH_COMPLETED: { tone: "indigo", label: "Result", group: "RESULT" },
+  TOURNAMENT_COMPLETED: { tone: "indigo", label: "Tournament", group: "TOURNAMENT" },
+  DISPUTE_RESOLVED: { tone: "emerald", label: "Dispute", group: "RESULT" },
+  DISPUTE_REJECTED: { tone: "slate", label: "Dispute", group: "RESULT" },
+};
+export const notificationMeta = (type) =>
+  NOTIFICATION_META[type] || { tone: "slate", label: "Update", group: "TOURNAMENT" };
+
+export const NOTIFICATION_GROUPS = [
+  { key: "ALL", label: "All" },
+  { key: "URGENT", label: "Urgent" },
+  { key: "MATCH", label: "Matches" },
+  { key: "SCHEDULE", label: "Schedule" },
+  { key: "REGISTRATION", label: "Registration" },
+  { key: "PAYMENT", label: "Payment" },
+  { key: "RESULT", label: "Results" },
+];
+
+export const isUrgentNotification = (n) => !!notificationMeta(n.type).urgent && !n.read;
+
+/* ============================ BRANDING =================================== */
+
+// Organizer branding must never make the public page unreadable, so an accent
+// colour is only ever used for accents (borders, chips, small text) on top of
+// the app's own surfaces — and text drawn ON the accent picks black or white
+// by relative luminance, so contrast holds whatever colour is chosen.
+export function accentTheme(hex) {
+  const fallback = { accent: "var(--color-accent-teal)", onAccent: "#04121a", isCustom: false };
+  if (!/^#[0-9a-fA-F]{6}$/.test(hex || "")) return fallback;
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const lin = (c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  const L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  return { accent: hex, onAccent: L > 0.45 ? "#0b1220" : "#ffffff", luminance: L, isCustom: true };
+}
+
+/* ============================ TIME HELPERS =============================== */
+
+export function fmtTime(iso) {
+  if (!iso) return "—";
+  try { return new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }); } catch { return "—"; }
+}
+
+export function fmtDuration(minutes) {
+  if (minutes === null || minutes === undefined) return "—";
+  const m = Math.max(0, Math.round(minutes));
+  if (m < 60) return `${m} min`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
+// "in 25 min" / "12 min ago" — the phrasing a player needs on a dashboard.
+export function relativeTime(iso, now = Date.now()) {
+  if (!iso) return "";
+  const diff = Math.round((new Date(iso).getTime() - now) / 60000);
+  const abs = Math.abs(diff);
+  const unit = abs < 60 ? `${abs} min` : abs < 1440 ? `${Math.round(abs / 60)}h` : `${Math.round(abs / 1440)}d`;
+  return diff >= 0 ? `in ${unit}` : `${unit} ago`;
 }

@@ -1,4 +1,12 @@
 -- Courtside — consolidated schema reference.
+--
+-- NOTE: this file is the ORIGINAL baseline only. Migrations 002–008 in
+-- ./migrations/ have been applied on top of it and are NOT folded in here —
+-- most importantly 008, which links players to auth users, revokes the anon
+-- read on `players` (it used to leak phone numbers and emails), adds the
+-- notification triggers, staff RBAC policies, per-match officials and
+-- branding. To rebuild a fresh environment, run this file first and then
+-- every migration in numeric order.
 -- This mirrors what has already been applied to the live project
 -- (dkkpolnuywgvmlacjzto) via 6 migrations. You don't need to run this —
 -- it's here so the schema is readable/versionable outside the dashboard.
@@ -25,7 +33,8 @@ create table public.tournaments (
   slug text unique,
   status text not null default 'DRAFT'
     check (status in ('DRAFT','REGISTRATION_OPEN','REGISTRATION_CLOSED','LIVE','COMPLETED','CANCELLED')),
-  settings jsonb not null default '{}'::jsonb, -- { matchDurationMins, startTime, rules }
+  settings jsonb not null default '{}'::jsonb, -- { matchDurationMins, bufferMins, minRestMins, startTime, endTime, rules }
+  schedule_published boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -35,6 +44,8 @@ create table public.courts (
   tournament_id uuid not null references public.tournaments(id) on delete cascade,
   name text not null,
   status text not null default 'AVAILABLE' check (status in ('AVAILABLE','UNAVAILABLE')),
+  available_start time not null default '09:00',
+  available_end time not null default '18:00',
   created_at timestamptz not null default now()
 );
 
@@ -82,13 +93,31 @@ create table public.matches (
   is_bye boolean not null default false,
   status text not null default 'PENDING' check (status in ('PENDING','SCHEDULED','READY','LIVE','COMPLETED','WALKOVER')),
   court text,
+  court_id uuid references public.courts(id) on delete set null,
   scheduled_at timestamptz,
+  scheduled_end timestamptz,
+  locked boolean not null default false,
+  priority text not null default 'NORMAL' check (priority in ('NORMAL','HIGH','CRITICAL')),
   winner_entry_id uuid references public.entries(id) on delete set null,
   next_match_id uuid references public.matches(id) on delete set null,
   next_slot text check (next_slot in ('A','B')),
   retired boolean not null default false,
   started_at timestamptz,
   completed_at timestamptz
+);
+
+create table public.schedule_audit_log (
+  id uuid primary key default gen_random_uuid(),
+  tournament_id uuid not null references public.tournaments(id) on delete cascade,
+  match_id uuid references public.matches(id) on delete set null,
+  action text not null,
+  from_court text,
+  to_court text,
+  from_time timestamptz,
+  to_time timestamptz,
+  note text,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now()
 );
 
 create table public.games (
@@ -128,6 +157,8 @@ create index on public.matches (entry_b);
 create index on public.matches (winner_entry_id);
 create index on public.games (match_id);
 create index on public.notifications (tournament_id);
+create index on public.matches (court_id);
+create index on public.schedule_audit_log (tournament_id, created_at desc);
 create index on public.tournaments (organizer_id);
 -- NOTE: no separate index on tournaments.slug — the UNIQUE constraint already provides one.
 
@@ -315,7 +346,14 @@ alter table public.organizer_profiles enable row level security;
 create policy "self_manage_profile" on public.organizer_profiles for all to authenticated
   using (id = (select auth.uid())) with check (id = (select auth.uid()));
 
+alter table public.schedule_audit_log enable row level security;
+create policy "owner_select_audit" on public.schedule_audit_log for select to authenticated
+  using (public.is_tournament_owner(tournament_id));
+create policy "owner_insert_audit" on public.schedule_audit_log for insert to authenticated
+  with check (public.is_tournament_owner(tournament_id));
+
 -- ── Realtime ────────────────────────────────────────────────────────────
 alter publication supabase_realtime add table
   public.tournaments, public.tournament_events, public.matches,
-  public.games, public.entries, public.courts, public.notifications;
+  public.games, public.entries, public.courts, public.notifications,
+  public.schedule_audit_log;

@@ -4,9 +4,11 @@ import { motion } from "motion/react";
 import { ChevronLeft, MapPin, Trophy, Share2, Building2 } from "lucide-react";
 import { cx, fmtDate, computeCareerStats, currentStreak, computeBadges, topRivals, divisionLabel, BadmintonScoringEngine, toAB } from "../lib/engines";
 import { getPlayer, getPlayerHistory, getPlayersByIds } from "../lib/repository";
+import { computeRanking } from "../lib/ranking";
 import { Card, Badge, Btn, EmptyState } from "../components/ui/primitives";
 import { BrandLoader, Reveal } from "../components/ui/motion";
 import { CourtGeometry } from "../components/ui/atmosphere";
+import { useDocumentMeta } from "../lib/useDocumentMeta";
 
 const BADGE_TONES = {
   yellow: "text-accent-yellow", teal: "text-accent-teal", purple: "text-accent-purple",
@@ -25,6 +27,7 @@ function StatTile({ label, value, accent }) {
 export default function PlayerProfile() {
   const { id } = useParams();
   const [player, setPlayer] = useState(null);
+  useDocumentMeta({ title: player?.name, description: player?.name ? `${player.name} on Matchday — tournament history, results and ranking.` : undefined });
   const [history, setHistory] = useState(null);
   const [rivals, setRivals] = useState([]);
   const [error, setError] = useState(null);
@@ -58,11 +61,6 @@ export default function PlayerProfile() {
   const streak = currentStreak(history.matches, entryIds);
   const mine = new Set(entryIds);
 
-  // Titles = divisions where one of this player's entries is the champion.
-  const titles = (history.entries || []).filter(
-    (a) => a.entries?.tournament_events?.champion_entry_id &&
-           a.entries.tournament_events.champion_entry_id === a.entry_id
-  );
   // event_id -> division, so each match row can name the division it was in
   const eventById = Object.fromEntries(
     (history.entries || [])
@@ -71,7 +69,14 @@ export default function PlayerProfile() {
       .map((ev) => [ev.id, ev])
   );
 
-  const badges = computeBadges(stats, streak, titles.length);
+  // Ranking uses the same match history already loaded — no extra fetch. The
+  // sport comes from the tournaments this player actually competed in.
+  const sport = (history.entries || [])
+    .map((a) => a.entries?.tournament_events?.tournaments?.sport)
+    .find(Boolean) || "badminton";
+  const ranking = computeRanking(history.matches, entryIds, eventById, sport);
+
+  const badges = computeBadges(stats, streak, ranking.titles);
 
   const tournaments = [...new Map(
     (history.entries || [])
@@ -103,15 +108,23 @@ export default function PlayerProfile() {
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.4 }}
-              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-accent-teal to-accent-blue font-display text-2xl font-bold text-white"
+              className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl"
             >
-              {player.name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()}
+              {player.photo_url ? (
+                <img src={player.photo_url} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-accent-teal to-accent-blue font-display text-2xl font-bold text-white">
+                  {player.name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()}
+                </div>
+              )}
             </motion.div>
             <div>
               <h1 className="text-2xl font-bold text-white">{player.name}</h1>
+              {player.bio && <p className="mt-0.5 max-w-md text-sm text-ink-2">{player.bio}</p>}
               <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-3">
                 {player.city && <span className="flex items-center gap-1"><MapPin size={11} />{player.city}</span>}
                 {player.club && <span className="flex items-center gap-1"><Building2 size={11} />{player.club}</span>}
+                {player.skill_level && <span className="capitalize">{player.skill_level.toLowerCase()}</span>}
                 {streak && streak.count > 1 && (
                   <span className={cx("font-semibold", streak.kind === "W" ? "text-accent-teal" : "text-ink-2")}>
                     {streak.count} {streak.kind === "W" ? "win" : "loss"} streak
@@ -123,12 +136,52 @@ export default function PlayerProfile() {
           <Btn size="sm" variant="secondary" icon={Share2} onClick={share}>Share</Btn>
         </div>
 
-        <div className="relative mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <div className="relative mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <StatTile label="Played" value={stats.played} />
           <StatTile label="Won" value={stats.won} accent="text-accent-teal" />
           <StatTile label="Lost" value={stats.lost} />
           <StatTile label="Win %" value={`${stats.winPct}%`} />
-          <StatTile label="Titles" value={titles.length} accent="text-accent-yellow" />
+          <StatTile label="Titles" value={ranking.titles} accent="text-accent-yellow" />
+          <StatTile label="Finals" value={ranking.finals} />
+        </div>
+
+        {/* Ranking is withheld rather than shown as a provisional number —
+            a "rank" off one match would read as a real standing. */}
+        <div className="relative mt-3 rounded-lg border border-white/10 bg-white/5 p-3.5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-ink-3">Badminton ranking points</div>
+              {ranking.ranked ? (
+                <div className="font-display text-3xl font-bold text-accent-teal">{ranking.points}</div>
+              ) : (
+                <div className="mt-0.5 max-w-xs text-sm text-ink-3">
+                  Unranked — {ranking.minMatches} completed matches are needed, {ranking.played} so far.
+                </div>
+              )}
+            </div>
+            {/* Cumulative points over completed matches. A sparkline is the
+                honest shape here: it shows direction without implying
+                precision the data does not have. */}
+            {ranking.ranked && ranking.history.length > 1 && (
+              <svg viewBox="0 0 120 36" className="h-9 w-32" preserveAspectRatio="none" aria-hidden="true">
+                <polyline
+                  fill="none" stroke="var(--color-accent-teal)" strokeWidth="2"
+                  strokeLinecap="round" strokeLinejoin="round"
+                  points={ranking.history.map((h, i) => {
+                    const x = (i / (ranking.history.length - 1)) * 118 + 1;
+                    const max = ranking.history[ranking.history.length - 1].points || 1;
+                    return `${x},${34 - (h.points / max) * 32}`;
+                  }).join(" ")}
+                />
+              </svg>
+            )}
+          </div>
+          {ranking.ranked && (
+            <div className="mt-1 text-[11px] text-ink-3">
+              Earned across {ranking.played} completed {ranking.played === 1 ? "match" : "matches"}. See the{" "}
+              <Link to="/leaderboard" className="text-accent-teal hover:underline">leaderboard</Link> for position.
+            </div>
+          )}
         </div>
 
         {badges.length > 0 && (

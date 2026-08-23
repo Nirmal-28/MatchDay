@@ -3,14 +3,38 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0B1220" />
+
+    <title>Matchday — run and play racket tournaments</title>
+    <meta name="description" content="Create a tournament, seed the draw, schedule courts and score matches live. Players find events, register and follow their results — one account for playing, organizing and officiating." />
+
+    <!-- Social preview. These are the site-wide defaults; a shared tournament
+         link gets its own title/description/image injected server-side for
+         crawlers by api/preview.js (see vercel.json), because social scrapers
+         do not run the JavaScript that would otherwise set them. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Matchday" />
+    <meta property="og:title" content="Matchday — run and play racket tournaments" />
+    <meta property="og:description" content="Create a tournament, seed the draw, schedule courts and score matches live. Players find events, register and follow their results." />
+    <meta property="og:image" content="/logo.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Matchday — run and play racket tournaments" />
+    <meta name="twitter:description" content="Create a tournament, seed the draw, schedule courts and score matches live. Players find events, register and follow their results." />
+    <meta name="twitter:image" content="/logo.png" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <title>Matchday</title>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <div style="font-family: system-ui, sans-serif; padding: 2rem; text-align: center">
+        Matchday needs JavaScript to show live draws and scores. Please enable it and reload.
+      </div>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

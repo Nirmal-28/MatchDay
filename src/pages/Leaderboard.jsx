@@ -2,19 +2,34 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Trophy, MapPin } from "lucide-react";
 import { cx } from "../lib/engines";
-import { getLeaderboard } from "../lib/repository";
+import { getRankingData } from "../lib/repository";
+import { computeRanking, rankPlayers, rankingConfigFor } from "../lib/ranking";
 import { EmptyState } from "../components/ui/primitives";
 import { BrandLoader, Reveal, StaggerList, StaggerItem } from "../components/ui/motion";
 import { CourtGeometry } from "../components/ui/atmosphere";
+import { useDocumentMeta } from "../lib/useDocumentMeta";
 
 const RANK_ACCENT = ["text-accent-yellow", "text-ink-3", "text-accent-orange"];
 
 export default function Leaderboard() {
   const [rows, setRows] = useState(null);
+  useDocumentMeta({ title: "Leaderboard", description: "Badminton ranking points from completed tournament matches." });
 
+  // Ranking points come from real completed matches only. getRankingData()
+  // returns the raw material; computeRanking() applies the sport's points
+  // model, and rankPlayers() drops anyone below the minimum match count
+  // rather than publishing a provisional number that reads as a real position.
   useEffect(() => {
     let cancelled = false;
-    getLeaderboard().then((r) => { if (!cancelled) setRows(r); });
+    getRankingData().then(({ players, matchesByPlayer, eventById }) => {
+      if (cancelled) return;
+      const scored = players.map((pl) => {
+        const rec = matchesByPlayer[pl.id];
+        const r = computeRanking(rec.matches, rec.entryIds, eventById, "badminton");
+        return { ...pl, points: r.points ?? 0, played: r.played, won: r.won, winPct: r.winPct, titles: r.titles };
+      });
+      setRows(rankPlayers(scored, "badminton"));
+    }).catch(() => setRows([]));
     return () => { cancelled = true; };
   }, []);
 
@@ -26,7 +41,7 @@ export default function Leaderboard() {
           <div className="text-[11px] font-semibold uppercase tracking-widest text-accent-teal">Matchday</div>
           <h1 className="mt-1 text-2xl font-bold text-white sm:text-3xl">Leaderboard</h1>
           <p className="mx-auto mt-2 max-w-md text-sm text-ink-3">
-            Ranked by matches won across every MatchDay tournament. Play more, climb higher.
+            Badminton ranking points from every completed match on MatchDay. A player needs at least {rankingConfigFor("badminton").minMatches} completed matches to be ranked.
           </p>
         </div>
       </div>
@@ -34,7 +49,7 @@ export default function Leaderboard() {
       {!rows ? (
         <BrandLoader />
       ) : rows.length === 0 ? (
-        <EmptyState icon={Trophy} title="No rankings yet" hint="Once a few tournaments finish, the top players will show up here." />
+        <EmptyState icon={Trophy} title="No rankings yet" hint={`Once players complete at least ${rankingConfigFor("badminton").minMatches} matches each, the ranking table fills in.`} />
       ) : (
         <Reveal>
           <div className="overflow-x-auto rounded-md border border-line">
@@ -43,6 +58,7 @@ export default function Leaderboard() {
                 <tr>
                   <th className="px-3 py-2 font-medium">#</th>
                   <th className="px-3 py-2 font-medium">Player</th>
+                  <th className="px-3 py-2 font-medium text-center">Points</th>
                   <th className="px-3 py-2 font-medium text-center">Played</th>
                   <th className="px-3 py-2 font-medium text-center">Won</th>
                   <th className="px-3 py-2 font-medium text-center">Win %</th>
@@ -68,6 +84,7 @@ export default function Leaderboard() {
                         </span>
                       )}
                     </td>
+                    <td className="px-3 py-2.5 text-center font-mono font-bold text-accent-teal">{p.points}</td>
                     <td className="px-3 py-2.5 text-center font-mono text-ink-2">{p.played}</td>
                     <td className="px-3 py-2.5 text-center font-mono font-semibold text-ink">{p.won}</td>
                     <td className={cx("px-3 py-2.5 text-center font-mono font-semibold", i < 3 ? "text-accent-teal" : "text-ink-2")}>

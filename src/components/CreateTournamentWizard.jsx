@@ -2,9 +2,11 @@ import React, { useState } from "react";
 import { MapPin, Calendar, Check, ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
 import { cx, fmtDateRange, inr, CATEGORY_META, AGE_GROUPS, SKILL_GRADES, FORMAT_META } from "../lib/engines";
 import { Modal, Field, Btn, Badge, Card, inputCls } from "./ui/primitives";
+import { SportIcon, SPORT_KEYS } from "./ui/motion";
 
 export default function CreateTournamentWizard({ open, onClose, onSubmit }) {
   const [step, setStep] = useState(1);
+  const [sport, setSport] = useState("badminton");
   const [basics, setBasics] = useState({
     name: "", description: "", organizerName: "", venue: "", location: "",
     startDate: "", endDate: "", registrationDeadline: "", contactEmail: "", contactPhone: "",
@@ -42,9 +44,10 @@ export default function CreateTournamentWizard({ open, onClose, onSubmit }) {
     setError("");
     setSaving(true);
     try {
-      await onSubmit({ basics, categories, settings, publish });
+      await onSubmit({ basics, categories, settings, publish, sport });
       setStep(1);
       setBasics({ name: "", description: "", organizerName: "", venue: "", location: "", startDate: "", endDate: "", registrationDeadline: "", contactEmail: "", contactPhone: "" });
+      setSport("badminton");
       setSelectedCats({ MS: true });
       setCatConfig({ MS: { maxEntries: 16, feeINR: 300 } });
       onClose();
@@ -69,16 +72,36 @@ export default function CreateTournamentWizard({ open, onClose, onSubmit }) {
 
       {step === 1 && (
         <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2"><Field label="Tournament name" required><input className={inputCls} value={basics.name} onChange={(e) => setBasics({ ...basics, name: e.target.value })} placeholder="e.g. Coimbatore Winter Open 2026" /></Field></div>
-          <div className="col-span-2"><Field label="Description"><textarea className={cx(inputCls, "resize-none")} rows={2} value={basics.description} onChange={(e) => setBasics({ ...basics, description: e.target.value })} /></Field></div>
-          <Field label="Organizer"><input className={inputCls} value={basics.organizerName} onChange={(e) => setBasics({ ...basics, organizerName: e.target.value })} /></Field>
-          <Field label="Venue" required><input className={inputCls} value={basics.venue} onChange={(e) => setBasics({ ...basics, venue: e.target.value })} /></Field>
-          <Field label="Location"><input className={inputCls} value={basics.location} onChange={(e) => setBasics({ ...basics, location: e.target.value })} placeholder="City, State" /></Field>
-          <Field label="Registration deadline"><input type="date" className={inputCls} value={basics.registrationDeadline} onChange={(e) => setBasics({ ...basics, registrationDeadline: e.target.value })} /></Field>
-          <Field label="Start date" required><input type="date" className={inputCls} value={basics.startDate} onChange={(e) => setBasics({ ...basics, startDate: e.target.value })} /></Field>
-          <Field label="End date" required><input type="date" className={inputCls} value={basics.endDate} onChange={(e) => setBasics({ ...basics, endDate: e.target.value })} /></Field>
-          <Field label="Contact email"><input className={inputCls} value={basics.contactEmail} onChange={(e) => setBasics({ ...basics, contactEmail: e.target.value })} /></Field>
-          <Field label="Contact phone"><input className={inputCls} value={basics.contactPhone} onChange={(e) => setBasics({ ...basics, contactPhone: e.target.value })} /></Field>
+          <div className="col-span-2">
+            <Field label="Sport" required>
+              <div className="flex flex-wrap gap-1.5">
+                {SPORT_KEYS.map((s) => (
+                  <button key={s} type="button" disabled={s !== "badminton"}
+                    onClick={() => setSport(s)}
+                    title={s === "badminton" ? undefined : "Coming soon — draws and scoring aren't built for this sport yet"}
+                    className={cx(
+                      "flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium",
+                      sport === s ? "border-accent-teal bg-accent-teal/10 text-accent-teal" : "border-line text-ink-2",
+                      s !== "badminton" ? "cursor-not-allowed opacity-40" : "hover:bg-surface-2"
+                    )}>
+                    <SportIcon sport={s} className="h-3.5 w-3.5" />
+                    {s[0].toUpperCase() + s.slice(1)}
+                    {s !== "badminton" && <span className="text-[9px] uppercase">Soon</span>}
+                  </button>
+                ))}
+              </div>
+            </Field>
+          </div>
+          <div className="col-span-2"><Field label="Tournament name" required><input className={inputCls} value={basics.name} onChange={(e) => setBasics((b) => ({ ...b, name: e.target.value }))} placeholder="e.g. Coimbatore Winter Open 2026" /></Field></div>
+          <div className="col-span-2"><Field label="Description"><textarea className={cx(inputCls, "resize-none")} rows={2} value={basics.description} onChange={(e) => setBasics((b) => ({ ...b, description: e.target.value }))} /></Field></div>
+          <Field label="Organizer"><input className={inputCls} value={basics.organizerName} onChange={(e) => setBasics((b) => ({ ...b, organizerName: e.target.value }))} /></Field>
+          <Field label="Venue" required><input className={inputCls} value={basics.venue} onChange={(e) => setBasics((b) => ({ ...b, venue: e.target.value }))} /></Field>
+          <Field label="Location"><input className={inputCls} value={basics.location} onChange={(e) => setBasics((b) => ({ ...b, location: e.target.value }))} placeholder="City, State" /></Field>
+          <Field label="Registration deadline"><input type="date" className={inputCls} value={basics.registrationDeadline} onChange={(e) => setBasics((b) => ({ ...b, registrationDeadline: e.target.value }))} /></Field>
+          <Field label="Start date" required><input type="date" className={inputCls} value={basics.startDate} onChange={(e) => setBasics((b) => ({ ...b, startDate: e.target.value }))} /></Field>
+          <Field label="End date" required><input type="date" className={inputCls} value={basics.endDate} onChange={(e) => setBasics((b) => ({ ...b, endDate: e.target.value }))} /></Field>
+          <Field label="Contact email"><input className={inputCls} value={basics.contactEmail} onChange={(e) => setBasics((b) => ({ ...b, contactEmail: e.target.value }))} /></Field>
+          <Field label="Contact phone"><input className={inputCls} value={basics.contactPhone} onChange={(e) => setBasics((b) => ({ ...b, contactPhone: e.target.value }))} /></Field>
         </div>
       )}
 
@@ -144,11 +167,11 @@ export default function CreateTournamentWizard({ open, onClose, onSubmit }) {
       {step === 3 && (
         <div className="grid grid-cols-2 gap-3">
           <Field label="Number of courts" hint="Used by the scheduling engine to spread matches across courts.">
-            <input type="number" min={1} className={inputCls} value={settings.courtsCount} onChange={(e) => setSettings({ ...settings, courtsCount: Number(e.target.value) })} />
+            <input type="number" min={1} className={inputCls} value={settings.courtsCount} onChange={(e) => setSettings((s) => ({ ...s, courtsCount: Number(e.target.value) }))} />
           </Field>
-          <Field label="Match duration (minutes)"><input type="number" min={15} className={inputCls} value={settings.matchDurationMins} onChange={(e) => setSettings({ ...settings, matchDurationMins: Number(e.target.value) })} /></Field>
-          <Field label="Daily start time"><input type="time" className={inputCls} value={settings.startTime} onChange={(e) => setSettings({ ...settings, startTime: e.target.value })} /></Field>
-          <div className="col-span-2"><Field label="Rules / notes"><textarea className={cx(inputCls, "resize-none")} rows={2} value={settings.rules} onChange={(e) => setSettings({ ...settings, rules: e.target.value })} /></Field></div>
+          <Field label="Match duration (minutes)"><input type="number" min={15} className={inputCls} value={settings.matchDurationMins} onChange={(e) => setSettings((s) => ({ ...s, matchDurationMins: Number(e.target.value) }))} /></Field>
+          <Field label="Daily start time"><input type="time" className={inputCls} value={settings.startTime} onChange={(e) => setSettings((s) => ({ ...s, startTime: e.target.value }))} /></Field>
+          <div className="col-span-2"><Field label="Rules / notes"><textarea className={cx(inputCls, "resize-none")} rows={2} value={settings.rules} onChange={(e) => setSettings((s) => ({ ...s, rules: e.target.value }))} /></Field></div>
         </div>
       )}
 

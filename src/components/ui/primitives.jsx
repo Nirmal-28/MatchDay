@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { X, AlertCircle, CheckCircle2 } from "lucide-react";
 import { cx, TONE_CLASSES } from "../../lib/engines";
 
@@ -47,14 +47,89 @@ export function EmptyState({ icon: Icon, title, hint, action }) {
   );
 }
 
+// Every modal in the app renders through this one, so the accessibility rules
+// live here rather than being re-implemented (or forgotten) at each call site:
+//
+//   - Escape closes it. Previously the only way out was finding the X, which
+//     on a phone can be off-screen inside a scrolled dialog.
+//   - Focus moves into the dialog on open and returns to whatever opened it on
+//     close, so a keyboard user is not dumped back at the top of the page.
+//   - Tab is trapped inside. Without this, tabbing walks out of the dialog and
+//     into the page behind it, which a screen reader still announces even
+//     though it is visually covered.
+//   - role="dialog" + aria-modal + aria-labelledby, so it is announced as a
+//     dialog with a name instead of an anonymous group of text.
+//   - Background scrolling is locked, which on iOS otherwise scrolls the page
+//     behind the dialog as soon as the dialog itself hits its end.
 export function Modal({ open, onClose, title, children, width = "max-w-lg" }) {
+  const panelRef = useRef(null);
+  const restoreRef = useRef(null);
+  // useId, not a module counter — it is stable across re-renders, unique per
+  // instance, and does not read a ref during render.
+  const titleId = `modal-title-${useId()}`;
+
+  useEffect(() => {
+    if (!open) return;
+
+    restoreRef.current = document.activeElement;
+    const { overflow } = document.body.style;
+    document.body.style.overflow = "hidden";
+
+    // Focus the first thing worth focusing; fall back to the panel itself so
+    // focus is never left behind on the page underneath.
+    const focusables = () =>
+      panelRef.current?.querySelectorAll(
+        'a[href], button:not([disabled]), textarea, input:not([disabled]), select, [tabindex]:not([tabindex="-1"])'
+      ) ?? [];
+    const first = focusables()[0];
+    (first || panelRef.current)?.focus();
+
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") { e.stopPropagation(); onClose?.(); return; }
+      if (e.key !== "Tab") return;
+
+      const items = Array.from(focusables());
+      if (!items.length) { e.preventDefault(); return; }
+      const firstItem = items[0];
+      const lastItem = items[items.length - 1];
+
+      // Wrap at both ends rather than letting focus escape the dialog.
+      if (e.shiftKey && document.activeElement === firstItem) {
+        e.preventDefault(); lastItem.focus();
+      } else if (!e.shiftKey && document.activeElement === lastItem) {
+        e.preventDefault(); firstItem.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown, true);
+      document.body.style.overflow = overflow;
+      restoreRef.current?.focus?.();
+    };
+  }, [open, onClose]);
+
   if (!open) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className={cx("max-h-[90vh] w-full overflow-y-auto rounded-lg border border-line bg-surface shadow-2xl", width)} onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className={cx("max-h-[90vh] w-full overflow-y-auto rounded-lg border border-line bg-surface shadow-2xl outline-none", width)}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
-          <h3 className="font-semibold text-ink">{title}</h3>
-          <button onClick={onClose} className="rounded p-1 text-ink-3 hover:bg-surface-2 hover:text-ink"><X size={18} /></button>
+          <h3 id={titleId} className="font-semibold text-ink">{title}</h3>
+          <button
+            type="button" onClick={onClose} aria-label="Close dialog"
+            className="rounded p-1 text-ink-3 hover:bg-surface-2 hover:text-ink"
+          >
+            <X size={18} />
+          </button>
         </div>
         <div className="p-5">{children}</div>
       </div>
@@ -86,7 +161,13 @@ export function ScoreDigits({ a, b, winner }) {
 
 export function Toasts({ toasts }) {
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-[100] flex flex-col gap-2">
+    // A live region, so a confirmation ("Draw generated") is announced rather
+    // than only appearing in a corner a screen reader user never looks at.
+    // "polite" because none of these interrupt anything urgent.
+    <div
+      role="status" aria-live="polite" aria-atomic="false"
+      className="pointer-events-none fixed bottom-4 right-4 z-[100] flex flex-col gap-2"
+    >
       {toasts.map((t) => (
         <div key={t.id} className={cx(
           "pointer-events-auto flex items-center gap-2 rounded-md border px-3.5 py-2.5 text-sm shadow-lg animate-[fadein_.15s_ease-out]",

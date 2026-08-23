@@ -1,0 +1,50 @@
+name: CI
+
+# Runs on every push and pull request. Before this, nothing checked a commit
+# before Vercel deployed it — a lint error or a broken build reached
+# production and the first sign of trouble was the site being down.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new push to the same branch makes the previous run irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Engine tests
+        run: |
+          npm run test:scheduling
+          npm run test:series
+
+      # The build needs the Supabase env vars because src/lib/supabaseClient.js
+      # throws at import time when they are missing. These are the PUBLISHABLE
+      # values (the same ones shipped in the browser bundle), not secrets —
+      # but they are read from repository secrets so this file never contains
+      # project identifiers, and so a fork's CI does not point at your project.
+      - name: Build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || 'placeholder-key' }}
+        run: npm run build
