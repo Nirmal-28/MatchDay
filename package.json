@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "test:scheduling": "node scripts/test-scheduling.mjs",
     "test:series": "node scripts/test-series-standings.mjs",
-    "test:migrations": "node scripts/verify-migration-012.mjs",
+    "test:migrations": "node scripts/verify-migration-012.mjs && node scripts/verify-rls-recursion.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:all": "npm run lint && npm test && npm run test:scheduling && npm run test:series && npm run test:migrations"

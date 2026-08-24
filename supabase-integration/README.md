@@ -245,13 +245,45 @@ from `follower_count()` / `follower_counts()`, which are SECURITY DEFINER and
 return numbers only. There is no feed, no follower list, and no mutual-follow
 concept, by design.
 
-## Applying 010, 011 and 012 — exact procedure
+## Migration 013 — P0: infinite RLS recursion on `matches`
+
+**Apply this one first, ahead of anything else.** Until it is applied, every
+authenticated user reading a tournament that has a draw gets:
+
+```
+GET /rest/v1/matches?select=*,games(*)  ->  500
+{"code":"54001","message":"stack depth limit exceeded"}
+```
+
+That takes out the draw, bracket, schedule, live scoring, Scorer Mode,
+results, Match Center, next-match and Tournament Health simultaneously.
+Anonymous spectators are unaffected, because the failing policy is
+`to authenticated` — which is exactly why public tournament pages kept
+working and hid the problem for so long.
+
+`can_score_match()` (migration 005) is `SECURITY INVOKER` *and* reads
+`public.matches`, while being the `USING` clause of `staff_select_matches`
+**on `public.matches`**. Reading a match re-enters the policy, which re-enters
+the function. 013 changes one word — `security invoker` → `security definer` —
+which is the same treatment migration 008 already gave `is_tournament_staff()`
+for the identical reason.
+
+It also resolves a transitive case: reading `games` evaluates
+`is_match_owner()`, which reads `matches`, which re-entered the same cycle.
+
+Guarded by `npm run test:migrations`, which applies 013 as shipped and asserts
+both that the recursion is gone and that `SECURITY DEFINER` did not widen
+access (a stranger still sees nothing; a SCORER sees only their own
+tournament; published tournaments stay publicly readable).
+
+## Applying 010, 011, 012 and 013 — exact procedure
 
 All three are idempotent (`if not exists` / `drop policy if exists` / `create
 or replace` throughout) and safe to re-run. **Apply them in order**, and apply
-010 first and on its own — it is the only one that fixes a live correctness
-bug (the concurrent-scorer race), so it is worth confirming before layering
-anything else on top.
+**013 first and on its own** — it is the only one repairing an active
+outage, and it is a single `create or replace function`, so it is safe to
+apply at any time and needs no coordination with the others. Confirm the app
+works again before layering anything else on top.
 
 ```bash
 # Option A — Supabase CLI (needs the DB password / a linked project)
@@ -259,10 +291,14 @@ supabase link --project-ref dkkpolnuywgvmlacjzto
 supabase db push
 
 # Option B — SQL editor: paste each file, in this order, one at a time
-#   1. 010_hardening_and_observability.sql
-#   2. 011_notification_delivery.sql
-#   3. 012_registration_fields_and_follows.sql
+#   1. 013_fix_can_score_match_recursion.sql   <-- P0, apply first
+#   2. 010_hardening_and_observability.sql
+#   3. 011_notification_delivery.sql
+#   4. 012_registration_fields_and_follows.sql
 ```
+
+Applying 013 out of numeric order is fine and intentional: it only redefines a
+function that has existed since 005, and depends on nothing 010–012 add.
 
 Migration 012's DDL is executed against a real Postgres in CI
 (`npm run test:migrations`, PGlite/WASM) — 24 assertions covering the
@@ -272,6 +308,20 @@ self-consistent; it does **not** prove anything about your live project's data,
 so still apply to staging first if you have one.
 
 ### Verifying after you apply
+
+```sql
+-- 013: can_score_match MUST come back with prosecdef = true. If it is false,
+-- the fix did not land and matches will still 500 for signed-in users.
+select proname, prosecdef as is_security_definer
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public' and p.proname = 'can_score_match';
+```
+
+The end-to-end check that actually matters: sign in, open a tournament that
+has a generated draw, and confirm the Draw tab renders a bracket instead of
+"Generate the draw", and that the matches count in the header is non-zero.
+Before 013 that page showed `MATCHES: 0` next to a `DRAW PUBLISHED` badge and
+a red `stack depth limit exceeded` toast.
 
 ```sql
 -- Expect 3 rows: score_point_atomic, consume_rate_limit, follower_count
