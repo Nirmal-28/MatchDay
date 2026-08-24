@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, MapPin, Calendar, Building2, Radio, Share2, Lock, Search, Megaphone, Users, ExternalLink, Trophy } from "lucide-react";
 import { cx, fmtDateRange, fmtDateTime, inr, entryName, entryShort, matchStageLabel, BadmintonScoringEngine, toAB, CATEGORY_META, divisionLabel, EVENT_STATUS_META, TOURNAMENT_STATUS_META, accentTheme } from "../lib/engines";
@@ -13,64 +13,7 @@ import StandingsPanel from "../components/StandingsPanel";
 import ScheduleTable from "../components/ScheduleTable";
 import ResultsPanel from "../components/ResultsPanel";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
-
-/* A horizontally scrollable strip that says so.
-
-   The tab row overflows on a phone — Bracket, Results and Players sit past
-   the right edge, which are exactly the tabs a spectator wants on tournament
-   day. Previously it clipped mid-label with no fade, no chevron and no
-   scrollbar, so the last visible thing was a sliced glyph that reads as a
-   rendering bug rather than an invitation to swipe (audit finding F3).
-
-   The fade is applied as a mask on the scroller itself, so it costs no
-   vertical space, and it tracks the real scroll position: it appears on the
-   right only while there is more to reach, on the left once you have moved,
-   and disappears entirely when everything already fits. A static fade would
-   keep implying hidden tabs at the end of the strip, which is its own small
-   lie. The border sits on the outer wrapper so the mask does not fade it. */
-function ScrollFade({ children, className, innerClassName }) {
-  const ref = useRef(null);
-  const [edges, setEdges] = useState({ left: false, right: false });
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const measure = () => {
-      // 1px of slack: sub-pixel layout means scrollLeft rarely lands exactly
-      // on scrollWidth - clientWidth, which would leave the fade stuck on.
-      const max = el.scrollWidth - el.clientWidth;
-      setEdges({ left: el.scrollLeft > 1, right: el.scrollLeft < max - 1 });
-    };
-    measure();
-    el.addEventListener("scroll", measure, { passive: true });
-    // Catches viewport resizes and tab-list changes alike (a tournament going
-    // live adds a Live tab, which can push the row into overflow).
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => { el.removeEventListener("scroll", measure); ro.disconnect(); };
-  }, [children]);
-
-  const mask =
-    edges.left && edges.right
-      ? "linear-gradient(to right, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%)"
-      : edges.right
-        ? "linear-gradient(to right, #000 calc(100% - 28px), transparent 100%)"
-        : edges.left
-          ? "linear-gradient(to right, transparent 0, #000 28px)"
-          : undefined;
-
-  return (
-    <div className={className}>
-      <div
-        ref={ref}
-        className={cx("overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", innerClassName)}
-        style={mask ? { maskImage: mask, WebkitMaskImage: mask } : undefined}
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
+import ScrollFade from "../components/ui/ScrollFade";
 
 // On tournament day LIVE leads; the rest of the time Overview does. The tab
 // list is built per-tournament so a section only exists when it has something

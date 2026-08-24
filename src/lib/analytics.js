@@ -235,7 +235,15 @@ export function commandCenter({ tournament, events, courts, entries, matches, no
     live,
     upNext,
     attention,
-    courtsFree: board.filter((b) => b.state === "AVAILABLE").length,
+    /* "Free" means free RIGHT NOW — no match on the court at this moment.
+       It previously counted only the AVAILABLE state, which excludes a court
+       whose next match is merely booked (state NEXT). The result was a header
+       reading "Courts free 0" directly above a Court Status panel showing two
+       idle courts: two panels on one screen contradicting each other, and the
+       header was the one that was wrong.
+
+       A court marked UNAVAILABLE is not free either — it is closed. */
+    courtsFree: board.filter((b) => b.state !== "LIVE" && b.state !== "UNAVAILABLE").length,
     courtsBusy: board.filter((b) => b.state === "LIVE").length,
   };
 }

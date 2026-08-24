@@ -33,6 +33,7 @@ import AuditLogPanel from "../components/AuditLogPanel";
 import DisputesPanel from "../components/DisputesPanel";
 import CommandCenterPanel from "../components/CommandCenterPanel";
 import RegistrationFieldsPanel from "../components/RegistrationFieldsPanel";
+import ScrollFade from "../components/ui/ScrollFade";
 import StaffPanel from "../components/StaffPanel";
 import FinancePanel from "../components/FinancePanel";
 import AnalyticsPanel from "../components/AnalyticsPanel";
@@ -271,13 +272,22 @@ export default function TournamentControlCenter() {
       </div>
 
       <div className="flex flex-col gap-5 lg:flex-row">
-        <div className="flex gap-1 overflow-x-auto lg:w-48 lg:flex-none lg:flex-col lg:overflow-visible">
+        {/* Horizontal rail on a phone, vertical sidebar from lg up. Below lg
+            it overflows badly — up to 15 tabs clipped mid-label with nothing
+            indicating there is more — so it gets the same scroll fade the
+            public tournament page uses. On lg the column does not overflow
+            horizontally, so ScrollFade measures no overflow and renders no
+            mask; the sidebar is untouched. */}
+        <ScrollFade
+          className="lg:w-48 lg:flex-none"
+          innerClassName="flex gap-1 lg:flex-col lg:overflow-visible"
+        >
           {visibleTabs.map((t) => (
             <button key={t.key} onClick={() => setTab(t.key)} className={`flex flex-shrink-0 items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium transition-colors ${activeTab === t.key ? "bg-accent-teal/10 text-accent-teal" : "text-ink-2 hover:bg-surface-2"}`}>
               <t.icon size={15} />{t.label}
             </button>
           ))}
-        </div>
+        </ScrollFade>
 
         <div className="min-w-0 flex-1">
           {["participants", "draw", "results"].includes(activeTab) && events.length > 1 && (

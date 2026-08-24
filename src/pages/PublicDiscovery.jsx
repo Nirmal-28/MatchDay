@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import {
   cx, fmtDate, fmtDateRange, inr, divisionLabel, TOURNAMENT_STATUS_META,
-  CATEGORY_META, AGE_GROUPS, SKILL_GRADES,
+  CATEGORY_META, AGE_GROUPS, SKILL_GRADES, todayLocal,
 } from "../lib/engines";
 import { listDiscoverableTournaments, listEvents, listMatches, listCourts } from "../lib/repository";
 import { useAuth } from "../lib/AuthContext";
@@ -439,7 +439,7 @@ export default function PublicDiscovery() {
           </div>
           <StaggerList className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((t) => {
-              const deadlinePassed = t.registration_deadline && t.registration_deadline < new Date().toISOString().slice(0, 10);
+              const deadlinePassed = t.registration_deadline && t.registration_deadline < todayLocal();
               // Best availability across this tournament's categories, using
               // the same rules the registration form and RLS apply.
               const reg = tournamentRegistrationState(t, t.events);

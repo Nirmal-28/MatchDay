@@ -116,6 +116,54 @@ describe("projectedFinish", () => {
     expect(p.remainingMatches).toBe(1);
   });
 
+  /* Regression: the projection used to anchor to `now` unconditionally, so a
+     tournament scheduled months out reported a finish time earlier the same
+     morning — arithmetically consistent, and completely wrong. */
+  it("anchors to the scheduled start when play has not begun", () => {
+    // First match is 8 hours away; 1 match, 1 court, 45 min slot.
+    const matches = [match("m1", { scheduled_at: iso(480) })];
+    const p = projectedFinish({
+      matches, courts: [court("c1", "1")],
+      settings: { matchDurationMins: 40, bufferMins: 5 }, now: T0,
+    });
+    expect(p.pending).toBe(true);
+    expect(p.startsAtIso).toBe(iso(480));
+    // Finishes 45 min after the START, not 45 min from now.
+    expect(p.iso).toBe(iso(525));
+  });
+
+  it("reports minutes of PLAY, not time until the finish, while pending", () => {
+    const matches = [match("m1", { scheduled_at: iso(480) })];
+    const p = projectedFinish({
+      matches, courts: [court("c1", "1")],
+      settings: { matchDurationMins: 40, bufferMins: 5 }, now: T0,
+    });
+    // 45 minutes of play — NOT the 525 minutes until it ends.
+    expect(p.minsRemaining).toBe(45);
+  });
+
+  it("anchors to now once the scheduled start has passed", () => {
+    // Scheduled an hour ago and still not started: work begins now, not then.
+    const matches = [match("m1", { scheduled_at: iso(-60) })];
+    const p = projectedFinish({
+      matches, courts: [court("c1", "1")],
+      settings: { matchDurationMins: 40, bufferMins: 5 }, now: T0,
+    });
+    expect(p.pending).toBe(false);
+    expect(p.startsAtIso).toBeNull();
+    expect(p.iso).toBe(iso(45));
+  });
+
+  it("falls back to now when nothing is scheduled at all", () => {
+    const p = projectedFinish({
+      matches: [match("m1", { scheduled_at: null })],
+      courts: [court("c1", "1")],
+      settings: { matchDurationMins: 40, bufferMins: 5 }, now: T0,
+    });
+    expect(p.pending).toBe(false);
+    expect(p.iso).toBe(iso(45));
+  });
+
   it("passes through the confidence of the duration model", () => {
     const p = projectedFinish({
       matches: [match("m1")], courts: [court("c1", "1")],

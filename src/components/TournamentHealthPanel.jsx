@@ -46,13 +46,17 @@ export default function TournamentHealthPanel({
   const statusMeta = HEALTH_STATUS_META[status];
 
   // The projection is the headline, so how it is qualified matters as much as
-  // the time itself.
+  // the time itself. Before the first match is due, the honest phrasing is
+  // how long the tournament RUNS, not how long is "left" — nothing is
+  // elapsing yet, and "2h 38m left" before anyone has served is a lie.
   const finishValue = !finish.available ? "—"
     : finish.complete ? "Finished"
-    : fmtClock(finish.iso);
+    : fmtClock(finish.iso, now);
   const finishSub = !finish.available ? finish.reason
     : finish.complete ? "Every match is done."
-    : `${fmtDuration(finish.minsRemaining)} left · ${CONFIDENCE_NOTE[finish.confidence]}`;
+    : finish.pending
+      ? `Runs about ${fmtDuration(finish.minsRemaining)} from the ${fmtClock(finish.startsAtIso, now)} start · ${CONFIDENCE_NOTE[finish.confidence]}`
+      : `${fmtDuration(finish.minsRemaining)} left · ${CONFIDENCE_NOTE[finish.confidence]}`;
 
   return (
     <div className="space-y-4">

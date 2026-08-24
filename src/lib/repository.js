@@ -692,12 +692,36 @@ function timeOnly(t, fallback = "09:00") { return (t || fallback).toString().sli
 
 // Inclusive list of 'YYYY-MM-DD' strings from start_date to end_date. Falls
 // back to a single day if end_date is missing/before start_date.
+/* The tournament's active days as 'YYYY-MM-DD', in LOCAL time.
+
+   `toISOString()` here was a real scheduling bug, not a style nit. The dates
+   are parsed as local midnight, but toISOString() converts to UTC before
+   slicing — so in any timezone ahead of UTC the day rolls backwards:
+
+     new Date('2026-11-14T00:00:00')   // 14 Nov 00:00 IST
+       .toISOString()                  // '2026-11-13T18:30:00.000Z'
+       .slice(0, 10)                   // '2026-11-13'   <-- a day early
+
+   That put every generated schedule one day before the tournament actually
+   ran, for the whole of India — the primary market. Verified live: a
+   tournament created for 14–15 Nov scheduled all seven matches on 13 Nov.
+
+   Formatting from the local getters keeps the calendar day the organizer
+   typed. Mirrors localDateStr() in schedulingEngine.js, which already did
+   this correctly on the engine side. */
+function localDateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function dateRange(startDate, endDate) {
   const start = new Date(`${startDate}T00:00:00`);
   const end = endDate ? new Date(`${endDate}T00:00:00`) : start;
   const dates = [];
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    dates.push(d.toISOString().slice(0, 10));
+    dates.push(localDateStr(d));
   }
   return dates.length ? dates : [startDate];
 }

@@ -458,6 +458,21 @@ export function accentTheme(hex) {
 
 /* ============================ TIME HELPERS =============================== */
 
+/* Today as 'YYYY-MM-DD' in LOCAL time, for comparing against `date` columns.
+
+   `new Date().toISOString().slice(0, 10)` is the tempting one-liner and it is
+   wrong everywhere east of Greenwich: it converts to UTC first, so between
+   midnight and 05:30 IST it yields YESTERDAY. Comparing a registration
+   deadline against that keeps a closed tournament looking open for the first
+   five and a half hours of every day — the same class of bug that had the
+   scheduler placing matches a day early (see dateRange in repository.js). */
+export function todayLocal(now = new Date()) {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 export function fmtTime(iso) {
   if (!iso) return "—";
   try { return new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }); } catch { return "—"; }
@@ -508,11 +523,34 @@ export function displaySentence(text) {
   return authorCapitalised(s.slice(i, i + 1)) ? s : s.slice(0, i) + s[i].toUpperCase() + s.slice(i + 1);
 }
 
-// "in 25 min" / "12 min ago" — the phrasing a player needs on a dashboard.
+/* "in 25 min" / "12 min ago" — the phrasing a player needs on a dashboard.
+
+   Relative time earns its place near the event and loses it fast: "in 25 min"
+   beats a clock time, "in 80d" is noise that told an organizer nothing and
+   made the Up Next list read as broken. Past ~18 hours this switches to the
+   actual date, which is what someone planning a trip to a venue needs.
+
+   The 18h threshold rather than 24h is deliberate: something 20 hours away is
+   tomorrow, and "in 20h" makes the reader do that conversion themselves. */
+const RELATIVE_HORIZON_MINS = 18 * 60;
+
 export function relativeTime(iso, now = Date.now()) {
   if (!iso) return "";
-  const diff = Math.round((new Date(iso).getTime() - now) / 60000);
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const diff = Math.round((then - now) / 60000);
   const abs = Math.abs(diff);
-  const unit = abs < 60 ? `${abs} min` : abs < 1440 ? `${Math.round(abs / 60)}h` : `${Math.round(abs / 1440)}d`;
+
+  if (abs > RELATIVE_HORIZON_MINS) {
+    const d = new Date(then);
+    const ref = new Date(now);
+    // Drop the year unless it differs — "Sat 14 Nov" is enough within a season.
+    const opts = d.getFullYear() === ref.getFullYear()
+      ? { weekday: "short", day: "numeric", month: "short" }
+      : { day: "numeric", month: "short", year: "numeric" };
+    return d.toLocaleDateString("en-IN", opts);
+  }
+
+  const unit = abs < 60 ? `${abs} min` : `${Math.round(abs / 60)}h`;
   return diff >= 0 ? `in ${unit}` : `${unit} ago`;
 }

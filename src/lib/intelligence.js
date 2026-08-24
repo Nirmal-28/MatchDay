@@ -104,13 +104,35 @@ export function projectedFinish({ matches, courts, settings = {}, now = Date.now
   const chainMins = roundsLeft * perSlot;
 
   const mins = Math.ceil(Math.max(throughputMins, chainMins));
-  const iso = new Date(now + mins * 60000).toISOString();
+
+  /* Work cannot start before the first match is due on court. Anchoring to
+     `now` unconditionally made a tournament that starts at 09:00 in three
+     months project a finish of 04:14 *this morning* — arithmetically right,
+     completely useless, and it made the whole Health panel look broken.
+
+     So the clock starts at whichever is later: now, or the earliest scheduled
+     start still outstanding. Once play is under way `now` is naturally the
+     later of the two and this reduces to the original behaviour. */
+  const nextScheduledStart = remaining
+    .map((m) => m.scheduled_at)
+    .filter(Boolean)
+    .sort()[0];
+  const scheduledStartMs = nextScheduledStart ? new Date(nextScheduledStart).getTime() : null;
+  // Nothing scheduled at all — `now` is the only honest anchor available.
+  const anchor = scheduledStartMs !== null ? Math.max(now, scheduledStartMs) : now;
+  const pending = anchor > now;
 
   return {
     available: true,
     complete: false,
-    iso,
+    iso: new Date(anchor + mins * 60000).toISOString(),
+    // Minutes of PLAY still to get through — not "time until the finish",
+    // which are different numbers whenever the tournament hasn't started.
     minsRemaining: mins,
+    // True when play has not begun, so the UI can say "runs about 2h 38m"
+    // rather than "2h 38m left", which would be a lie before the first serve.
+    pending,
+    startsAtIso: pending ? new Date(anchor).toISOString() : null,
     remainingMatches: remaining.length,
     courtsUsed: activeCourts.length,
     basis: model.basis,
@@ -596,11 +618,27 @@ export const HEALTH_STATUS_META = {
 
 export const SEVERITY_TONE = { CRITICAL: "red", WARNING: "amber", INFO: "slate" };
 
-// "7:42 PM" — the format an organizer reads off a screen at a glance.
-export function fmtClock(iso) {
+/* "7:42 pm" — the format an organizer reads off a screen at a glance, with
+   the date added whenever it is NOT today.
+
+   A bare time is only unambiguous on the day itself. On a tournament page
+   opened weeks ahead, "6:20 pm" silently reads as *this evening*, which is
+   how the Health panel came to advertise a finish time three months early.
+   Same-day stays terse, because that is the case an organizer reads twenty
+   times an hour on tournament day. */
+export function fmtClock(iso, now = Date.now()) {
   if (!iso) return "—";
   try {
-    return new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "—";
+    const t = d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+    const ref = new Date(now);
+    const sameDay = d.getFullYear() === ref.getFullYear()
+      && d.getMonth() === ref.getMonth()
+      && d.getDate() === ref.getDate();
+    if (sameDay) return t;
+    const day = d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+    return `${day}, ${t}`;
   } catch { return "—"; }
 }
 
