@@ -207,6 +207,114 @@ function is included but **commented out**, because a trigger pointing at an
 undeployed function would fail and roll back the tournament change that
 produced the notification.
 
+## Migration 012 — configurable registration fields + follows
+
+**`012_registration_fields_and_follows.sql`** adds two things.
+
+**Configurable registration fields.** Organizers can ask for more than
+name/phone/email — club, skill level, jersey size, emergency contact, a waiver
+acknowledgement. The field *definitions* live on
+`tournaments.registration_fields` (jsonb, capped at 25) because they are
+configuration, always read as a whole set with their tournament.
+
+The *answers* deliberately do **not** live on `entries`. `select_entries`
+(schema.sql) is readable by `anon` for any published event, so a
+`custom_fields` column there would have made every emergency contact number
+world-readable the moment the tournament went public. Answers therefore live
+in `entry_details`, whose RLS restricts reads to the entry's own players and
+the owning tournament's staff. Only fields the organizer explicitly marks
+`visibility: "PUBLIC"` are exposed, through the `public_entry_details` view
+which filters by the tournament's own field definitions. Private answers have
+no public read path at all.
+
+`src/lib/registrationFields.js` mirrors that boundary client-side and refuses
+to let a field that looks like contact or identity data (`tel`/`email`/`date`
+types, or a label matching emergency/phone/address/medical/…) be marked
+public — the SQL view is the enforcement, this is just so the organizer never
+gets that far.
+
+Note the new helper `is_entry_tournament_staff()`: policies could not call the
+existing `entry_tournament_id()` because 008 revoked `EXECUTE` on it from
+`authenticated` to keep it off the RPC surface, and Postgres evaluates policy
+expressions as the calling role.
+
+**Follows.** One row per (user, subject) in `follows`, where subject is a
+PLAYER or a TOURNAMENT. Deliberately not a social graph: a user can read only
+their *own* follow rows, so nobody can enumerate who follows whom. Counts come
+from `follower_count()` / `follower_counts()`, which are SECURITY DEFINER and
+return numbers only. There is no feed, no follower list, and no mutual-follow
+concept, by design.
+
+## Applying 010, 011 and 012 — exact procedure
+
+All three are idempotent (`if not exists` / `drop policy if exists` / `create
+or replace` throughout) and safe to re-run. **Apply them in order**, and apply
+010 first and on its own — it is the only one that fixes a live correctness
+bug (the concurrent-scorer race), so it is worth confirming before layering
+anything else on top.
+
+```bash
+# Option A — Supabase CLI (needs the DB password / a linked project)
+supabase link --project-ref dkkpolnuywgvmlacjzto
+supabase db push
+
+# Option B — SQL editor: paste each file, in this order, one at a time
+#   1. 010_hardening_and_observability.sql
+#   2. 011_notification_delivery.sql
+#   3. 012_registration_fields_and_follows.sql
+```
+
+Migration 012's DDL is executed against a real Postgres in CI
+(`npm run test:migrations`, PGlite/WASM) — 24 assertions covering the
+constraints, the policies and, most importantly, that answers marked PRIVATE
+never appear in `public_entry_details`. That proves the SQL is valid and
+self-consistent; it does **not** prove anything about your live project's data,
+so still apply to staging first if you have one.
+
+### Verifying after you apply
+
+```sql
+-- Expect 3 rows: score_point_atomic, consume_rate_limit, follower_count
+select proname from pg_proc
+where proname in ('score_point_atomic','consume_rate_limit','follower_count');
+
+-- Expect 6 rows: client_errors, analytics_events, rate_limits,
+-- notification_preferences, push_subscriptions, entry_details, follows
+select tablename, rowsecurity from pg_tables
+where schemaname = 'public'
+  and tablename in ('client_errors','analytics_events','rate_limits',
+                    'notification_preferences','push_subscriptions',
+                    'entry_details','follows');
+-- rowsecurity must be true for every one of them.
+
+-- The PII boundary: this must return ZERO rows. Any row means a field marked
+-- PRIVATE is reachable through the public view.
+select d.entry_id, f.key
+from public.entry_details d
+join public.entries e            on e.id  = d.entry_id
+join public.tournament_events ev on ev.id = e.event_id
+join public.tournaments t        on t.id  = ev.tournament_id
+cross join lateral (
+  select value ->> 'key' k, value ->> 'visibility' v
+  from jsonb_array_elements(t.registration_fields)
+) f(key, visibility)
+where f.visibility <> 'PUBLIC'
+  and (select answers from public.public_entry_details p where p.entry_id = d.entry_id) ? f.key;
+```
+
+Once 010 is applied, confirm the scoring race is actually closed from the
+client side too: score a point in Scorer Mode with the browser console open.
+Before the migration you get
+
+```
+[repository] score_point_atomic() is not present — falling back to
+client-side scoring. Apply migration 010 to remove the two-device race.
+```
+
+After it, that warning must not appear. If it still does, the function did not
+land (check the schema cache — `notify pgrst, 'reload schema';`), and scoring
+is still racy.
+
 ## External integrations still required
 
 None of these can be done from the browser; each needs a server-side piece.
@@ -237,11 +345,17 @@ None of these can be done from the browser; each needs a server-side piece.
 
 ## Honest gaps, so nothing surprises you later
 
-- **Payments are still fake.** `devSimulatePayment()` sets `payment_status`
-  directly from the client — that only exists so you can click through the
-  UI. In production, `payment_status` must only ever be written by a
-  server-side Razorpay webhook using the `service_role` key (never shipped
-  to the browser). That's the next piece to build.
+- **No online payments.** There is no gateway connected, and nothing in the
+  app claims otherwise. What *does* exist is `recordOfflinePayment()`, where
+  the organizer asserts "I received this money" for cash/UPI collected at the
+  venue — a permanent feature of how club tournaments actually run, restricted
+  to the entry's own organizer by RLS. It is deliberately not the same
+  operation as a gateway payment succeeding: when Razorpay is connected,
+  `payment_status` for an *online* payment must only ever be written by the
+  server-side webhook using the `service_role` key (never shipped to the
+  browser). See `src/lib/payments/RazorpayProvider.js` for the full checklist.
+  (This function was previously named `devSimulatePayment()`, which wrongly
+  implied the app could fake a gateway success. It never could.)
 - ~~**Scoring has a small race window.**~~ — **fixed in migration 010** by
   `score_point_atomic()`, which does the read and the write in one statement
   under a row lock. Note the client falls back to the old racy path if that

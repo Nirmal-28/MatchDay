@@ -3,16 +3,16 @@ import { Link, useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import {
   CalendarClock, MapPin, Trophy, Radio, UserCheck, CreditCard, Compass, ArrowRight,
-  Ticket, ClipboardCheck, User,
+  Ticket, ClipboardCheck, User, Heart,
 } from "lucide-react";
 import {
-  fmtDate, fmtTime, relativeTime, inr, entryShort, divisionLabel,
+  cx, fmtDate, fmtDateRange, fmtTime, relativeTime, inr, entryShort, divisionLabel,
   matchStageLabel, REG_STATUS_META, PAY_STATUS_META,
   CHECK_IN_META, TOURNAMENT_STATUS_META,
 } from "../lib/engines";
 import {
   getMyPlayerData, listMyNotifications, listMyTournaments,
-  subscribeToMyNotifications, subscribeToMyMatches,
+  subscribeToMyNotifications, subscribeToMyMatches, listFollowedTournaments,
 } from "../lib/repository";
 import { useAuth } from "../lib/AuthContext";
 import MatchCenter from "../components/MatchCenter";
@@ -174,6 +174,69 @@ function NextUp({ item, player }) {
   );
 }
 
+/* Your season — the numbers that make a dashboard feel like a competitive
+   record rather than an account page. Every figure is derived from completed
+   matches the player actually played; nothing here is estimated, and the whole
+   block is hidden rather than showing a row of zeroes to someone who has not
+   played yet. */
+function SeasonStats({ completed, wins, tournaments, titles }) {
+  if (!completed.length) return null;
+  const winPct = Math.round((wins / completed.length) * 100);
+
+  const tiles = [
+    { label: "Matches", value: completed.length },
+    { label: "Won", value: wins, accent: "text-accent-teal" },
+    { label: "Win %", value: `${winPct}%` },
+    { label: "Tournaments", value: tournaments.length },
+    { label: "Titles", value: titles, accent: "text-accent-yellow" },
+  ];
+
+  return (
+    <section>
+      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">Your season</h2>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+        {tiles.map((t) => (
+          <Card key={t.label} className="p-3">
+            <div className="text-[10px] uppercase tracking-wide text-ink-3">{t.label}</div>
+            <div className={cx("font-display text-2xl font-bold leading-tight", t.accent || "text-ink")}>{t.value}</div>
+          </Card>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* Tournaments this player follows. Kept to a compact strip: following exists
+   so a player can keep an eye on an event they aren't entered in, not to
+   become a feed. */
+function FollowingStrip({ tournaments }) {
+  if (!tournaments.length) return null;
+  return (
+    <section>
+      <h2 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2">
+        <Heart size={12} className="text-accent-teal" /> Following
+      </h2>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {tournaments.map((t) => (
+          <Link key={t.id} to={t.slug ? `/t/${t.slug}` : `/tournament/${t.id}`}>
+            <Card className="flex items-center justify-between gap-3 px-3.5 py-2.5 transition-colors hover:border-accent-teal/50">
+              <div className="min-w-0">
+                <div className="truncate text-sm font-medium text-ink">{t.name}</div>
+                <div className="truncate text-[11px] text-ink-3">
+                  {t.venue}{t.location ? `, ${t.location}` : ""} · {fmtDateRange(t.start_date, t.end_date)}
+                </div>
+              </div>
+              {t.status === "LIVE"
+                ? <LivePulse />
+                : <Badge tone={TOURNAMENT_STATUS_META[t.status]?.tone || "slate"}>{TOURNAMENT_STATUS_META[t.status]?.label || t.status}</Badge>}
+            </Card>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function EntryRow({ entry, event, tournament }) {
   return (
     <Card className="p-3.5">
@@ -211,18 +274,21 @@ export default function PlayerDashboard() {
   const [notifications, setNotifications] = useState([]);
   useDocumentMeta({ title: "Your matches" });
   const [organized, setOrganized] = useState([]);
+  const [followed, setFollowed] = useState([]);
   const [error, setError] = useState(null);
 
   const load = useCallback(async () => {
     try {
-      const [d, n, mine] = await Promise.all([
+      const [d, n, mine, follows] = await Promise.all([
         getMyPlayerData(),
         listMyNotifications(60).catch(() => []),
         listMyTournaments().catch(() => []),
+        listFollowedTournaments().catch(() => []),
       ]);
       setData(d);
       setNotifications(n);
       setOrganized(mine);
+      setFollowed(follows);
     } catch (e) { setError(e.message); }
   }, []);
 
@@ -311,6 +377,14 @@ export default function PlayerDashboard() {
 
     const wins = completed.filter((c) => c.won).length;
 
+    // A title is winning the final of a knockout stage — the last round, and
+    // not a group match (group rounds share the round numbering). Counted
+    // rather than stored, so it can never drift from the actual results.
+    const titles = completed.filter(
+      (c) => c.won && !c.match.group_label &&
+        c.event?.total_rounds && c.match.round === c.event.total_rounds
+    ).length;
+
     // "MATCH UPDATED" comes from the notification records the database wrote
     // when the schedule actually changed — not from guessing client-side.
     // Once the player has read the notification, the flag clears.
@@ -321,7 +395,7 @@ export default function PlayerDashboard() {
         .map((n) => n.match_id)
     );
 
-    return { player, entries, upcoming, live, completed, next, tournaments, wins, updatedMatchIds };
+    return { player, entries, upcoming, live, completed, next, tournaments, wins, titles, updatedMatchIds };
   }, [data, notifications]);
 
   if (loading) return <BrandLoader />;
@@ -337,7 +411,7 @@ export default function PlayerDashboard() {
   if (error) return <EmptyState icon={Trophy} title="Couldn't load your dashboard" hint={error} />;
   if (!view) return <BrandLoader />;
 
-  const { player, entries, upcoming, live, completed, next, tournaments, wins, updatedMatchIds } = view;
+  const { player, entries, upcoming, live, completed, next, tournaments, wins, titles, updatedMatchIds } = view;
 
   // A signed-in user with no player row hasn't finished onboarding yet.
   if (!player) {
@@ -386,6 +460,10 @@ export default function PlayerDashboard() {
 
       {/* Match center */}
       <MatchCenter live={live} upcoming={upcoming} completed={completed} updatedMatchIds={updatedMatchIds} />
+
+      <SeasonStats completed={completed} wins={wins} tournaments={tournaments} titles={titles} />
+
+      <FollowingStrip tournaments={followed} />
 
       <PlayerSeries playerId={player.id} />
 

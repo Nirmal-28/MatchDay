@@ -10,9 +10,10 @@
     "preview": "vite preview",
     "test:scheduling": "node scripts/test-scheduling.mjs",
     "test:series": "node scripts/test-series-standings.mjs",
+    "test:migrations": "node scripts/verify-migration-012.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:all": "npm run lint && npm test && npm run test:scheduling && npm run test:series"
+    "test:all": "npm run lint && npm test && npm run test:scheduling && npm run test:series && npm run test:migrations"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",
@@ -28,6 +29,7 @@
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.7",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.17",

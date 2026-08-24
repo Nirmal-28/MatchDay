@@ -1,79 +1,76 @@
-# Courtside — handoff to Claude Code
+# MatchDay — orientation
 
-Read this file first. It's the full context for continuing this project
-in a real dev environment.
+> **Historical note.** Earlier versions of this file described a project that
+> had not been scaffolded yet, whose "next steps" were *scaffold a Vite app*,
+> *build auth UI*, and *wire the reference artifact to the repository layer*.
+> All three were done long ago. That version of this file actively misled
+> anyone who read it first, as it invited, so it has been replaced with an
+> accurate map. `README.md` and `supabase-integration/README.md` are the
+> authoritative documents; this one just points at them.
 
-## What this project is
+## What this is
 
-**Courtside** — a badminton tournament operations platform (create
-tournament → register players → generate draw → schedule matches → live
-score → results), built for an Indian organizer market. Full brief and
-product spec was worked through in a prior chat session; this file
-summarizes where things stand.
+**MatchDay** — a tournament operating system for sports, badminton-first,
+built for the Indian organizer market. A real React 19 + Vite + Supabase
+application, deployed, with a live database.
 
-## What already exists in this folder
+One account, many capabilities: the same person can be a **player**, an
+**organizer**, a **scorer** and a **referee**. Roles are scoped per tournament
+via `tournament_members` — organizing tournament A never grants any access to
+tournament B, and that boundary is enforced in RLS, not in the UI.
 
-- `courtside_reference_artifact.jsx` — a **working, single-file reference
-  implementation** of the entire UI and business logic (badminton scoring
-  engine, single-elimination draw generator with bye handling, round-based
-  scheduling engine, organizer dashboard, public tournament pages, live
-  scoring, etc). It currently runs standalone in a sandboxed preview using
-  an in-memory `useReducer` + a non-standard `window.storage` API for
-  persistence — **neither of those exist in a real browser/Vite app**, so
-  this file is a *reference for logic and UI*, not something to import
-  as-is. Read it to understand the intended architecture and copy/adapt
-  the JSX/components and the pure functions (scoring engine, draw
-  generator, scheduling engine) — those are portable as-is.
+## Where things live
 
-- `supabase-integration/` — the **real, working backend integration**:
-  - `schema.sql` — full schema already applied to the live Supabase
-    project (see below). Documentation copy, not something to re-run.
-  - `supabaseClient.js` + `repository.js` — real `@supabase/supabase-js`
-    calls (createTournament, generateDraw, scorePoint, startTournament,
-    realtime subscriptions, etc.) that replace the reference artifact's
-    reducer actions one-to-one. These are meant to be dropped into a real
-    project directly.
-  - `.env.example` — pre-filled with the real project's URL and
-    publishable (anon) key.
-  - `README.md` — setup steps and an honest list of known gaps (payments
-    are still a client-side stub, scoring has a small concurrency edge
-    case, schedule writes are row-by-row not bulk).
+| Path | What it is |
+|---|---|
+| `src/pages/` | Route-level screens (player dashboard, control center, public tournament page, scorer mode, venue display). |
+| `src/components/` | Feature panels composed by those pages. |
+| `src/lib/repository.js` | **The only** module that talks to Supabase. Everything else goes through it. |
+| `src/lib/*.js` (engines) | Pure, dependency-free rule engines: `engines.js` (scoring, draws, standings), `schedulingEngine.js`, `intelligence.js`, `ranking.js`, `seriesStandings.js`, `lifecycle.js`. No Supabase, no React — unit-testable, and tested. |
+| `supabase-integration/migrations/` | Ordered SQL migrations, 002 → 012. |
+| `supabase-integration/README.md` | Migration-by-migration changelog, RLS reasoning, and an honest gaps list. **Read this before touching the schema.** |
 
-## Live infrastructure already set up (nothing to redo)
+`courtside_reference_artifact.jsx` at the repo root is the original
+single-file prototype. It is kept for reference only; nothing imports it.
 
-- Supabase project: **"Tournament app 1"**, ref `dkkpolnuywgvmlacjzto`,
-  region `ap-south-1` (Mumbai). Reachable via the Supabase MCP connector if
-  available in this environment, or via the URL/key in `.env.example`.
-- 9 tables, all with Row Level Security enabled and policies written
-  (organizer-owns-their-tournament model, public read for published
-  tournaments only, player PII never exposed publicly).
-- Realtime enabled on the tables that need live updates.
-- Security + performance advisors run and cleared (one documented
-  exception, see `schema.sql` comments on `public_entry_names`).
+## The rules this codebase holds itself to
 
-## What's NOT done yet (the actual next steps)
+These are worth knowing before changing anything, because a lot of the code
+is shaped by them:
 
-1. **Scaffold a real Vite + React project** and wire the reference
-   artifact's UI to `repository.js` instead of the in-memory reducer.
-   This is mostly mechanical (split one big file into components, swap
-   `dispatch({type:...})` calls for `await someRepositoryFunction(...)`)
-   but real work — loading states, error handling, and realtime
-   subscriptions need to be added since network calls aren't instant like
-   the in-memory version.
-2. **Organizer auth UI** — `signUp`/`signIn`/`signOut` functions already
-   exist in `repository.js`; there's no login form yet.
-3. **Razorpay payments** — not started. Needs a Supabase Edge Function
-   (server-side) to create orders and verify webhooks with the
-   `service_role` key; the client must never set `payment_status` directly
-   in production (a `devSimulatePayment()` stub exists for now).
-4. **Deployment** — no hosting/domain set up yet. Vercel is a natural fit
-   for the Vite frontend.
-5. **Legal basics** (Terms, Privacy Policy, refund policy) — not started,
-   flagged as needed before taking real registrations/money.
+1. **Never fabricate a number.** Analytics and intelligence return
+   `{ available: false, reason }` rather than a plausible-looking zero. A
+   projected finish time that is really a guess is worse than no projection,
+   because an organizer will tell 60 players to arrive at it.
+2. **Never claim an integration works when it doesn't.** No payment gateway,
+   email, SMS, WhatsApp or push provider is connected. Each boundary exists,
+   each reports `isConnected() === false`, and each refuses rather than
+   silently swallowing a call.
+3. **PII never reaches a public read path.** `entries` and `entry_players` are
+   anon-readable for published tournaments, so anything sensitive goes in a
+   separate table with its own RLS (see `entry_details`, migration 012) or a
+   name-only view (`public_players`, `public_entry_names`).
+4. **RLS is the security control; hiding UI is a usability choice.**
+
+## Current state
+
+Working end to end: auth, tournament creation, registration + waitlists,
+configurable registration fields, draws (knockout / round robin / groups →
+knockout), seeding, scheduling with conflict detection, check-in, badminton
+live scoring with an offline queue, disputes, staff/RBAC, notifications
+(in-app), rankings, series, finance, analytics, exports, branding, public
+tournament pages, discovery, venue display, and tournament intelligence.
+
+**Not connected, by design, pending credentials:** Razorpay, email, SMS,
+WhatsApp, push. See the *External integrations still required* table in
+`supabase-integration/README.md` for exactly what each one needs.
+
+**Migrations 010, 011 and 012 are written but not yet applied** to the live
+project. Until 010 is applied, concurrent-scorer protection
+(`score_point_atomic`), rate limiting and client-error logging are inactive.
+Apply them in order via the Supabase SQL editor.
 
 ## Suggested order of work
 
-Scaffold the Vite project → wire up auth → replace the reference
-artifact's persistence with `repository.js` end-to-end (test the full
-create → register → draw → schedule → score → results flow against the
-real database) → then payments → then deployment.
+Apply migrations 010 → 011 → 012, then final QA and a security audit, then
+connect Razorpay and the notification providers.

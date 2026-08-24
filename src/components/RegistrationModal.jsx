@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { CheckCircle2, Users, User, CreditCard, ChevronLeft, MapPin, CalendarDays, Info, AlertTriangle } from "lucide-react";
 import {
@@ -6,6 +6,9 @@ import {
 } from "../lib/engines";
 import { registrationState, REG_STATE } from "../lib/lifecycle";
 import { getEventCapacity } from "../lib/repository";
+import {
+  normaliseFields, blankAnswers, validateAnswers, cleanAnswers,
+} from "../lib/registrationFields";
 import { useAuth } from "../lib/AuthContext";
 import { Modal, Field, Btn, Badge, inputCls } from "./ui/primitives";
 
@@ -38,6 +41,66 @@ function Stepper({ steps, current }) {
           {i < steps.length - 1 && <div className={cx("h-px flex-1", i < current ? "bg-accent-teal" : "bg-line")} />}
         </div>
       ))}
+    </div>
+  );
+}
+
+/* The organizer's own questions, rendered from tournaments.registration_fields.
+   Definitions and validation are shared with the builder (lib/registrationFields)
+   so the two can never disagree about what "required" or "public" means. */
+function CustomFields({ fields, answers, errors, onChange }) {
+  if (!fields.length) return null;
+  return (
+    <div className="space-y-3">
+      <div className="text-xs font-semibold uppercase tracking-wide text-ink-2">
+        {"A few questions from the organizer"}
+      </div>
+      {fields.map((f) => {
+        const err = errors?.[f.key];
+        const set = (v) => onChange({ ...answers, [f.key]: v });
+
+        if (f.type === "checkbox") {
+          return (
+            <div key={f.key}>
+              <label className="flex cursor-pointer items-start gap-2 text-sm text-ink-2">
+                <input
+                  type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-teal-500"
+                  checked={answers[f.key] === true}
+                  onChange={(e) => set(e.target.checked)}
+                />
+                <span>
+                  {f.label} {f.required && <span className="text-red-400">*</span>}
+                  {f.help && <span className="mt-0.5 block text-[11px] text-ink-3">{f.help}</span>}
+                </span>
+              </label>
+              {err && <p className="mt-1 text-[11px] text-red-300">{err}</p>}
+            </div>
+          );
+        }
+
+        return (
+          <Field key={f.key} label={f.label} required={f.required} hint={f.help || undefined}>
+            {f.type === "select" ? (
+              <select className={inputCls} value={answers[f.key] ?? ""} onChange={(e) => set(e.target.value)}>
+                <option value="">Select…</option>
+                {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+            ) : f.type === "textarea" ? (
+              <textarea className={cx(inputCls, "resize-none")} rows={3}
+                value={answers[f.key] ?? ""} onChange={(e) => set(e.target.value)} />
+            ) : (
+              <input
+                className={inputCls}
+                type={f.type === "number" ? "number" : f.type === "date" ? "date" : f.type === "email" ? "email" : "text"}
+                inputMode={f.type === "tel" ? "tel" : undefined}
+                value={answers[f.key] ?? ""}
+                onChange={(e) => set(e.target.value)}
+              />
+            )}
+            {err && <p className="mt-1 text-[11px] text-red-300">{err}</p>}
+          </Field>
+        );
+      })}
     </div>
   );
 }
@@ -75,19 +138,29 @@ export default function RegistrationModal({ open, onClose, event, tournament, on
   const [result, setResult] = useState(null);   // the entry the database actually created
   const [capacity, setCapacity] = useState(null);
 
+  // The organizer's extra questions, and this registrant's answers to them.
+  const customFields = useMemo(
+    () => normaliseFields(tournament?.registration_fields),
+    [tournament?.registration_fields]
+  );
+  const [answers, setAnswers] = useState({});
+  const [answerErrors, setAnswerErrors] = useState({});
+
   const steps = isDoubles ? ["Category", "Partner", "Details", "Review"] : ["Category", "Details", "Review"];
 
   const reset = useCallback(() => {
     setStep(0);
     setError("");
     setResult(null);
+    setAnswers(blankAnswers(customFields));
+    setAnswerErrors({});
     // Prefill from the signed-in player's own profile — they should not have
     // to retype their own name and number to enter a tournament.
     setP1(caps?.player
       ? { name: caps.player.name || "", phone: caps.player.phone || "", email: caps.player.email || "" }
       : blankPlayer());
     setP2(blankPlayer());
-  }, [caps]);
+  }, [caps, customFields]);
 
   useEffect(() => { if (open) reset(); }, [open, event, reset]);
 
@@ -109,8 +182,17 @@ export default function RegistrationModal({ open, onClose, event, tournament, on
       setError("Enter your partner's name and phone number."); return;
     }
     const detailsStep = isDoubles ? 2 : 1;
-    if (step === detailsStep && (!p1.name.trim() || !p1.phone.trim())) {
-      setError("Enter your name and phone number."); return;
+    if (step === detailsStep) {
+      if (!p1.name.trim() || !p1.phone.trim()) {
+        setError("Enter your name and phone number."); return;
+      }
+      // The organizer's own questions are answered on the same step, so they
+      // are validated here rather than being discovered at submit.
+      const errs = validateAnswers(customFields, answers);
+      setAnswerErrors(errs);
+      if (Object.keys(errs).length) {
+        setError("Please check the highlighted questions."); return;
+      }
     }
     setStep((s) => s + 1);
   };
@@ -119,7 +201,9 @@ export default function RegistrationModal({ open, onClose, event, tournament, on
     setError(""); setSaving(true);
     try {
       const players = isDoubles ? [p1, p2] : [p1];
-      const entry = await onSubmit(event.id, players);
+      // cleanAnswers strips anything not defined as a field, so a tampered
+      // form cannot smuggle extra keys into the stored JSON.
+      const entry = await onSubmit(event.id, players, cleanAnswers(customFields, answers));
       setResult(entry || { reg_status: "PENDING" });
     } catch (e) {
       // RLS refuses inserts outside the registration window, so a closed
@@ -289,7 +373,11 @@ export default function RegistrationModal({ open, onClose, event, tournament, on
       {/* Details */}
       {step === detailsStep && (
         <div className="space-y-4">
-          <PlayerFields label={isDoubles ? "Your details" : "Your details"} value={p1} onChange={setP1} />
+          <PlayerFields label="Your details" value={p1} onChange={setP1} />
+          <CustomFields
+            fields={customFields} answers={answers} errors={answerErrors}
+            onChange={(a) => { setAnswers(a); setAnswerErrors({}); }}
+          />
           {error && <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div>}
           <div className="flex gap-2">
             <Btn variant="ghost" icon={ChevronLeft} onClick={() => setStep(step - 1)}>Back</Btn>
@@ -314,6 +402,16 @@ export default function RegistrationModal({ open, onClose, event, tournament, on
               <div className="flex justify-between gap-3">
                 <dt className="text-ink-2">Contact</dt><dd className="text-right text-ink">{p1.phone}</dd>
               </div>
+              {customFields
+                .filter((f) => (f.type === "checkbox" ? answers[f.key] === true : String(answers[f.key] ?? "").trim()))
+                .map((f) => (
+                  <div key={f.key} className="flex justify-between gap-3">
+                    <dt className="text-ink-2">{f.label}</dt>
+                    <dd className="text-right text-ink">
+                      {f.type === "checkbox" ? "Accepted" : String(answers[f.key])}
+                    </dd>
+                  </div>
+                ))}
               <div className="flex justify-between gap-3 border-t border-line-soft pt-2">
                 <dt className="font-medium text-ink">Entry fee</dt>
                 <dd className="text-right font-bold text-ink">{Number(event.fee_inr) > 0 ? inr(event.fee_inr) : "Free"}</dd>

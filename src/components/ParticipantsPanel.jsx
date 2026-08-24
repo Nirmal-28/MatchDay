@@ -2,11 +2,36 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Search, UserPlus, Check, X, CreditCard, Trash2, Users, Upload, ArrowUpCircle } from "lucide-react";
 import { cx, fmtDate, entryName, REG_STATUS_META, PAY_STATUS_META, CHECK_IN_META } from "../lib/engines";
+import { normaliseFields } from "../lib/registrationFields";
 import { Badge, Btn, EmptyState, inputCls } from "./ui/primitives";
 import RegistrationModal from "./RegistrationModal";
 import CsvImportModal from "./CsvImportModal";
 
-export default function ParticipantsPanel({ event, entries, onApprove, onReject, onRemove, onSimPay, onRefund, onAddManual, onImport, onPromoteWaitlist, onToggleAutoPromote }) {
+/* Answers to the organizer's configured registration questions, shown to
+   staff only (RLS on entry_details enforces that, not this component). Nothing
+   renders when a tournament asks no extra questions, which is the common case. */
+function EntryAnswers({ fields, answers }) {
+  const shown = normaliseFields(fields).filter((f) => {
+    const v = answers?.[f.key];
+    return f.type === "checkbox" ? v === true : String(v ?? "").trim();
+  });
+  if (!shown.length) return null;
+
+  return (
+    <dl className="mt-2 grid gap-x-4 gap-y-1 border-t border-line-soft pt-2 text-[11px] sm:grid-cols-2">
+      {shown.map((f) => (
+        <div key={f.key} className="flex justify-between gap-2">
+          <dt className="text-ink-3">{f.label}</dt>
+          <dd className="truncate text-right font-medium text-ink-2">
+            {f.type === "checkbox" ? "Yes" : String(answers[f.key])}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+export default function ParticipantsPanel({ event, entries, registrationFields = [], entryDetails = {}, onApprove, onReject, onRemove, onRecordPayment, onRefund, onAddManual, onImport, onPromoteWaitlist, onToggleAutoPromote }) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("ALL");
   const [addOpen, setAddOpen] = useState(false);
@@ -97,6 +122,11 @@ export default function ParticipantsPanel({ event, entries, onApprove, onReject,
                 </Badge>
               </div>
 
+              {/* Answers to the organizer's own registration questions. Staff-
+                  only by RLS — this is where the emergency contact they asked
+                  for actually becomes useful on tournament day. */}
+              <EntryAnswers fields={registrationFields} answers={entryDetails[e.id]} />
+
               <div className="mt-2.5 flex flex-wrap gap-1.5 border-t border-line-soft pt-2.5">
                 {e.reg_status === "PENDING" && canEdit && (
                   <>
@@ -105,7 +135,7 @@ export default function ParticipantsPanel({ event, entries, onApprove, onReject,
                   </>
                 )}
                 {e.payment_status !== "PAID" && e.payment_status !== "REFUNDED" && (
-                  <Btn size="sm" variant="secondary" icon={CreditCard} onClick={() => onSimPay(e.id)}>Mark paid</Btn>
+                  <Btn size="sm" variant="secondary" icon={CreditCard} onClick={() => onRecordPayment(e.id)}>Mark paid</Btn>
                 )}
                 {e.payment_status === "PAID" && (
                   <Btn size="sm" variant="ghost" onClick={() => onRefund(e.id)}>Refund</Btn>
@@ -153,7 +183,7 @@ export default function ParticipantsPanel({ event, entries, onApprove, onReject,
                         <Btn size="sm" variant="ghost" onClick={() => onReject(e.id)} title="Reject"><X size={14} /></Btn>
                       </>}
                       {e.payment_status !== "PAID" && e.payment_status !== "REFUNDED" && (
-                        <Btn size="sm" variant="ghost" icon={CreditCard} onClick={() => onSimPay(e.id)} title="Simulate payment success">Pay</Btn>
+                        <Btn size="sm" variant="ghost" icon={CreditCard} onClick={() => onRecordPayment(e.id)} title="Record a payment you received in cash or by UPI">Pay</Btn>
                       )}
                       {e.payment_status === "PAID" && (
                         <Btn size="sm" variant="ghost" onClick={() => onRefund(e.id)} title="Mark refunded">Refund</Btn>

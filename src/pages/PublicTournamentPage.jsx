@@ -7,6 +7,7 @@ import { registrationState } from "../lib/lifecycle";
 import { Badge, Btn, Card, EmptyState, inputCls } from "../components/ui/primitives";
 import { BrandLoader, LivePulse } from "../components/ui/motion";
 import RegistrationModal from "../components/RegistrationModal";
+import FollowButton from "../components/FollowButton";
 import BracketView from "../components/BracketView";
 import StandingsPanel from "../components/StandingsPanel";
 import ScheduleTable from "../components/ScheduleTable";
@@ -115,9 +116,9 @@ export default function PublicTournamentPage() {
   // Returns the created entry so the confirmation can report what the
   // database actually did — PENDING, or WAITLISTED when the capacity trigger
   // moved them — instead of assuming success.
-  const handleRegister = async (eid, players) => {
+  const handleRegister = async (eid, players, customAnswers) => {
     const ev = events.find((e) => e.id === eid);
-    const entry = await registerEntry(eid, players, ev?.fee_inr);
+    const entry = await registerEntry(eid, players, ev?.fee_inr, customAnswers);
     await loadEventData(events);
     return entry;
   };
@@ -157,15 +158,18 @@ export default function PublicTournamentPage() {
                 </div>
               </div>
             </div>
-            <Btn
-              size="sm" variant="secondary" icon={Share2}
-              onClick={() => {
-                const text = `${tournament.name} — ${tournament.venue}, ${fmtDateRange(tournament.start_date, tournament.end_date)}. Live draws, schedule and scores on MatchDay: ${window.location.href}`;
-                window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
-              }}
-            >
-              Share
-            </Btn>
+            <div className="flex flex-wrap items-center gap-2">
+              <FollowButton subjectType="TOURNAMENT" subjectId={tournament.id} />
+              <Btn
+                size="sm" variant="secondary" icon={Share2}
+                onClick={() => {
+                  const text = `${tournament.name} — ${tournament.venue}, ${fmtDateRange(tournament.start_date, tournament.end_date)}. Live draws, schedule and scores on MatchDay: ${window.location.href}`;
+                  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+                }}
+              >
+                Share
+              </Btn>
+            </div>
           </div>
         </div>
       </div>

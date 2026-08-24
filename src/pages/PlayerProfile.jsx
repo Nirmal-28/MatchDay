@@ -9,6 +9,7 @@ import { Card, Badge, Btn, EmptyState } from "../components/ui/primitives";
 import { BrandLoader, Reveal } from "../components/ui/motion";
 import { CourtGeometry } from "../components/ui/atmosphere";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
+import FollowButton from "../components/FollowButton";
 
 const BADGE_TONES = {
   yellow: "text-accent-yellow", teal: "text-accent-teal", purple: "text-accent-purple",
@@ -133,7 +134,10 @@ export default function PlayerProfile() {
               </div>
             </div>
           </div>
-          <Btn size="sm" variant="secondary" icon={Share2} onClick={share}>Share</Btn>
+          <div className="flex flex-wrap items-center gap-2">
+            <FollowButton subjectType="PLAYER" subjectId={player.id} />
+            <Btn size="sm" variant="secondary" icon={Share2} onClick={share}>Share</Btn>
+          </div>
         </div>
 
         <div className="relative mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">

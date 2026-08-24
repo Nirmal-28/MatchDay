@@ -20,10 +20,12 @@ import * as SchedulingEngine from "./schedulingEngine";
      "bulk update with different values per row" helper). Fine for a few
      dozen matches; for very large draws, move this into a Postgres function
      using unnest() for a single bulk UPDATE.
-   - devSimulatePayment() is exactly what it says — a stand-in so the UI has
-     something to call. Replace with the Razorpay order+webhook flow before
-     charging anyone for real; payment_status must only ever be set by the
-     server-side webhook (using the service_role key), never by the client.
+   - recordOfflinePayment() marks an entry paid because the ORGANIZER says
+     they received the money (cash/UPI at the venue). That is a permanent
+     feature, not a stand-in. What does NOT exist is any path for the browser
+     to claim a GATEWAY payment succeeded: when Razorpay is connected,
+     payment_status for an online payment must only ever be set by the
+     server-side webhook using the service_role key. See lib/payments/.
    ========================================================================== */
 
 /* ---------------------------- AUTH --------------------------------------- */
@@ -273,7 +275,7 @@ export async function listEntriesPublic(eventId) {
 // gated to REGISTRATION_OPEN events only. The capacity trigger on entries
 // will raise a Postgres exception ("This category is full.") if the event
 // is already at max_entries; surface that error message directly to the UI.
-export async function registerEntry(eventId, players, feeINR) {
+export async function registerEntry(eventId, players, feeINR, customAnswers = null) {
   const { data: entry, error: eErr } = await supabase
     .from("entries")
     .insert({ event_id: eventId, type: players.length > 1 ? "DOUBLES" : "SINGLES", fee_inr: feeINR ?? 0 })
@@ -292,7 +294,59 @@ export async function registerEntry(eventId, players, feeINR) {
   }));
   const { error: pErr } = await supabase.from("entry_players").insert(rows);
   if (pErr) throw pErr;
+
+  // Answers to the organizer's custom questions go to `entry_details`, NOT to
+  // a column on `entries` — `entries` is anon-readable for any published
+  // event, so an emergency contact stored there would be world-readable
+  // (migration 012 explains this at length).
+  if (customAnswers && Object.keys(customAnswers).length) {
+    const { error: dErr } = await supabase
+      .from("entry_details")
+      .insert({ entry_id: entry.id, answers: customAnswers });
+    // A failed answer write must not strand the registration itself — the
+    // entry is the thing that matters, and the organizer can collect a
+    // missing jersey size by other means.
+    if (dErr) console.warn("Registration answers were not saved:", dErr.message);
+  }
   return entry;
+}
+
+/* -------------------- CONFIGURABLE REGISTRATION FIELDS --------------------- */
+
+// The organizer's extra questions, stored on the tournament as configuration.
+// See migration 012 for the field shape and why answers live elsewhere.
+export async function updateRegistrationFields(tournamentId, fields) {
+  const { data, error } = await supabase
+    .from("tournaments")
+    .update({ registration_fields: fields })
+    .eq("id", tournamentId)
+    .select("id, registration_fields")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+// Answers for one tournament's entries, for the organizer's participant list
+// and exports. RLS restricts this to staff of the owning tournament.
+export async function listEntryDetails(entryIds) {
+  if (!entryIds?.length) return {};
+  const { data, error } = await supabase
+    .from("entry_details")
+    .select("entry_id, answers")
+    .in("entry_id", entryIds);
+  if (error) throw error;
+  return Object.fromEntries((data || []).map((r) => [r.entry_id, r.answers || {}]));
+}
+
+// Correct an answer after the fact. Staff-only by RLS.
+export async function updateEntryDetails(entryId, answers) {
+  const { data, error } = await supabase
+    .from("entry_details")
+    .upsert({ entry_id: entryId, answers, updated_at: new Date().toISOString() })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 /* ---------------------------- PLAYERS -------------------------------------- */
@@ -396,13 +450,39 @@ export async function markRefunded(entryId) {
   if (error) throw error;
 }
 
-// DEV ONLY — see file header. Replace with the Razorpay webhook before launch.
-export async function devSimulatePayment(entryId, succeeded = true) {
-  const patch = succeeded
+/* Record a payment the organizer collected OUTSIDE the app — cash at the
+   venue, a UPI transfer, a bank deposit. This is a real and permanent part of
+   how club tournaments run in India, not a development shortcut, so it stays
+   after a gateway is connected.
+
+   It is deliberately NOT the same operation as a gateway payment succeeding:
+
+     - here, the organizer is asserting "I received this money", and RLS
+       already restricts that assertion to the entry's own organizer;
+     - a gateway payment is asserted by the PROVIDER, verified server-side by
+       webhook signature, and must never be writable from a browser.
+
+   The old name (devSimulatePayment) blurred those two, which made it look
+   like the app could fake a gateway success. It cannot, and must not. */
+export async function recordOfflinePayment(entryId, { received = true, amountINR = null } = {}) {
+  const patch = received
     ? { payment_status: "PAID", reg_status: "CONFIRMED" }
     : { payment_status: "FAILED" };
   const { error } = await supabase.from("entries").update(patch).eq("id", entryId);
   if (error) throw error;
+
+  // Best-effort ledger line so Finance shows WHY an entry is marked paid.
+  // `payments` has no browser insert policy by design (migration 005), so this
+  // is expected to be refused until a server-side endpoint exists — the entry
+  // status above is the authoritative record either way, and a missing ledger
+  // row must not fail the organizer's action.
+  if (received && amountINR !== null) {
+    await supabase.from("payments").insert({
+      entry_id: entryId, provider: "MOCK", amount_inr: amountINR, status: "PAID",
+    }).then(({ error: e }) => {
+      if (e) console.info("Offline payment ledger row not written (expected without a server endpoint):", e.message);
+    });
+  }
 }
 
 /* ----------------------------- DRAW ---------------------------------------- */
@@ -1762,9 +1842,100 @@ export async function getEventCapacity(eventId) {
 // Register the signed-in user into an event, linking the entry to their own
 // player row so it lands on their dashboard immediately. Falls back to the
 // anonymous path when nobody is signed in.
-export async function registerMyself(eventId, players, feeINR) {
-  const entry = await registerEntry(eventId, players, feeINR);
+export async function registerMyself(eventId, players, feeINR, customAnswers = null) {
+  const entry = await registerEntry(eventId, players, feeINR, customAnswers);
   return entry;
+}
+
+/* ------------------------------- FOLLOWS ---------------------------------- */
+
+// Follow edges are deliberately minimal (migration 012): a user reads only
+// their own rows, and counts come from an aggregate function so that no page
+// can ever enumerate who follows whom.
+
+export async function listMyFollows(subjectType = null) {
+  const { data: sess } = await supabase.auth.getSession();
+  if (!sess?.session) return [];
+  let q = supabase.from("follows").select("id, subject_type, subject_id, created_at");
+  if (subjectType) q = q.eq("subject_type", subjectType);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
+}
+
+export async function isFollowing(subjectType, subjectId) {
+  const { data: sess } = await supabase.auth.getSession();
+  if (!sess?.session) return false;
+  const { data, error } = await supabase
+    .from("follows").select("id")
+    .eq("subject_type", subjectType).eq("subject_id", subjectId)
+    .maybeSingle();
+  if (error) throw error;
+  return !!data;
+}
+
+export async function followSubject(subjectType, subjectId) {
+  const { data: sess } = await supabase.auth.getSession();
+  if (!sess?.session) throw new Error("Sign in to follow.");
+  const { error } = await supabase.from("follows").insert({
+    follower_id: sess.session.user.id, subject_type: subjectType, subject_id: subjectId,
+  });
+  // The unique constraint makes a double-follow harmless rather than an error
+  // the UI has to explain.
+  if (error && error.code !== "23505") throw error;
+  return true;
+}
+
+export async function unfollowSubject(subjectType, subjectId) {
+  const { error } = await supabase
+    .from("follows").delete()
+    .eq("subject_type", subjectType).eq("subject_id", subjectId);
+  if (error) throw error;
+  return true;
+}
+
+// Aggregate only — returns a number, never an identity.
+export async function getFollowerCount(subjectType, subjectId) {
+  const { data, error } = await supabase.rpc("follower_count", {
+    p_subject_type: subjectType, p_subject_id: subjectId,
+  });
+  if (error) throw error;
+  return Number(data || 0);
+}
+
+// One round trip for a list of subjects instead of N.
+export async function getFollowerCounts(subjectType, subjectIds) {
+  if (!subjectIds?.length) return {};
+  const { data, error } = await supabase.rpc("follower_counts", {
+    p_subject_type: subjectType, p_subject_ids: subjectIds,
+  });
+  if (error) throw error;
+  return Object.fromEntries((data || []).map((r) => [r.subject_id, Number(r.followers)]));
+}
+
+// The tournaments a player follows, resolved to real rows for their dashboard.
+export async function listFollowedTournaments() {
+  const follows = await listMyFollows("TOURNAMENT");
+  if (!follows.length) return [];
+  const { data, error } = await supabase
+    .from("tournaments")
+    .select("id, name, slug, venue, location, start_date, end_date, status, sport, logo_url, accent_color")
+    .in("id", follows.map((f) => f.subject_id))
+    .order("start_date", { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+// Followed players, via the public projection so no PII is pulled in.
+export async function listFollowedPlayers() {
+  const follows = await listMyFollows("PLAYER");
+  if (!follows.length) return [];
+  const { data, error } = await supabase
+    .from("public_players")
+    .select("id, name, city, club, photo_url, skill_level")
+    .in("id", follows.map((f) => f.subject_id));
+  if (error) throw error;
+  return data || [];
 }
 
 export function subscribeToMyMatches(entryIds, onChange) {

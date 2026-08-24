@@ -9,13 +9,13 @@ import {
   getTournament, listEvents, listCourts, listEntries, listMatches, listNotifications, markNotificationsRead,
   publishTournament, closeRegistration, startTournament, completeTournament, cancelTournament, updateTournament,
   addCourt, updateCourt, removeCourt, updateCourtAvailability,
-  updateEntryStatus, removeEntry, devSimulatePayment, markRefunded, registerEntry,
+  updateEntryStatus, removeEntry, recordOfflinePayment, markRefunded, registerEntry,
   importEntries, promoteNextWaitlisted, updateEvent,
   generateDraw, generateRoundRobin, generateGroupStage, generateKnockoutFromGroups, setSeeds,
   startMatch, scorePoint, undoLastGame, retireMatch,
   subscribeToEvent,
   setCheckInStatus, checkInByCode,
-  getMyRole, listPayments,
+  getMyRole, listPayments, listMembers, listEntryDetails,
 } from "../lib/repository";
 import { Btn, Badge, Card, Field, inputCls, useToasts, Toasts } from "../components/ui/primitives";
 import { BrandLoader, LivePulse } from "../components/ui/motion";
@@ -32,6 +32,7 @@ import CheckInPanel from "../components/CheckInPanel";
 import AuditLogPanel from "../components/AuditLogPanel";
 import DisputesPanel from "../components/DisputesPanel";
 import CommandCenterPanel from "../components/CommandCenterPanel";
+import RegistrationFieldsPanel from "../components/RegistrationFieldsPanel";
 import StaffPanel from "../components/StaffPanel";
 import FinancePanel from "../components/FinancePanel";
 import AnalyticsPanel from "../components/AnalyticsPanel";
@@ -85,6 +86,11 @@ export default function TournamentControlCenter() {
   const [eventId, setEventId] = useState(null);
   const [role, setRole] = useState(undefined); // undefined = still checking
   const [payments, setPayments] = useState([]);
+  // Staff list, used by the health panel to decide whether "no official
+  // assigned" is even a meaningful warning for this tournament.
+  const [members, setMembers] = useState([]);
+  // Answers to the organizer's custom registration questions, keyed by entry.
+  const [entryDetails, setEntryDetails] = useState({});
   const { toasts, notify } = useToasts();
 
   const loadEventData = useCallback(async (evs) => {
@@ -114,6 +120,20 @@ export default function TournamentControlCenter() {
   // which tabs exist at all; RLS enforces the same boundary on the server, so
   // hiding a tab is a usability choice, not the security control.
   useEffect(() => { getMyRole(id).then((r) => setRole(r || null)); }, [id]);
+
+  // Non-owner staff cannot read the member list under RLS; an empty list just
+  // means "we don't know of assigned officials", which the health panel
+  // already treats as "don't warn about officials".
+  useEffect(() => { listMembers(id).then(setMembers).catch(() => setMembers([])); }, [id]);
+
+  // Registration answers are only rendered on the participants tab, and only
+  // exist when the organizer configured questions — so this stays lazy.
+  useEffect(() => {
+    const ids = Object.values(entriesByEvent).flat().map((e) => e.id);
+    if (tab !== "participants" || !ids.length) return;
+    if (!(tournament?.registration_fields || []).length) return;
+    listEntryDetails(ids).then(setEntryDetails).catch(() => setEntryDetails({}));
+  }, [tab, entriesByEvent, tournament?.registration_fields]);
 
   // Payments only matter to the finance/analytics tabs and are owner-only by
   // RLS, so they are fetched lazily rather than on every load.
@@ -244,7 +264,7 @@ export default function TournamentControlCenter() {
               <CommandCenterPanel
                 tournament={tournament} events={events} courts={courts}
                 entries={allEntries} matches={allMatches} entriesById={entriesById}
-                onGoToTab={setTab}
+                members={members} onGoToTab={setTab}
               />
               <div>
                 <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">Categories</div>
@@ -300,10 +320,14 @@ export default function TournamentControlCenter() {
           {activeTab === "participants" && event && (
             <ParticipantsPanel
               event={event} entries={eventEntries}
+              registrationFields={tournament.registration_fields} entryDetails={entryDetails}
               onApprove={(eid) => guarded(async () => { await updateEntryStatus(eid, "CONFIRMED"); await loadEventData(events); })}
               onReject={(eid) => guarded(async () => { await updateEntryStatus(eid, "REJECTED"); await loadEventData(events); })}
               onRemove={(eid) => guarded(async () => { await removeEntry(eid); await loadEventData(events); })}
-              onSimPay={(eid) => guarded(async () => { await devSimulatePayment(eid, true); await loadEventData(events); })}
+              onRecordPayment={(eid) => guarded(async () => {
+                await recordOfflinePayment(eid, { received: true, amountINR: Number(event?.fee_inr || 0) });
+                await loadEventData(events);
+              }, "Payment recorded.")}
               onRefund={(eid) => guarded(async () => { await markRefunded(eid); await loadEventData(events); })}
               onAddManual={(eid, players) => guarded(async () => { await registerEntry(eid, players, event.fee_inr); await loadEventData(events); })}
               onImport={async (eid, rows) => {
@@ -434,7 +458,7 @@ export default function TournamentControlCenter() {
           {activeTab === "audit" && <AuditLogPanel tournamentId={tournament.id} allMatches={allMatches} />}
 
           {activeTab === "settings" && (
-            <div className="max-w-lg space-y-4">
+            <div className="max-w-2xl space-y-4">
               <Card className="p-4 space-y-3">
                 <Field label="Tournament name"><input className={inputCls} defaultValue={tournament.name} onBlur={(e) => e.target.value !== tournament.name && guarded(async () => { await updateTournament(tournament.id, { name: e.target.value }); await loadAll(); })} /></Field>
                 <Field label="Venue"><input className={inputCls} defaultValue={tournament.venue} onBlur={(e) => e.target.value !== tournament.venue && guarded(async () => { await updateTournament(tournament.id, { venue: e.target.value }); await loadAll(); })} /></Field>
@@ -468,6 +492,18 @@ export default function TournamentControlCenter() {
                   </Field>
                 </div>
               </Card>
+
+              {/* What this tournament asks registrants beyond name/phone/email.
+                  Answers land in entry_details, never on the anon-readable
+                  entries table.
+
+                  Owner-only, because `owner_update_tournaments` scopes writes
+                  to organizer_id — a non-owner ORGANIZER can open this tab but
+                  their save would be refused by RLS, so the panel is hidden
+                  rather than shown as a control that silently fails. */}
+              {isOwner && (
+                <RegistrationFieldsPanel tournament={tournament} notify={notify} onChanged={loadAll} />
+              )}
 
               <Card className="space-y-2 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-ink-2">Lifecycle</div>

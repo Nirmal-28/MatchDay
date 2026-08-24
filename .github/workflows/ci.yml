@@ -38,6 +38,14 @@ jobs:
           npm run test:scheduling
           npm run test:series
 
+      # Executes the migration against a real Postgres (PGlite/WASM — no
+      # database service needed) and asserts the PII boundary holds: that
+      # answers marked PRIVATE never reach the public view. A regression there
+      # would leak emergency contact numbers, so it is checked on every push
+      # rather than trusted to review.
+      - name: Migration tests
+        run: npm run test:migrations
+
       # The build needs the Supabase env vars because src/lib/supabaseClient.js
       # throws at import time when they are missing. These are the PUBLISHABLE
       # values (the same ones shipped in the browser bundle), not secrets —

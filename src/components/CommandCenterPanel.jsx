@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  AlertTriangle, Radio, Clock, LayoutGrid, CheckCircle2, ArrowRight, Users, Activity,
+  Radio, Clock, LayoutGrid, CheckCircle2, Users, Activity,
 } from "lucide-react";
 import {
-  cx, fmtTime, relativeTime, fmtDuration, entryShort, divisionLabel, matchStageLabel, TONE_CLASSES,
+  cx, fmtTime, relativeTime, fmtDuration, entryShort, divisionLabel, matchStageLabel,
 } from "../lib/engines";
 import { commandCenter, courtUtilization } from "../lib/analytics";
 import { Badge, Card } from "../components/ui/primitives";
 import { LivePulse } from "../components/ui/motion";
+import TournamentHealthPanel from "./TournamentHealthPanel";
 
 /* The one screen that answers "what is happening in my tournament right now?"
    It renders entirely from data the control center has already loaded —
@@ -67,7 +68,7 @@ const COURT_STATE = {
   UNAVAILABLE: { label: "Closed", tone: "slate" },
 };
 
-export default function CommandCenterPanel({ tournament, events, courts, entries, matches, entriesById, onGoToTab }) {
+export default function CommandCenterPanel({ tournament, events, courts, entries, matches, entriesById, members = [], onGoToTab }) {
   // A live tournament changes with the clock, not only with the data — a
   // match becomes "running late" purely by time passing. Re-render on a
   // timer so the attention list stays truthful without a page refresh.
@@ -83,7 +84,9 @@ export default function CommandCenterPanel({ tournament, events, courts, entries
   );
   const util = useMemo(() => courtUtilization(courts, matches, tournament), [courts, matches, tournament]);
 
-  const { participation: p, matches: ms, board, live, upNext, attention } = cc;
+  // `attention` is deliberately not destructured — TournamentHealthPanel is
+  // now the single source of the attention list (see below).
+  const { participation: p, matches: ms, board, live, upNext } = cc;
   const name = (id) => entryShort(entriesById[id]) || "TBD";
 
   return (
@@ -121,25 +124,18 @@ export default function CommandCenterPanel({ tournament, events, courts, entries
         </div>
       </div>
 
-      {/* ── Attention ────────────────────────────────────────────────── */}
-      {attention.length > 0 && (
-        <div>
-          <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2">
-            <AlertTriangle size={13} className="text-amber-400" /> Needs attention
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {attention.map((a) => (
-              <button key={a.key} onClick={() => onGoToTab?.(a.tab)}
-                className={cx(
-                  "inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-80",
-                  TONE_CLASSES[a.tone]
-                )}>
-                {a.label} <ArrowRight size={12} />
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* ── Tournament health ────────────────────────────────────────────
+          Owns the attention list outright. It previously lived here as a row
+          of chips built by commandCenter(); the intelligence layer computes a
+          strict superset (those items plus delay, bottleneck, rest and
+          officials analysis) with severity attached, and two competing
+          "needs attention" lists on one screen is how an organizer learns to
+          trust neither. */}
+      <TournamentHealthPanel
+        tournament={tournament} courts={courts}
+        entries={entries} matches={matches} members={members}
+        onGoToTab={onGoToTab} now={now}
+      />
 
       {/* ── Live matches ─────────────────────────────────────────────── */}
       <div>
