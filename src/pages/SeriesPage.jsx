@@ -260,7 +260,7 @@ export default function SeriesPage() {
             </div>
             <label className="text-[11px] text-ink-2">
               <span className="mb-1 block font-medium">Scoring</span>
-              <select className={cx(inputCls, "w-auto py-1 text-xs")} value={scoring} onChange={(e) => setScoring(e.target.value)}>
+              <select className={cx(inputCls, "sm:w-auto py-1 text-xs")} value={scoring} onChange={(e) => setScoring(e.target.value)}>
                 {Object.values(SERIES_SCORING).map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
               </select>
             </label>

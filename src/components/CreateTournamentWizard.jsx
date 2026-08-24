@@ -196,7 +196,7 @@ export default function CreateTournamentWizard({ open, onClose, onSubmit }) {
           <Field label="Registration deadline"><input type="date" className={inputCls} value={basics.registrationDeadline} onChange={(e) => setBasics((b) => ({ ...b, registrationDeadline: e.target.value }))} /></Field>
           <Field label="Start date" required><input type="date" className={inputCls} value={basics.startDate} onChange={(e) => setBasics((b) => ({ ...b, startDate: e.target.value }))} /></Field>
           <Field label="End date" required><input type="date" className={inputCls} value={basics.endDate} onChange={(e) => setBasics((b) => ({ ...b, endDate: e.target.value }))} /></Field>
-          <Field label="Contact email"><input className={inputCls} value={basics.contactEmail} onChange={(e) => setBasics((b) => ({ ...b, contactEmail: e.target.value }))} /></Field>
+          <Field label="Contact email" hint="Shown publicly on your tournament page."><input className={inputCls} value={basics.contactEmail} onChange={(e) => setBasics((b) => ({ ...b, contactEmail: e.target.value }))} /></Field>
           <Field label="Contact phone"><input className={inputCls} value={basics.contactPhone} onChange={(e) => setBasics((b) => ({ ...b, contactPhone: e.target.value }))} /></Field>
         </div>
       )}

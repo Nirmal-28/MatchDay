@@ -389,7 +389,19 @@ describe("estimateTournament", () => {
     expect(e.totalMatches).toBe(15);
     expect(e.fits).toBe(true);
     expect(e.warnings).toEqual([]);
-    expect(e.estimatedFinish).toBeTruthy();
+    // 12-hour clock with AM/PM — a bare "09:34" is ambiguous, and this is the
+    // number an organizer repeats verbatim to every player.
+    expect(e.estimatedFinish).toMatch(/^\d{1,2}:\d{2} (AM|PM)$/);
+  });
+
+  it("states the finish time with AM/PM even when it lands in the morning", () => {
+    const e = estimateTournament({
+      categories: [{ category: "MS", maxEntries: 4, format: "SINGLE_ELIM" }],
+      courtsCount: 4, matchDurationMins: 40, bufferMins: 5, startTime: "00:00", endTime: "21:00",
+    });
+    // 4 entries is a 2-round chain (semis, then final) — 2 x 45 min from
+    // midnight, so the dependency floor governs even with courts to spare.
+    expect(e.estimatedFinish).toBe("1:30 AM");
   });
 
   it("warns — with a concrete fix — when the day is too short", () => {

@@ -31,7 +31,7 @@ function EntryAnswers({ fields, answers }) {
   );
 }
 
-export default function ParticipantsPanel({ event, entries, registrationFields = [], entryDetails = {}, onApprove, onReject, onRemove, onRecordPayment, onRefund, onAddManual, onImport, onPromoteWaitlist, onToggleAutoPromote }) {
+export default function ParticipantsPanel({ event, entries, registrationFields = [], entryDetails = {}, isOwner = true, onApprove, onReject, onRemove, onRecordPayment, onRefund, onAddManual, onImport, onPromoteWaitlist, onToggleAutoPromote }) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("ALL");
   const [addOpen, setAddOpen] = useState(false);
@@ -54,12 +54,19 @@ export default function ParticipantsPanel({ event, entries, registrationFields =
           <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-3" />
           <input className={cx(inputCls, "pl-8")} placeholder="Search participants" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
-        <select className={cx(inputCls, "w-auto")} value={filter} onChange={(e) => setFilter(e.target.value)}>
+        {/* sm:w-auto, not a bare w-auto — see AuditLogPanel.jsx for why. */}
+        <select className={cx(inputCls, "sm:w-auto")} value={filter} onChange={(e) => setFilter(e.target.value)}>
           <option value="ALL">All statuses</option>
           {Object.keys(REG_STATUS_META).filter((s) => s !== "WAITLISTED").map((s) => <option key={s} value={s}>{REG_STATUS_META[s].label}</option>)}
         </select>
-        {onImport && <Btn size="sm" variant="secondary" icon={Upload} onClick={() => setImportOpen(true)}>Import CSV</Btn>}
-        <Btn size="sm" variant="secondary" icon={UserPlus} onClick={() => setAddOpen(true)}>Add participant</Btn>
+        {/* Adding an entry directly (as opposed to a player registering
+            themselves) goes through owner_insert_entries in RLS, which has
+            no staff equivalent — a non-owner ORGANIZER's "Add participant" or
+            CSV import would be refused outright. Hidden rather than shown as
+            a control that fails after they've filled in a form (same
+            reasoning as audit finding F4). */}
+        {isOwner && onImport && <Btn size="sm" variant="secondary" icon={Upload} onClick={() => setImportOpen(true)}>Import CSV</Btn>}
+        {isOwner && <Btn size="sm" variant="secondary" icon={UserPlus} onClick={() => setAddOpen(true)}>Add participant</Btn>}
       </div>
 
       {waitlisted.length > 0 && (
@@ -67,7 +74,10 @@ export default function ParticipantsPanel({ event, entries, registrationFields =
           <div className="mb-2 flex items-center justify-between">
             <div className="text-xs font-semibold uppercase tracking-wide text-amber-400">Waitlist ({waitlisted.length})</div>
             <div className="flex items-center gap-3">
-              {onToggleAutoPromote && (
+              {/* tournament_events UPDATE is owner_update_events only — a
+                  staff toggle here would flip visually and revert on
+                  reload, since the write matches 0 rows. */}
+              {onToggleAutoPromote && isOwner && (
                 <label className="flex items-center gap-1.5 text-xs text-ink-2">
                   <input type="checkbox" checked={!!event.auto_promote_waitlist} onChange={(e) => onToggleAutoPromote(e.target.checked)} className="accent-teal-500" />
                   Auto-promote on cancellation
@@ -140,7 +150,12 @@ export default function ParticipantsPanel({ event, entries, registrationFields =
                 {e.payment_status === "PAID" && (
                   <Btn size="sm" variant="ghost" onClick={() => onRefund(e.id)}>Refund</Btn>
                 )}
-                {canEdit && (
+                {/* DELETE on entries is owner_delete_entries only — there is
+                    no staff equivalent, and an RLS DELETE that matches no row
+                    succeeds silently (0 rows affected, no error), unlike an
+                    RLS-refused INSERT. canEdit alone would let staff click
+                    this and see nothing happen (audit finding F4 class). */}
+                {canEdit && isOwner && (
                   <Btn size="sm" variant="ghost" className="ml-auto text-red-400" icon={Trash2} onClick={() => onRemove(e.id)}>Remove</Btn>
                 )}
               </div>
@@ -188,7 +203,7 @@ export default function ParticipantsPanel({ event, entries, registrationFields =
                       {e.payment_status === "PAID" && (
                         <Btn size="sm" variant="ghost" onClick={() => onRefund(e.id)} title="Mark refunded">Refund</Btn>
                       )}
-                      {canEdit && <Btn size="sm" variant="ghost" onClick={() => onRemove(e.id)} title="Remove"><Trash2 size={14} className="text-red-500" /></Btn>}
+                      {canEdit && isOwner && <Btn size="sm" variant="ghost" onClick={() => onRemove(e.id)} title="Remove"><Trash2 size={14} className="text-red-500" /></Btn>}
                     </div>
                   </td>
                 </tr>

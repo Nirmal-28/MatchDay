@@ -52,25 +52,56 @@ const toLocalInput = (iso) => {
 };
 const fromLocalInput = (v) => (v ? new Date(v).toISOString() : null);
 
-// `roles` gates a tab to those tournament roles; omit it for tabs everyone
-// with any access may open. OWNER is the tournament creator.
+/* `roles` gates a tab to those tournament roles; omit it for tabs everyone
+   with any access may open. OWNER is the tournament creator.
+
+   These lists must mirror what RLS will actually ALLOW, not what seems
+   reasonable to show. That distinction matters more than it looks: an UPDATE
+   refused by RLS does not raise — it matches zero rows and returns success —
+   so a control the database will refuse does not show an error, it silently
+   does nothing. `guarded()` cannot catch it. The only defence is not
+   rendering the control (audit finding F4).
+
+   Verified against the policies in schema.sql + migrations 005/008/009:
+
+     tournaments   UPDATE  owner_update_tournaments   organizer_id = auth.uid()  → OWNER only
+     courts        I/U/D   owner_*_courts             is_tournament_owner()      → OWNER only
+     court_avail   ALL     owner_write_court_avail    is_tournament_owner()      → OWNER only
+     members       ALL     owner_manage_members       is_tournament_owner()      → OWNER only
+     invites       ALL     owner_manage_invites       is_tournament_owner()      → OWNER only
+     payments      SELECT  owner_select_payments      is_entry_owner()           → OWNER only
+     entries       UPDATE  staff_update_checkin       ORGANIZER/ADMIN/VOLUNTEER  → staff ok
+     matches       UPDATE  staff_update_matches       can_score_match()          → staff ok
+     games         I/U/D   staff_*_games              can_score_match()          → staff ok
+     disputes      INSERT  scorer_insert_disputes     +REFEREE/SCORER            → staff ok
+     disputes      UPDATE  owner_update_disputes      ORGANIZER/ADMIN            → staff ok
+
+   Settings, Courts, Staff and Finance are therefore OWNER-only in full —
+   every control they contain writes (or reads) an owner-scoped table, so
+   there is no useful read-only remainder to leave visible for staff.
+
+   NOTE (reported, not fixed here): Participants, Draw and the publish/settings
+   actions inside Schedule are MIXED — their reads are useful to staff but
+   their writes are owner-only. Those still need either a panel-level
+   read-only pass or an RLS decision about what a non-owner ORGANIZER should
+   be able to do. Left visible deliberately rather than silently narrowed. */
 const ORG_TABS = [
   { key: "overview", label: "Command center", icon: Home },
   { key: "participants", label: "Participants", icon: Users, roles: ["OWNER", "ORGANIZER", "ADMIN"] },
   { key: "draw", label: "Draw", icon: Swords, roles: ["OWNER", "ORGANIZER", "ADMIN"] },
   { key: "schedule", label: "Schedule", icon: Calendar, roles: ["OWNER", "ORGANIZER", "ADMIN"] },
-  { key: "courts", label: "Courts", icon: LayoutGrid, roles: ["OWNER", "ORGANIZER", "ADMIN"] },
+  { key: "courts", label: "Courts", icon: LayoutGrid, roles: ["OWNER"] },
   { key: "checkin", label: "Check-in", icon: UserCheck, roles: ["OWNER", "ORGANIZER", "ADMIN", "VOLUNTEER"] },
   { key: "live", label: "Live scoring", icon: Radio, roles: ["OWNER", "ORGANIZER", "ADMIN", "REFEREE", "SCORER"] },
   { key: "results", label: "Results", icon: Trophy },
-  { key: "staff", label: "Staff", icon: Shield, roles: ["OWNER", "ORGANIZER", "ADMIN"] },
-  { key: "finance", label: "Finance", icon: IndianRupee, roles: ["OWNER", "ORGANIZER"] },
+  { key: "staff", label: "Staff", icon: Shield, roles: ["OWNER"] },
+  { key: "finance", label: "Finance", icon: IndianRupee, roles: ["OWNER"] },
   { key: "analytics", label: "Analytics", icon: BarChart3, roles: ["OWNER", "ORGANIZER", "ADMIN"] },
   { key: "exports", label: "Exports", icon: Download, roles: ["OWNER", "ORGANIZER", "ADMIN"] },
   { key: "branding", label: "Branding", icon: Palette, roles: ["OWNER"] },
   { key: "disputes", label: "Disputes", icon: ShieldAlert, roles: ["OWNER", "ORGANIZER", "ADMIN", "REFEREE", "SCORER"] },
   { key: "audit", label: "Audit log", icon: ClipboardList, roles: ["OWNER", "ORGANIZER", "ADMIN"] },
-  { key: "settings", label: "Settings", icon: Settings, roles: ["OWNER", "ORGANIZER"] },
+  { key: "settings", label: "Settings", icon: Settings, roles: ["OWNER"] },
 ];
 
 export default function TournamentControlCenter() {
@@ -317,9 +348,25 @@ export default function TournamentControlCenter() {
             <BrandingPanel tournament={tournament} notify={notify} onChanged={loadAll} />
           )}
 
+          {/* MIXED tabs: staff can usefully read these, but the write actions
+              inside them are owner-scoped in RLS and would fail silently. Until
+              those panels get a proper read-only mode (or RLS grants staff more),
+              say so plainly rather than letting a button quietly do nothing. */}
+          {!isOwner && ["participants", "draw", "schedule"].includes(activeTab) && (
+            <div className="mb-3 flex gap-2 rounded-md border border-amber-400/30 bg-amber-400/[0.07] px-3 py-2.5 text-[11px] leading-relaxed text-amber-200">
+              <ShieldAlert size={13} className="mt-px shrink-0" />
+              <span>
+                You have staff access to this tournament, not owner access.
+                {activeTab === "schedule"
+                  ? " You can move and lock matches, but publishing the schedule and changing scheduling settings are limited to the tournament owner."
+                  : " You can view everything here, but only the tournament owner can make changes on this tab."}
+              </span>
+            </div>
+          )}
+
           {activeTab === "participants" && event && (
             <ParticipantsPanel
-              event={event} entries={eventEntries}
+              event={event} entries={eventEntries} isOwner={isOwner}
               registrationFields={tournament.registration_fields} entryDetails={entryDetails}
               onApprove={(eid) => guarded(async () => { await updateEntryStatus(eid, "CONFIRMED"); await loadEventData(events); })}
               onReject={(eid) => guarded(async () => { await updateEntryStatus(eid, "REJECTED"); await loadEventData(events); })}
@@ -462,7 +509,7 @@ export default function TournamentControlCenter() {
               <Card className="p-4 space-y-3">
                 <Field label="Tournament name"><input className={inputCls} defaultValue={tournament.name} onBlur={(e) => e.target.value !== tournament.name && guarded(async () => { await updateTournament(tournament.id, { name: e.target.value }); await loadAll(); })} /></Field>
                 <Field label="Venue"><input className={inputCls} defaultValue={tournament.venue} onBlur={(e) => e.target.value !== tournament.venue && guarded(async () => { await updateTournament(tournament.id, { venue: e.target.value }); await loadAll(); })} /></Field>
-                <Field label="Contact email"><input className={inputCls} defaultValue={tournament.contact_email || ""} onBlur={(e) => e.target.value !== tournament.contact_email && guarded(async () => { await updateTournament(tournament.id, { contact_email: e.target.value }); await loadAll(); })} /></Field>
+                <Field label="Contact email" hint="Shown publicly on your tournament page."><input className={inputCls} defaultValue={tournament.contact_email || ""} onBlur={(e) => e.target.value !== tournament.contact_email && guarded(async () => { await updateTournament(tournament.id, { contact_email: e.target.value }); await loadAll(); })} /></Field>
               </Card>
               {/* Registration window. These two timestamps are what actually
                   gate public entry — the RLS insert policy checks them — so
@@ -497,10 +544,11 @@ export default function TournamentControlCenter() {
                   Answers land in entry_details, never on the anon-readable
                   entries table.
 
-                  Owner-only, because `owner_update_tournaments` scopes writes
-                  to organizer_id — a non-owner ORGANIZER can open this tab but
-                  their save would be refused by RLS, so the panel is hidden
-                  rather than shown as a control that silently fails. */}
+                  The whole Settings tab is now OWNER-gated in ORG_TABS, so
+                  this check is redundant — kept as defence in depth, since
+                  `owner_update_tournaments` is what actually refuses the save
+                  and a future change to the tab's roles should not quietly
+                  re-expose a control the database will ignore. */}
               {isOwner && (
                 <RegistrationFieldsPanel tournament={tournament} notify={notify} onChanged={loadAll} />
               )}

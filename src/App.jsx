@@ -158,13 +158,18 @@ function Header() {
               {/* The one thing a signed-out visitor cannot otherwise discover:
                   that they can run their own tournament here, not just browse
                   other people's. Hidden on /host, where it would point at the
-                  page already being read. */}
+                  page already being read. Visible at every width — a mobile
+                  visitor is not less likely to want to organize, and this was
+                  previously invisible below 640px with no other way to find
+                  it (audit finding F1). The label shortens on narrow screens
+                  so it sits comfortably next to "Sign in" without wrapping. */}
               {location.pathname !== "/host" && (
                 <Link
                   to="/host"
-                  className="hidden rounded-md bg-accent-teal px-2.5 py-1.5 text-xs font-semibold text-navy-950 hover:brightness-110 sm:inline-block"
+                  className="inline-block rounded-md bg-accent-teal px-2.5 py-1.5 text-xs font-semibold text-navy-950 hover:brightness-110"
                 >
-                  Host a tournament
+                  <span className="sm:hidden">Host</span>
+                  <span className="hidden sm:inline">Host a tournament</span>
                 </Link>
               )}
               <Link to="/login" className="text-xs font-medium text-ink-2 hover:text-ink">Sign in</Link>

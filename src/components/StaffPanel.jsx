@@ -10,7 +10,12 @@ import { Badge, Btn, Card, Field, inputCls } from "../components/ui/primitives";
 // tournament_members role — it's tournaments.organizer_id, exactly one person,
 // and it cannot be granted or revoked from here.
 export const STAFF_ROLES = [
-  { key: "ORGANIZER", label: "Organizer", hint: "Full access to this tournament, except transferring ownership." },
+  // ORGANIZER and ADMIN carry identical RLS grants — both can run matches,
+  // check-in and disputes, but neither can touch Courts, Staff, Finance,
+  // Branding or Settings, which stay owner-only. The hint used to promise
+  // "full access... except ownership", which stopped being true once those
+  // tabs were correctly gated to OWNER (audit finding F4).
+  { key: "ORGANIZER", label: "Organizer", hint: "Runs match day — participants, draws, schedule, check-in and disputes. Courts, staff, finance and settings stay owner-only." },
   { key: "ADMIN", label: "Admin", hint: "Manage participants, draws, schedule, check-in and disputes." },
   { key: "REFEREE", label: "Referee", hint: "See assigned matches and officiate. Can score and raise disputes." },
   { key: "SCORER", label: "Scorer", hint: "Score assigned matches in Scorer Mode. No tournament settings." },
@@ -20,7 +25,7 @@ const ROLE_TONE = { ORGANIZER: "teal", ADMIN: "indigo", REFEREE: "amber", SCORER
 
 function RoleSelect({ value, onChange, disabled }) {
   return (
-    <select className={cx(inputCls, "w-auto py-1 text-xs")} value={value} disabled={disabled}
+    <select className={cx(inputCls, "sm:w-auto py-1 text-xs")} value={value} disabled={disabled}
       onChange={(e) => onChange(e.target.value)}>
       {STAFF_ROLES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
     </select>
@@ -209,7 +214,7 @@ export default function StaffPanel({ tournament, events, matches, entriesById, i
                       {["referee_id", "scorer_id"].map((field) => (
                         <td key={field} className="px-3 py-2">
                           <select
-                            className={cx(inputCls, "w-auto min-w-[9rem] py-1 text-xs")}
+                            className={cx(inputCls, "sm:w-auto min-w-[9rem] py-1 text-xs")}
                             value={m[field] || ""}
                             disabled={busy}
                             onChange={(e) => guard(() => assignMatchOfficials(m.id, { [field]: e.target.value || null }), "Assignment saved.").then(onChanged)}

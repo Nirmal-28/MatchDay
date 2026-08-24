@@ -1020,9 +1020,15 @@ export async function markNotificationsRead(tournamentId) {
   if (error) throw error;
 }
 
+// More than one component subscribes to the same user's notifications at
+// once — the player dashboard and the notification bell both mount on /me.
+// Supabase Realtime refuses a second `.subscribe()` on a channel name that's
+// already live ("cannot add `postgres_changes` callbacks for realtime:..."),
+// so the name must be unique per SUBSCRIPTION, not just per user.
+let notifSubSeq = 0;
 export function subscribeToMyNotifications(userId, onChange) {
   const channel = supabase
-    .channel(`notif-${userId}`)
+    .channel(`notif-${userId}-${++notifSubSeq}`)
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` }, onChange)
     .subscribe();
   return () => supabase.removeChannel(channel);

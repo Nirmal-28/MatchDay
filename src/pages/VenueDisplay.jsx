@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { Radio, Megaphone, WifiOff } from "lucide-react";
 import {
   cx, entryShort, matchStageLabel, fmtTime, divisionLabel, accentTheme,
-  BadmintonScoringEngine, toAB,
+  BadmintonScoringEngine, toAB, displayTitle, displaySentence,
 } from "../lib/engines";
 import { getTournamentBySlug, listEvents, listEntriesPublic, listMatches, listCourts, subscribeToEvent } from "../lib/repository";
 import { courtBoard } from "../lib/analytics";
@@ -177,9 +177,13 @@ export default function VenueDisplay() {
             ? <img src={tournament.logo_url} alt="" className="h-[5vw] w-[5vw] shrink-0 rounded-[0.8vw] object-cover" />
             : <img src={logo} alt="" className="h-[5vw] w-[5vw] shrink-0 rounded-[0.8vw]" />}
           <div className="min-w-0">
-            <h1 className="truncate font-display text-[3.2vw] font-bold leading-none">{tournament.name}</h1>
+            {/* Display casing only — the stored name is untouched. This is a
+                broadcast surface read across a hall, where "chennai premier
+                league" in lower case reads as unfinished. Acronyms the
+                organizer typed (CSK) survive intact; see displayTitle. */}
+            <h1 className="truncate font-display text-[3.2vw] font-bold leading-none">{displayTitle(tournament.name)}</h1>
             <div className="mt-[0.4vw] text-[1.2vw] text-white/50">
-              {tournament.venue}{tournament.location ? `, ${tournament.location}` : ""}
+              {displayTitle(tournament.venue)}{tournament.location ? `, ${displayTitle(tournament.location)}` : ""}
             </div>
           </div>
         </div>
@@ -201,7 +205,9 @@ export default function VenueDisplay() {
         <div className="mb-[1.2vw] flex items-center gap-[1vw] rounded-[0.8vw] px-[1.4vw] py-[0.9vw]"
           style={{ background: `${accent}1f`, border: `2px solid ${accent}55` }}>
           <Megaphone className="shrink-0" style={{ color: accent, width: "2vw", height: "2vw" }} />
-          <span className="text-[1.6vw] font-medium">{tournament.announcement}</span>
+          {/* Sentence case, not title case — an announcement is prose, and
+              "Courts 3 And 4 Are In 1st Floor" would read as a headline. */}
+          <span className="text-[1.6vw] font-medium">{displaySentence(tournament.announcement)}</span>
         </div>
       )}
 

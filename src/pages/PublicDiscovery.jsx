@@ -308,11 +308,21 @@ export default function PublicDiscovery() {
               <input className={`${inputCls} pl-8`} placeholder="Search by name, venue or city"
                 value={filters.q} onChange={(e) => setFilter("q", e.target.value)} />
             </div>
-            <select className={`${inputCls} w-auto`} value={filters.sport} onChange={(e) => setFilter("sport", e.target.value)}>
+            {/* `inputCls` opens with `w-full`; appending a bare `w-auto` after
+                it does NOT reliably win (Tailwind utilities of equal
+                specificity are ordered by the compiled stylesheet, not by
+                position in the class string), which was forcing both selects
+                to full width and wrapping the whole row onto separate lines
+                even at desktop widths (audit finding F2). `sm:w-auto` is the
+                actual fix: Tailwind always emits responsive variants after
+                their bare counterpart, so this reliably overrides w-full from
+                the sm breakpoint (640px) up, while phones narrower than that
+                keep the full-width, stacked layout that already suits them. */}
+            <select className={`${inputCls} sm:w-auto`} value={filters.sport} onChange={(e) => setFilter("sport", e.target.value)}>
               <option value="ALL">All sports</option>
               {SPORT_KEYS.map((s) => <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
             </select>
-            <select className={`${inputCls} w-auto`} value={filters.status} onChange={(e) => setFilter("status", e.target.value)}>
+            <select className={`${inputCls} sm:w-auto`} value={filters.status} onChange={(e) => setFilter("status", e.target.value)}>
               <option value="ALL">Any status</option>
               <option value="LIVE">Live</option>
               <option value="REGISTRATION_OPEN">Registration open</option>

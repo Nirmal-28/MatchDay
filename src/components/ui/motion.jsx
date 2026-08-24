@@ -1,14 +1,30 @@
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import logo from "../../assets/logo.png";
+
+/* Scroll-reveal helpers.
+
+   Every one of these checks `useReducedMotion()`, which reads the OS-level
+   `prefers-reduced-motion` setting. When it is on, the content renders at its
+   final opacity and position immediately instead of fading and sliding.
+
+   This is not decoration: the discovery and host-landing pages are built
+   almost entirely out of these, so without the check a visitor with vestibular
+   motion sensitivity gets the whole page sliding at them as they scroll.
+   SportsBackground.jsx already honoured the same preference — these did not,
+   which made the app inconsistent with its own standard (audit finding F5).
+
+   Note it disables the ANIMATION, not the reveal: content must still end up
+   visible, so the fix is to skip the offset rather than to skip the trigger. */
 
 // Fades + slides an element up as it scrolls into view. Fires once.
 export function Reveal({ children, delay = 0, className, as: As = motion.div, ...props }) {
+  const reduce = useReducedMotion();
   return (
     <As
-      initial={{ opacity: 0, y: 16 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={reduce ? false : { opacity: 0, y: 16 }}
+      whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-40px" }}
-      transition={{ duration: 0.4, delay, ease: "easeOut" }}
+      transition={reduce ? { duration: 0 } : { duration: 0.4, delay, ease: "easeOut" }}
       className={className}
       {...props}
     >
@@ -22,12 +38,16 @@ export function Reveal({ children, delay = 0, className, as: As = motion.div, ..
 // each child still needs the fade/slide, so pair with <StaggerItem>.
 export function StaggerList({ children, className, stagger = 0.06, as = "div" }) {
   const As = motion[as] || motion.div;
+  const reduce = useReducedMotion();
   return (
     <As
-      initial="hidden"
+      // The children read "hidden"/"show" from this container, so the variant
+      // names still have to be driven even when the motion itself is removed —
+      // StaggerItem is what flattens them to a no-op transition.
+      initial={reduce ? false : "hidden"}
       whileInView="show"
       viewport={{ once: true, margin: "-40px" }}
-      transition={{ staggerChildren: stagger }}
+      transition={reduce ? { duration: 0 } : { staggerChildren: stagger }}
       className={className}
     >
       {children}
@@ -37,10 +57,15 @@ export function StaggerList({ children, className, stagger = 0.06, as = "div" })
 
 export function StaggerItem({ children, className, as = "div" }) {
   const As = motion[as] || motion.div;
+  const reduce = useReducedMotion();
   return (
     <As
-      variants={{ hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0 } }}
-      transition={{ duration: 0.35, ease: "easeOut" }}
+      variants={
+        reduce
+          ? { hidden: { opacity: 1, y: 0 }, show: { opacity: 1, y: 0 } }
+          : { hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0 } }
+      }
+      transition={reduce ? { duration: 0 } : { duration: 0.35, ease: "easeOut" }}
       className={className}
     >
       {children}

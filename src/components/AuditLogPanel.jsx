@@ -26,7 +26,13 @@ export default function AuditLogPanel({ tournamentId, allMatches }) {
 
   return (
     <div className="space-y-3">
-      <select className={`${inputCls} w-auto`} value={filter} onChange={(e) => setFilter(e.target.value)}>
+      {/* `sm:w-auto`, not a bare `w-auto` — inputCls opens with `w-full`, and a
+          bare `w-auto` appended after it in the class string does not reliably
+          win (equal specificity; the compiled stylesheet order decides, not
+          the class-string order). Tailwind always emits responsive variants
+          after their bare counterpart, so `sm:w-auto` is the fix that actually
+          holds (same root cause as audit finding F2). */}
+      <select className={`${inputCls} sm:w-auto`} value={filter} onChange={(e) => setFilter(e.target.value)}>
         <option value="ALL">All actions</option>
         {Object.keys(ACTION_META).map((a) => <option key={a} value={a}>{ACTION_META[a].label}</option>)}
       </select>

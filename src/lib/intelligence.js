@@ -494,6 +494,18 @@ export function matchCountFor({ format = "SINGLE_ELIM", entries = 0, groupCount 
   return n - 1; // single elimination: every entry but the winner loses once
 }
 
+// "9:34 PM" from a minutes-since-midnight offset (which may run past 1440 for
+// a next-day finish, hence the modulo). Used by estimateTournament() below,
+// where there is no Date/ISO string yet to hand to fmtClock().
+function fmtClockFromMins(totalMins) {
+  const m = ((Math.round(totalMins) % 1440) + 1440) % 1440;
+  const h24 = Math.floor(m / 60);
+  const mm = m % 60;
+  const period = h24 < 12 ? "AM" : "PM";
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h12}:${String(mm).padStart(2, "0")} ${period}`;
+}
+
 // The honest answer to "can I actually run this in a day?" for the create
 // wizard. Everything here is arithmetic over what the organizer just typed —
 // no promises the scheduling engine cannot keep.
@@ -564,10 +576,10 @@ export function estimateTournament({
     courtHoursNeeded: Math.round((requiredMins / 60) * 10) / 10,
     courtHoursAvailable: Math.round((capacityMins / 60) * 10) / 10,
     estimatedRunMins: runMins,
-    // Only meaningful when it lands inside the day it started.
-    estimatedFinish: finishMins <= 24 * 60
-      ? `${String(Math.floor(finishMins / 60)).padStart(2, "0")}:${String(finishMins % 60).padStart(2, "0")}`
-      : null,
+    // Only meaningful when it lands inside the day it started. 12-hour with
+    // AM/PM — a bare "09:34" reads as morning to some and evening to others,
+    // and this is exactly the number an organizer repeats to 60 players.
+    estimatedFinish: finishMins <= 24 * 60 ? fmtClockFromMins(finishMins) : null,
     recommendedCourts: dayMins > 0 ? Math.max(1, Math.ceil(requiredMins / (dayMins * Math.max(1, days)))) : courts,
     fits,
     warnings,

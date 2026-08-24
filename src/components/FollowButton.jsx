@@ -66,7 +66,10 @@ export default function FollowButton({
     ? "px-2.5 py-1 text-[11px] gap-1"
     : "px-3 py-1.5 text-xs gap-1.5";
 
-  const countLabel = showCount && count !== null
+  // Hidden at zero. "Follow 0" next to a call-to-action reads as an empty
+  // room rather than an invitation, and a brand-new tournament always starts
+  // there (audit finding F8).
+  const countLabel = showCount && count !== null && count > 0
     ? <span className="tabular-nums opacity-80">{count}</span>
     : null;
 

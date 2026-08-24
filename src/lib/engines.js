@@ -470,6 +470,44 @@ export function fmtDuration(minutes) {
   return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
+/* ────────────────────── DISPLAY CASING (presentation only) ────────────────
+   Organizers type names in whatever case they like — "chennai premier league",
+   "CSK", "madras badminton". On most screens that is fine, but the venue
+   display is a broadcast surface read from across a hall, where inconsistent
+   casing is the fastest tell that separates a club spreadsheet from a
+   scoreboard (audit finding F6).
+
+   These are display transforms ONLY. They never touch stored data, so the
+   organizer's own text is preserved everywhere it is edited — this just
+   renders it consistently on the one screen where it matters.
+
+   Both deliberately leave any word that already carries a capital alone. A
+   blind `text-transform: capitalize` would turn "CSK" into "Csk", which is
+   worse than the problem being fixed. */
+
+const capitaliseFirstLetter = (word) => word.replace(/\p{Ll}/u, (c) => c.toUpperCase());
+// A word the author already capitalised is deliberate — an acronym (CSK), a
+// brand (McMahon), a model number. Leave it exactly as typed.
+const authorCapitalised = (word) => /\p{Lu}/u.test(word);
+
+// Title case, for names: "chennai premier league" -> "Chennai Premier League".
+export function displayTitle(text) {
+  if (!text) return text;
+  return String(text).replace(/\S+/gu, (w) => (authorCapitalised(w) ? w : capitaliseFirstLetter(w)));
+}
+
+// Sentence case, for prose: "courts 3 and 4 are in 1st floor" ->
+// "Courts 3 and 4 are in 1st floor". Title-casing a sentence would read as
+// a headline, which an announcement is not.
+export function displaySentence(text) {
+  if (!text) return text;
+  const s = String(text);
+  const i = s.search(/\p{L}/u);
+  if (i === -1) return s;
+  // Only touch the first letter, and only if the author left it lowercase.
+  return authorCapitalised(s.slice(i, i + 1)) ? s : s.slice(0, i) + s[i].toUpperCase() + s.slice(i + 1);
+}
+
 // "in 25 min" / "12 min ago" — the phrasing a player needs on a dashboard.
 export function relativeTime(iso, now = Date.now()) {
   if (!iso) return "";
