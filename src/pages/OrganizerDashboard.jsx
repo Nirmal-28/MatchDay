@@ -6,6 +6,7 @@ import { listMyTournaments, createTournament, publishTournament, listMySeries, c
 import { Btn, Badge, Card, Field, inputCls, useToasts, Toasts } from "../components/ui/primitives";
 import { BrandLoader, Reveal, StaggerList, StaggerItem } from "../components/ui/motion";
 import { StatusPill, sportAccent } from "../components/ui/md";
+import { MaskText } from "../components/ui/reveal";
 import CreateTournamentWizard from "../components/CreateTournamentWizard";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
 
@@ -99,7 +100,7 @@ export default function OrganizerDashboard() {
       <Reveal className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="md-eyebrow mb-1 text-accent-teal">Organize</div>
-          <h1 className="md-display md-h2 text-ink">Tournaments I organize</h1>
+          <MaskText as="h1" className="md-display md-h2 text-ink" lines={["Tournaments", "I organize"]} />
           <p className="mt-0.5 text-sm text-ink-2">
             Tournaments you own or help run. Your player profile is unaffected — it&apos;s the same account.
           </p>

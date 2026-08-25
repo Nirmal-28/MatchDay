@@ -26,6 +26,7 @@ import { Link } from "react-router-dom";
 import { MapPin, Clock, Users } from "lucide-react";
 import { cx } from "../../lib/engines";
 import { SportIcon } from "./motion";
+import { Tilt, Rise } from "./reveal";
 
 /* ── Sport identity ──────────────────────────────────────────────────────
    A sport's accent colour, used for the card's leading court line and its
@@ -77,16 +78,22 @@ export function StatusPill({ status, children, className }) {
 
 /* ── Section header ──────────────────────────────────────────────────────
    The court-line rule + condensed title. Used at the top of every block so
-   the page reads as a sequence of named sections rather than a wall. */
+   the page reads as a sequence of named sections rather than a wall.
+
+   The arrival choreography lives HERE rather than at each call site. That
+   is deliberate: every section in the product gets the same reveal, with
+   the same timing, without a single page importing an animation primitive
+   to decorate its own heading. One place to tune it, one place to turn it
+   off, and no chance of two pages drifting to different easings. */
 export function SectionHeader({ title, eyebrow, action, className, id }) {
   return (
-    <div className={cx("mb-3 flex items-end justify-between gap-4", className)}>
+    <Rise className={cx("mb-3 flex items-end justify-between gap-4", className)}>
       <div className="min-w-0">
         {eyebrow && <div className="md-eyebrow mb-1">{eyebrow}</div>}
         <h2 id={id} className="md-display md-h3 md-rule text-ink">{title}</h2>
       </div>
       {action && <div className="shrink-0 pb-1">{action}</div>}
-    </div>
+    </Rise>
   );
 }
 
@@ -366,83 +373,89 @@ export function TournamentCard({ t, variant = "default", className, footer }) {
   return (
     <Link
       to={t.slug ? `/t/${t.slug}` : `/t/${t.id}`}
-      className={cx("group block h-full", className)}
+      className={cx("md-group group block h-full", className)}
     >
-      <div
-        className={cx(
-          "md-card md-card-link md-edge flex h-full flex-col p-4 pl-5",
-          featured && "md-hatch sm:p-5 sm:pl-6"
-        )}
-        style={{ "--md-edge": accent }}
-      >
-        {/* Sport first — it is the single most useful filter a browsing
-            player applies, and the glyph reads faster than a word. */}
-        <div className="mb-2.5 flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <SportIcon sport={t.sport} className="h-5 w-5" style={{ color: accent }} />
-            <span className="md-eyebrow" style={{ color: accent }}>{t.sportLabel || t.sport}</span>
-          </div>
-          {t.live ? (
-            <StatusPill status="live" />
-          ) : t.status ? (
-            <span className={cx("md-status", `md-status-${t.status}`)}>{t.statusLabel || t.status}</span>
-          ) : null}
-        </div>
-
-        <h3
+      {/* The card behaves as a physical object: it leans toward the pointer
+          and catches a highlight from it. Both are pointer-only and both
+          release on leave — see <Tilt/> for why that matters for compositor
+          layers. On touch this renders as a plain div with no listeners. */}
+      <Tilt className="h-full">
+        <div
           className={cx(
-            "md-display md-clamp-2 text-ink transition-colors group-hover:text-accent-teal",
-            featured ? "text-2xl sm:text-3xl" : "text-xl"
+            "md-card md-card-link md-edge md-sheen flex h-full flex-col p-4 pl-5",
+            featured && "md-hatch sm:p-5 sm:pl-6"
           )}
+          style={{ "--md-edge": accent }}
         >
-          {t.name}
-        </h3>
-
-        <div className="mt-2.5 space-y-1 text-[13px] text-ink-2">
-          {t.dateLabel && (
-            <div className="flex items-center gap-1.5">
-              <Clock size={13} className="shrink-0 text-ink-3" aria-hidden="true" />
-              <span className="truncate">{t.dateLabel}</span>
+          {/* Sport first — it is the single most useful filter a browsing
+              player applies, and the glyph reads faster than a word. */}
+          <div className="mb-2.5 flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <SportIcon sport={t.sport} className="h-5 w-5" style={{ color: accent }} />
+              <span className="md-eyebrow" style={{ color: accent }}>{t.sportLabel || t.sport}</span>
             </div>
-          )}
-          {(t.venue || t.location) && (
-            <div className="flex items-center gap-1.5">
-              <MapPin size={13} className="shrink-0 text-ink-3" aria-hidden="true" />
-              <span className="truncate">{[t.venue, t.location].filter(Boolean).join(" · ")}</span>
-            </div>
-          )}
-          {t.level && (
-            <div className="flex items-center gap-1.5">
-              <Users size={13} className="shrink-0 text-ink-3" aria-hidden="true" />
-              <span className="truncate">{t.level}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Spacer pushes the capacity/fee footer to the bottom so a row of
-            cards of different title lengths still aligns along its base. */}
-        <div className="flex-1" />
-
-        {/* A real, dated fact when there is one — never a manufactured
-            urgency cue. Callers pass this only when the tournament actually
-            has a registration deadline. */}
-        {t.note && (
-          <div className="mt-3 text-[11px] font-semibold" style={{ color: t.noteTone || "var(--color-closing)" }}>
-            {t.note}
+            {t.live ? (
+              <StatusPill status="live" />
+            ) : t.status ? (
+              <span className={cx("md-status", `md-status-${t.status}`)}>{t.statusLabel || t.status}</span>
+            ) : null}
           </div>
-        )}
 
-        <CapacityBar filled={t.filled} capacity={t.capacity} className="mt-3.5" />
-
-        {(t.fee != null || footer) && (
-          <div className="mt-3 flex items-center justify-between gap-3 border-t border-line-soft pt-3">
-            {t.fee != null && (
-              <span className="text-sm font-semibold text-ink">{t.fee}</span>
+          <h3
+            className={cx(
+              "md-display md-clamp-2 text-ink transition-colors group-hover:text-accent-teal",
+              featured ? "text-2xl sm:text-3xl" : "text-xl"
             )}
-            {footer}
+          >
+            {t.name}
+          </h3>
+
+          <div className="mt-2.5 space-y-1 text-[13px] text-ink-2">
+            {t.dateLabel && (
+              <div className="flex items-center gap-1.5">
+                <Clock size={13} className="shrink-0 text-ink-3" aria-hidden="true" />
+                <span className="truncate">{t.dateLabel}</span>
+              </div>
+            )}
+            {(t.venue || t.location) && (
+              <div className="flex items-center gap-1.5">
+                <MapPin size={13} className="shrink-0 text-ink-3" aria-hidden="true" />
+                <span className="truncate">{[t.venue, t.location].filter(Boolean).join(" · ")}</span>
+              </div>
+            )}
+            {t.level && (
+              <div className="flex items-center gap-1.5">
+                <Users size={13} className="shrink-0 text-ink-3" aria-hidden="true" />
+                <span className="truncate">{t.level}</span>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+
+          {/* Spacer pushes the capacity/fee footer to the bottom so a row of
+              cards of different title lengths still aligns along its base. */}
+          <div className="flex-1" />
+
+          {/* A real, dated fact when there is one — never a manufactured
+              urgency cue. Callers pass this only when the tournament actually
+              has a registration deadline. */}
+          {t.note && (
+            <div className="mt-3 text-[11px] font-semibold" style={{ color: t.noteTone || "var(--color-closing)" }}>
+              {t.note}
+            </div>
+          )}
+
+          <CapacityBar filled={t.filled} capacity={t.capacity} className="mt-3.5" />
+
+            {(t.fee != null || footer) && (
+              <div className="mt-3 flex items-center justify-between gap-3 border-t border-line-soft pt-3">
+                {t.fee != null && (
+                  <span className="text-sm font-semibold text-ink">{t.fee}</span>
+                )}
+                {footer}
+              </div>
+            )}
+        </div>
+      </Tilt>
     </Link>
   );
 }

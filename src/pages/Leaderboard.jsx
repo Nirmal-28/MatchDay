@@ -7,6 +7,7 @@ import { computeRanking, rankPlayers, rankingConfigFor } from "../lib/ranking";
 import { EmptyState } from "../components/ui/primitives";
 import { BrandLoader, Reveal, StaggerList, StaggerItem } from "../components/ui/motion";
 import { CourtGeometry } from "../components/ui/atmosphere";
+import { MaskText } from "../components/ui/reveal";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
 
 const RANK_ACCENT = ["text-accent-yellow", "text-ink-3", "text-accent-orange"];
@@ -39,7 +40,7 @@ export default function Leaderboard() {
         <CourtGeometry />
         <div className="relative">
           <div className="md-eyebrow text-accent-teal">Matchday</div>
-          <h1 className="md-display md-h1 mt-1.5 text-ink">Rankings</h1>
+          <MaskText as="h1" className="md-display md-h1 mt-1.5 text-ink" lines={["Rankings"]} />
           <p className="mx-auto mt-2 max-w-md text-sm text-ink-3">
             Badminton ranking points from every completed match on MatchDay. A player needs at least {rankingConfigFor("badminton").minMatches} completed matches to be ranked.
           </p>

@@ -1,8 +1,9 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from "react-router-dom";
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import { AuthProvider, useAuth } from "./lib/AuthContext";
 import { BrandLoader } from "./components/ui/motion";
+import NavOverlay from "./components/ui/NavOverlay";
 // Purely decorative. It is now static SVG rather than the GSAP timelines it
 // used to run, so the chunk is small — but it is still off the critical path
 // between a shared tournament link and the score someone opened it to see,
@@ -140,12 +141,40 @@ function Header() {
   const location = useLocation();
   const surfaces = surfacesFor(caps);
   const surface = surfaceOf(location.pathname);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // The header stays legible over whatever is behind it, but only earns its
+  // border and blur once the page has actually moved — at the very top of a
+  // hero it should feel like part of the composition, not a bar bolted on.
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    // Passive: this listener must never be able to delay a scroll frame.
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // A route change closes the menu. Without this, following a link inside
+  // the overlay navigates behind a panel that stays open.
+  useEffect(() => { setMenuOpen(false); }, [location.pathname]);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-canvas/85 backdrop-blur-xl">
+    <header
+      className={cx(
+        "sticky top-0 z-30 transition-colors duration-300",
+        scrolled ? "border-b border-line bg-canvas/85 backdrop-blur-xl" : "border-b border-transparent"
+      )}
+    >
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4">
-        <Link to="/" className="flex shrink-0 items-center gap-2" aria-label="MatchDay home">
-          <img src={logo} alt="" className="h-7 w-7 rounded-md" width="28" height="28" />
+        <Link to="/" className="md-group flex shrink-0 items-center gap-2" aria-label="MatchDay home">
+          {/* The mark tilts a few degrees toward the wordmark on hover and
+              settles back — a single, short, physical acknowledgement rather
+              than a looping logo animation. */}
+          <img
+            src={logo} alt="" width="28" height="28"
+            className="h-7 w-7 rounded-md transition-transform duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:-rotate-6 group-hover:scale-110"
+          />
           <Wordmark className="text-2xl" />
         </Link>
 
@@ -227,8 +256,35 @@ function Header() {
               </Link>
             </>
           )}
+
+          {/* The menu trigger. Present at every width — on a phone it is the
+              only route to Rankings and the account links, and on desktop it
+              reaches the full destination list without crowding the header
+              with every link the product has. */}
+          <button
+            type="button"
+            onClick={() => setMenuOpen(true)}
+            aria-expanded={menuOpen}
+            aria-haspopup="dialog"
+            className="md-group flex h-9 items-center gap-2 rounded-full border border-line px-3 text-xs font-bold uppercase tracking-wider text-ink-2 transition-colors hover:border-accent-teal hover:text-ink"
+          >
+            <span className="flex flex-col gap-[3px]" aria-hidden="true">
+              <span className="block h-px w-4 bg-current transition-transform duration-300 group-hover:translate-x-0.5" />
+              <span className="block h-px w-4 bg-current" />
+            </span>
+            Menu
+          </button>
         </div>
       </div>
+
+      <NavOverlay
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        surfaces={surfaces}
+        currentSurface={surface}
+        session={session}
+        onSignOut={() => signOut()}
+      />
     </header>
   );
 }
@@ -242,6 +298,11 @@ function AnimatedRoutes() {
   useEffect(() => { trackPageView(location.pathname); }, [location.pathname]);
 
   return (
+    // `mode="wait"` so the outgoing page finishes leaving before the next
+    // one arrives — the two never overlap, which is what stops a route change
+    // from reading as a flicker. Timings are deliberately short (180/260ms):
+    // a page transition is connective tissue, and anything longer puts a
+    // delay between a tap and the content on every single navigation.
     <AnimatePresence mode="wait">
       <motion.div
         key={location.pathname}

@@ -213,6 +213,27 @@ export default function VenueDisplay() {
 
   return (
     <div className="flex min-h-screen flex-col bg-navy-950 p-[2vw] text-white">
+      {/* Broadcast motion, scoped to this screen. Three one-shot animations,
+          all triggered by the board's content actually changing: a match
+          arriving on court, a pane rotating, and (in LiveCard) a point
+          landing. Nothing here loops — a venue screen runs for eight hours
+          and any idle animation becomes visual noise in the hall long before
+          the day is over. */}
+      <style>{`
+        @keyframes vd-enter {
+          from { opacity: 0; transform: translate3d(0, 1.2vw, 0) scale(0.985); }
+          to   { opacity: 1; transform: none; }
+        }
+        @keyframes vd-pane {
+          from { opacity: 0; transform: translate3d(0, 0.8vw, 0); }
+          to   { opacity: 1; transform: none; }
+        }
+        .vd-enter { animation: vd-enter 520ms cubic-bezier(0.16,1,0.3,1) both; }
+        .vd-pane  { animation: vd-pane 460ms cubic-bezier(0.16,1,0.3,1) both; }
+        @media (prefers-reduced-motion: reduce) {
+          .vd-enter, .vd-pane { animation: none; }
+        }
+      `}</style>
       {/* ── Header: organizer branding, MatchDay stays the platform mark ── */}
       <header className="mb-[1.5vw] flex items-center justify-between gap-[2vw]">
         <div className="flex min-w-0 items-center gap-[1.2vw]">
@@ -273,7 +294,15 @@ export default function VenueDisplay() {
       ) : (
         <div className={cx("mb-[1.5vw] grid gap-[1.2vw]", live.length <= 2 ? "grid-cols-2" : live.length <= 4 ? "grid-cols-2" : "grid-cols-3")}>
           {live.slice(0, 6).map((m) => (
-            <LiveCard key={m.id} m={m} event={eventById[m.event_id]} entriesById={entriesById} accent={accent} />
+            // Keyed on the match id, so a board that swaps one match for
+            // another plays the arrival once. A card that is merely updating
+            // its score keeps its key and does not re-enter — only the score
+            // itself bumps. That distinction is the whole point: on a screen
+            // nobody is touching, motion must mean "something changed", and
+            // a board that re-animated on every point would be unwatchable.
+            <div key={m.id} className="vd-enter">
+              <LiveCard m={m} event={eventById[m.event_id]} entriesById={entriesById} accent={accent} />
+            </div>
           ))}
         </div>
       )}
@@ -313,8 +342,12 @@ export default function VenueDisplay() {
           )}
         </div>
 
+        {/* Keyed on which pane is showing, so the rotation crossfades as one
+            piece instead of two lists swapping in place. This is a scheduled
+            change of content on an unattended screen — exactly the case where
+            a transition helps a viewer notice the board has moved on. */}
         {showResults ? (
-          <div className="grid grid-cols-2 gap-[0.8vw]">
+          <div key="results" className="vd-pane grid grid-cols-2 gap-[0.8vw]">
             {recent.map((m) => {
               const games = [...(m.games || [])].sort((x, y) => x.game_number - y.game_number);
               const tally = BadmintonScoringEngine.gameTally(toAB(games));
@@ -345,7 +378,7 @@ export default function VenueDisplay() {
             Nothing scheduled next
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-[0.8vw]">
+          <div key="next" className="vd-pane grid grid-cols-2 gap-[0.8vw]">
             {next.map((m) => (
               <div key={m.id} className="flex items-center gap-[1.2vw] rounded-[0.8vw] border-2 border-white/10 bg-white/[0.03] px-[1.2vw] py-[0.9vw]">
                 <div className="shrink-0 text-center">

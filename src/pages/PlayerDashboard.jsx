@@ -19,6 +19,7 @@ import PlayerSeries from "../components/PlayerSeries";
 import { Badge, Btn, EmptyState } from "../components/ui/primitives";
 import { BrandLoader } from "../components/ui/motion";
 import { SectionHeader, StatTile, StatusPill, Tabs } from "../components/ui/md";
+import { MaskText, Rise, Counter } from "../components/ui/reveal";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
 
 const DONE = ["COMPLETED", "WALKOVER"];
@@ -256,10 +257,11 @@ function SeasonStats({ completed, wins, tournaments, titles }) {
     <section>
       <SectionHeader eyebrow="Real results only" title="Your record" />
       <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-5">
-        <StatTile label="Played" value={completed.length} />
-        <StatTile label="Won" value={wins} tone="open" />
+        <StatTile label="Played" value={<Counter value={completed.length} />} />
+        <StatTile label="Won" value={<Counter value={wins} />} tone="open" />
+        {/* A percentage is derived, not tallied — it gets no count-up. */}
         <StatTile label="Win rate" value={`${winPct}%`} />
-        <StatTile label="Tournaments" value={tournaments.length} />
+        <StatTile label="Tournaments" value={<Counter value={tournaments.length} />} />
         <StatTile label="Titles" value={titles} tone={titles > 0 ? "closing" : undefined} />
       </div>
     </section>
@@ -511,7 +513,7 @@ export default function PlayerDashboard() {
             </div>
           )}
           <div className="min-w-0">
-            <h1 className="md-display text-3xl text-ink">{player.name}</h1>
+            <MaskText as="h1" className="md-display text-3xl text-ink" lines={[player.name]} />
             <div className="mt-0.5 text-xs text-ink-2">
               {entries.length} {entries.length === 1 ? "entry" : "entries"} · {completed.length} played · {wins} won
             </div>
@@ -524,7 +526,9 @@ export default function PlayerDashboard() {
       </div>
 
       {/* ── THE answer ───────────────────────────────────────────────── */}
-      <NowCard item={next} player={player} />
+      <Rise>
+        <NowCard item={next} player={player} />
+      </Rise>
 
       {/* ── Matches ──────────────────────────────────────────────────── */}
       <MatchCenter live={live} upcoming={upcoming} completed={completed} updatedMatchIds={updatedMatchIds} />

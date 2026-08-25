@@ -16,6 +16,7 @@ import {
 import { Badge, Btn, Card, Field, EmptyState, inputCls, useToasts, Toasts } from "../components/ui/primitives";
 import { BrandLoader } from "../components/ui/motion";
 import { StatTile, Tabs, StatusPill } from "../components/ui/md";
+import { MaskText } from "../components/ui/reveal";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
 
 /* A series is a set of matchdays. Each matchday is an ordinary tournament with
@@ -168,7 +169,7 @@ export default function SeriesPage() {
         <div className="md-eyebrow mb-2.5 flex items-center gap-1.5 text-accent-purple">
           <Layers size={12} /> Series
         </div>
-        <h1 className="md-display md-h2 text-ink">{series.name}</h1>
+        <MaskText as="h1" className="md-display md-h2 text-ink" lines={[series.name]} />
         {series.description && (
           <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-ink-2">{series.description}</p>
         )}

@@ -16,6 +16,7 @@ import { BrandLoader, SportIcon } from "../components/ui/motion";
 import {
   SectionHeader, Tabs, MatchCard, StatusPill, CapacityBar, sportAccent, StatTile,
 } from "../components/ui/md";
+import { MaskText, Rise } from "../components/ui/reveal";
 import { sportMeta } from "../lib/sports";
 import RegistrationModal from "../components/RegistrationModal";
 import FollowButton from "../components/FollowButton";
@@ -250,9 +251,15 @@ export default function PublicTournamentPage() {
               <img src={tournament.logo_url} alt="" className="h-16 w-16 shrink-0 rounded-xl border border-line object-cover" />
             )}
             <div className="min-w-0 flex-1">
-              <h1 className="md-display md-h2 text-ink">{tournament.name}</h1>
+              <MaskText
+                as="h1"
+                className="md-display md-h2 text-ink"
+                lines={[tournament.name]}
+              />
               {tournament.description && (
-                <p className="mt-2.5 max-w-xl text-[15px] leading-relaxed text-ink-2">{tournament.description}</p>
+                <Rise delay={0.12}>
+                  <p className="mt-2.5 max-w-xl text-[15px] leading-relaxed text-ink-2">{tournament.description}</p>
+                </Rise>
               )}
             </div>
           </div>
@@ -275,7 +282,7 @@ export default function PublicTournamentPage() {
             )}
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center gap-2.5">
+          <Rise delay={0.2} className="mt-6 flex flex-wrap items-center gap-2.5">
             {/* One unmistakable primary action, chosen by real state: enter
                 if anything is open, otherwise watch if anything is live. */}
             {openEvent ? (
@@ -305,7 +312,7 @@ export default function PublicTournamentPage() {
             >
               Share
             </Btn>
-          </div>
+          </Rise>
         </div>
       </header>
 

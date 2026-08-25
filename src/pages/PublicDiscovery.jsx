@@ -15,6 +15,7 @@ import { SportIcon, SPORT_KEYS } from "../components/ui/motion";
 import {
   SectionHeader, TournamentCard, CardSkeletonGrid, StatusPill, sportAccent,
 } from "../components/ui/md";
+import { MaskText, Rise, Magnetic, Stagger, StaggerChild, Counter } from "../components/ui/reveal";
 import { sportMeta } from "../lib/sports";
 import logo from "../assets/logo.png";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
@@ -97,7 +98,7 @@ function Hero({ liveCount, openCount, query, onQuery, session }) {
   return (
     <section className="md-court-texture relative -mx-4 -mt-6 overflow-hidden border-b border-line px-4 pb-10 pt-12 sm:px-8 sm:pb-14 sm:pt-16">
       <div className="mx-auto max-w-4xl">
-        <div className="md-eyebrow mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <Rise className="md-eyebrow mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
           {liveCount > 0 && (
             <span className="md-status md-status-live">
               <span className="md-live-dot" />
@@ -108,23 +109,31 @@ function Hero({ liveCount, openCount, query, onQuery, session }) {
             <span className="md-status md-status-open">{openCount} open for entry</span>
           )}
           {liveCount === 0 && openCount === 0 && <span>Multi-sport competition platform</span>}
-        </div>
+        </Rise>
 
-        <h1 className="md-display md-h1 text-ink">
-          Everyone
-          <br />
-          can compete.
-        </h1>
+        {/* The brand statement, revealed line by line from behind its own
+            mask. This is the one place in the product that gets the full
+            treatment — it earns it by being the first thing anyone sees, and
+            it stays still forever after it lands. */}
+        <MaskText
+          as="h1"
+          className="md-display text-ink"
+          lineClassName="md-h1"
+          lines={["Play.", "Compete.", "Belong."]}
+          stagger={0.085}
+        />
 
-        <p className="mt-5 max-w-lg text-[15px] leading-relaxed text-ink-2">
-          Find a tournament, enter it, and follow every point live. One account to
-          play, to organize, and to officiate.
-        </p>
+        <Rise delay={0.28}>
+          <p className="mt-6 max-w-lg text-[15px] leading-relaxed text-ink-2">
+            Anyone can enter the arena — any age, any level, any sport. Find a
+            tournament, enter it, and follow every point live.
+          </p>
+        </Rise>
 
         {/* Search sits in the hero because "what can I play" is the first
             question, and burying the field below three marketing sections
             made people scroll past the thing they came for. */}
-        <div className="mt-7 flex flex-col gap-2.5 sm:flex-row">
+        <Rise delay={0.36} className="mt-7 flex flex-col gap-2.5 sm:flex-row">
           <div className="relative flex-1">
             <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-3" />
             <label className="sr-only" htmlFor="discover-search">Search tournaments</label>
@@ -136,20 +145,26 @@ function Hero({ liveCount, openCount, query, onQuery, session }) {
               onChange={(e) => onQuery(e.target.value)}
             />
           </div>
-          <a
-            href="#tournaments"
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-accent-teal px-6 text-sm font-bold uppercase tracking-wide text-navy-950 transition-[filter] hover:brightness-110"
-          >
-            Browse events <ArrowRight size={15} />
-          </a>
-        </div>
+          {/* The one magnetic control in the product. It drifts toward the
+              pointer as you aim at it — a small reward for reaching for the
+              primary action, and one that stops meaning anything if every
+              button does it. */}
+          <Magnetic>
+            <a
+              href="#tournaments"
+              className="md-group inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-accent-teal px-6 text-sm font-bold uppercase tracking-wide text-navy-950 transition-[filter] hover:brightness-110 sm:w-auto"
+            >
+              Browse events <ArrowRight size={15} className="md-arrow" />
+            </a>
+          </Magnetic>
+        </Rise>
 
-        <div className="mt-4 text-[13px] text-ink-3">
+        <Rise delay={0.44} className="mt-4 text-[13px] text-ink-3">
           Running one yourself?{" "}
-          <Link to={session ? "/organizer" : "/host"} className="font-semibold text-accent-teal hover:underline">
+          <Link to={session ? "/organizer" : "/host"} className="md-underline font-semibold text-accent-teal">
             Host a tournament on MatchDay
           </Link>
-        </div>
+        </Rise>
       </div>
     </section>
   );
@@ -205,7 +220,10 @@ function LiveStrip({ tournament, matches, courts }) {
                   className="md-score text-3xl"
                   style={{ color: s.live && s.value > 0 ? "var(--color-live)" : "var(--color-ink)" }}
                 >
-                  {s.value}
+                  {/* Counts up once on arrival. Only ever applied to real
+                      row counts — a count-up implies a tally that actually
+                      happened, so it must never dress a derived figure. */}
+                  <Counter value={s.value} />
                 </div>
                 <div className="md-eyebrow mt-0.5">{s.label}</div>
               </div>
@@ -236,13 +254,13 @@ function Rail({ eyebrow, title, icon: Icon, tone, tournaments }) {
       />
       {/* One markup path, two layouts: the rail scrolls below `sm`, and the
           same children lay out as a grid from `sm` up. */}
-      <div className="md-rail -mx-4 px-4 sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-3 sm:overflow-visible sm:px-0 lg:grid-cols-3">
+      <Stagger className="md-rail -mx-4 px-4 sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-3 sm:overflow-visible sm:px-0 lg:grid-cols-3">
         {tournaments.map((t) => (
-          <div key={t.id} className="w-[78vw] max-w-[320px] sm:w-auto sm:max-w-none">
+          <StaggerChild key={t.id} className="w-[78vw] max-w-[320px] sm:w-auto sm:max-w-none">
             <TournamentCard t={t} variant="featured" />
-          </div>
+          </StaggerChild>
         ))}
-      </div>
+      </Stagger>
     </section>
   );
 }
@@ -646,33 +664,34 @@ export default function PublicDiscovery() {
             action={<button onClick={resetFilters} className="mt-2 text-sm font-semibold text-accent-teal hover:underline">Clear all filters</button>}
           />
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Stagger className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((t) => {
               const model = toCardModel(t);
               return (
-                <TournamentCard
-                  key={t.id}
-                  t={model}
-                  footer={
-                    <span
-                      className={cx(
-                        "inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wide",
-                        model.reg.canRegister ? "text-accent-teal"
-                          : model.live ? "text-[color:var(--color-live)]"
-                          : "text-ink-3"
-                      )}
-                    >
-                      {model.reg.key === "WAITLIST" ? "Join waitlist"
-                        : model.reg.canRegister ? "Enter now"
-                        : model.live ? "Watch live"
-                        : "View"}
-                      <ArrowRight size={12} />
-                    </span>
-                  }
-                />
+                <StaggerChild key={t.id}>
+                  <TournamentCard
+                    t={model}
+                    footer={
+                      <span
+                        className={cx(
+                          "inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wide",
+                          model.reg.canRegister ? "text-accent-teal"
+                            : model.live ? "text-[color:var(--color-live)]"
+                            : "text-ink-3"
+                        )}
+                      >
+                        {model.reg.key === "WAITLIST" ? "Join waitlist"
+                          : model.reg.canRegister ? "Enter now"
+                          : model.live ? "Watch live"
+                          : "View"}
+                        <ArrowRight size={12} className="md-arrow" />
+                      </span>
+                    }
+                  />
+                </StaggerChild>
               );
             })}
-          </div>
+          </Stagger>
         )}
 
         {/* Category chips and deadlines are detail a card should not carry —
