@@ -498,16 +498,24 @@ html { scroll-behavior: smooth; }
   overflow-x: clip;
 }
 
-/* Poster type. This is the size the reference sites use and the reason
-   their headlines read as statements: the line fills the measure edge to
-   edge, and leading is pulled tight enough that the block reads as one
-   shape rather than three sentences. */
+/* Poster type.
+
+   Sized against BOTH axes. A width-only clamp (the obvious first attempt)
+   produces a headline that fits horizontally and then runs off the bottom
+   of a laptop — at 1440x900 it pushed the search field, the primary CTA
+   and the scroll cue below the fold, and on a short window it clipped the
+   last line outright.
+
+   `min(11vw, 13vh)` is the fix: whichever axis is scarcer wins. A three
+   line block at 0.82 leading occupies roughly 2.5x the font size, so
+   capping at 13vh keeps the headline near 33vh and leaves the rest of the
+   hero room to sit under it on any shape of screen. */
 .md-poster {
   font-family: var(--font-display);
   font-weight: 700;
   text-transform: uppercase;
-  font-size: clamp(3.25rem, 15vw, 15rem);
-  line-height: 0.82;
+  font-size: clamp(2.75rem, min(13vw, 13vh), 9.5rem);
+  line-height: 0.84;
   letter-spacing: -0.02em;
 }
 
@@ -515,8 +523,8 @@ html { scroll-behavior: smooth; }
   font-family: var(--font-display);
   font-weight: 700;
   text-transform: uppercase;
-  font-size: clamp(2.5rem, 8.5vw, 7rem);
-  line-height: 0.86;
+  font-size: clamp(2.25rem, min(7.5vw, 9vh), 6rem);
+  line-height: 0.88;
   letter-spacing: -0.015em;
 }
 

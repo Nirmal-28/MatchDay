@@ -1,209 +1,198 @@
-/* Fixed, app-wide playing surface: a court rendered in perspective beneath
-   an arena bowl, with the trace of a rally arcing across it.
+/* ═══════════════════════════════════════════════════════════════════════
+   BACKGROUND — THE DRAW
+   ═══════════════════════════════════════════════════════════════════════
 
-   STILL BY DESIGN. This component used to run three infinite GSAP timelines
-   — arcs redrawing forever, fourteen motes drifting, the whole court slowly
-   breathing. Behind a discovery page of dense tournament cards and a scorer
-   staring at a live match, that is motion competing with the content for
-   attention every second the app is open.
+   The app-wide backdrop is a tournament bracket: many entrants along both
+   edges, converging round by round toward a single point at the centre.
 
-   The immersion is now carried by composition instead: perspective, depth of
-   field via the vignette, and the sport's own geometry. The only motion is a
-   single draw-on when the page first mounts — it says "the surface is being
-   laid out", once, and then holds. Under prefers-reduced-motion even that is
-   skipped and the artwork simply appears.
+   WHY THIS AND NOT A COURT
 
-   Dropping the timelines also removed GSAP from the bundle entirely; it was
-   the largest dependency in the app and this was its only consumer.
+   The previous version drew a playing surface in perspective with rally
+   arcs across it. Rendered at the low opacity a background needs, the
+   perspective transform turned it into a set of unrelated diagonal streaks
+   in one corner — legible as "lines", not as "a court", and carrying no
+   meaning at all.
 
-   MULTI-SPORT BY DESIGN. MatchDay runs badminton today but is built to cover
-   every sport, so court geometry and rally shapes are data, not markup —
-   adding tennis or basketball is a new entry in SPORTS, not a rewrite.
+   A draw is the one shape that IS this product. It is what the software
+   generates, and its form says the thing the platform exists to say:
+   everyone starts on the outside, and the structure carries them inward.
+   Anyone can enter the bracket.
 
-   Decorative only: aria-hidden, pointer-events-none, behind all content. */
+   It is also honestly abstract. It is not pretending to be a real
+   tournament's draw — it is the geometry of one, at 6% opacity, behind
+   everything.
 
-const L = (x1, y1, x2, y2, w) => ({ t: "line", x1, y1, x2, y2, w });
-const R = (x, y, width, height) => ({ t: "rect", x, y, width, height });
-const C = (cx, cy, r) => ({ t: "circle", cx, cy, r });
-const A = (d) => ({ t: "path", d });
+   STATIC. Nothing here loops. One draw-in on mount, then it holds. The
+   whole component is deterministic geometry with no animation library, no
+   timers and no per-frame work.
+   ══════════════════════════════════════════════════════════════════════ */
 
-export const SPORTS = {
-  badminton: {
-    label: "Badminton",
-    accent: "var(--color-accent-teal)",
-    // Regulation court: tramlines, short/long service lines, centre lines.
-    court: [
-      R(200, 100, 800, 600),
-      L(200, 400, 1000, 400, 2.4), // net
-      L(240, 100, 240, 700), L(960, 100, 960, 700), // doubles tramlines
-      L(200, 340, 1000, 340), L(200, 460, 1000, 460), // short service
-      L(200, 160, 1000, 160), L(200, 640, 1000, 640), // long service
-      L(600, 100, 600, 340), L(600, 460, 600, 700), // centre
-    ],
-    // Shuttle: climbs high, drops steeply.
-    arcs: ["M 150 620 Q 600 40 1050 560", "M 1080 180 Q 600 760 180 300"],
-  },
+const W = 1600;
+const H = 900;
+const CX = W / 2;
+const CY = H / 2;
 
-  tennis: {
-    label: "Tennis",
-    accent: "var(--color-accent-yellow)",
-    court: [
-      R(200, 100, 800, 600),
-      L(200, 400, 1000, 400, 2.4), // net
-      L(270, 100, 270, 700), L(930, 100, 930, 700), // singles sidelines
-      L(270, 250, 930, 250), L(270, 550, 930, 550), // service lines
-      L(600, 250, 600, 550), // centre service line
-    ],
-    // Flatter, faster than a shuttle.
-    arcs: ["M 170 520 Q 600 240 1030 480", "M 1040 300 Q 600 600 190 340"],
-  },
+/* Builds one half of a bracket as a list of polylines.
 
-  basketball: {
-    label: "Basketball",
-    accent: "var(--color-accent-orange)",
-    court: [
-      R(200, 100, 800, 600),
-      L(600, 100, 600, 700), // halfway
-      C(600, 400, 90), // centre circle
-      R(200, 250, 150, 300), R(850, 250, 150, 300), // keys
-      A("M 350 250 A 90 90 0 0 1 350 550"), // free-throw arc
-      A("M 850 250 A 90 90 0 0 0 850 550"),
-      A("M 200 180 A 240 240 0 0 1 200 620"), // three-point arcs
-      A("M 1000 180 A 240 240 0 0 0 1000 620"),
-    ],
-    arcs: ["M 300 620 Q 600 60 900 300", "M 900 620 Q 600 60 300 300"],
-  },
+   Each round halves the number of participants and doubles the vertical
+   gap between them. A pair of adjacent slots is joined by an elbow — out
+   from each slot, up/down to meet, then a single line onward into the next
+   round. That is exactly how a real draw is drawn, which is why the shape
+   reads as a bracket rather than as a decorative tree.
 
-  football: {
-    label: "Football",
-    accent: "var(--color-accent-teal)",
-    court: [
-      R(160, 120, 880, 560),
-      L(600, 120, 600, 680), // halfway
-      C(600, 400, 100), // centre circle
-      R(160, 250, 120, 300), R(920, 250, 120, 300), // penalty areas
-      R(160, 330, 50, 140), R(990, 330, 50, 140), // six-yard boxes
-    ],
-    arcs: ["M 220 620 Q 600 180 1000 420", "M 1000 220 Q 560 660 200 380"],
-  },
+   `dir` is -1 for the left half (advancing rightward) and +1 for the right
+   half (advancing leftward), so the two sides mirror into the centre. */
+function buildBracket(dir, rounds = 4) {
+  const paths = [];
+  const slots0 = 2 ** rounds;          // 16 entrants per side
+  const edgeX = CX + dir * (W * 0.46); // outermost column
+  // MAGNITUDE, not a signed delta. Taking the signed difference made stepX
+  // negative for the left half, and `edgeX - dir * stepX * r` then marched
+  // that half off the left edge of the canvas — the whole left bracket was
+  // rendering outside the viewBox. Direction is carried by `dir` alone.
+  const stepX = Math.abs(edgeX - (CX + dir * 90)) / rounds;
+  const spacing0 = H / (slots0 + 1);
 
-  volleyball: {
-    label: "Volleyball",
-    accent: "var(--color-accent-blue)",
-    court: [
-      R(240, 140, 720, 520),
-      L(240, 400, 960, 400, 2.4), // net
-      L(240, 290, 960, 290), L(240, 510, 960, 510), // attack lines
-    ],
-    arcs: ["M 300 560 Q 600 80 900 520", "M 880 240 Q 600 700 320 280"],
-  },
+  // Vertical centre of slot `i` in round `r`.
+  const slotY = (r, i) => {
+    const count = slots0 / 2 ** r;
+    const spacing = (H * 0.92) / count;
+    return (H - H * 0.92) / 2 + spacing * (i + 0.5);
+  };
 
-  tableTennis: {
-    label: "Table Tennis",
-    accent: "var(--color-accent-pink)",
-    court: [
-      R(260, 180, 680, 440),
-      L(260, 400, 940, 400, 2.4), // net
-      L(600, 180, 600, 620), // centre line
-    ],
-    arcs: ["M 320 520 Q 600 300 880 500", "M 880 300 Q 600 520 320 320"],
-  },
+  for (let r = 0; r < rounds; r++) {
+    const count = slots0 / 2 ** r;
+    const x = edgeX - dir * stepX * r;
+    const nextX = edgeX - dir * stepX * (r + 1);
 
-  cricket: {
-    label: "Cricket",
-    accent: "var(--color-accent-purple)",
-    court: [
-      C(600, 400, 330), // boundary
-      C(600, 400, 200), // inner ring
-      R(560, 250, 80, 300), // pitch
-      L(560, 280, 640, 280), L(560, 520, 640, 520), // creases
-    ],
-    arcs: ["M 260 400 Q 600 300 940 400", "M 600 560 Q 900 200 1060 420"],
-  },
-};
+    for (let i = 0; i < count; i += 2) {
+      const yTop = slotY(r, i);
+      const yBot = slotY(r, i + 1);
+      const mid = (yTop + yBot) / 2;
 
-function CourtShape({ shape }) {
-  const common = { fill: "none", vectorEffect: "non-scaling-stroke" };
-  if (shape.t === "line") {
-    return <line {...common} strokeWidth={shape.w || undefined} x1={shape.x1} y1={shape.y1} x2={shape.x2} y2={shape.y2} />;
+      // Two horizontal stubs, the vertical that joins them, and the line
+      // carrying the winner into the next round.
+      paths.push(`M ${x} ${yTop} L ${nextX} ${yTop}`);
+      paths.push(`M ${x} ${yBot} L ${nextX} ${yBot}`);
+      paths.push(`M ${nextX} ${yTop} L ${nextX} ${yBot}`);
+      paths.push(`M ${nextX} ${mid} L ${nextX - dir * stepX * 0.45} ${mid}`);
+    }
   }
-  if (shape.t === "rect") return <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} {...common} />;
-  if (shape.t === "circle") return <circle cx={shape.cx} cy={shape.cy} r={shape.r} {...common} />;
-  return <path d={shape.d} {...common} />;
+
+  // The last leg into the final.
+  paths.push(`M ${edgeX - dir * stepX * rounds} ${CY} L ${CX + dir * 90} ${CY}`);
+  return { paths, spacing0 };
 }
 
-export default function SportsBackground({ sport = "badminton" }) {
-  const config = SPORTS[sport] || SPORTS.badminton;
+const LEFT = buildBracket(-1);
+const RIGHT = buildBracket(1);
 
+// Entrant ticks along both outer edges — the "anyone" end of the draw.
+function entrantTicks(dir) {
+  const ticks = [];
+  const count = 16;
+  const edgeX = CX + dir * (W * 0.46);
+  for (let i = 0; i < count; i++) {
+    const spacing = (H * 0.92) / count;
+    const y = (H - H * 0.92) / 2 + spacing * (i + 0.5);
+    ticks.push({ x: edgeX, y, dir });
+  }
+  return ticks;
+}
+
+const TICKS = [...entrantTicks(-1), ...entrantTicks(1)];
+
+export default function SportsBackground() {
   return (
     <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-canvas">
-      {/* Depth: a lit ceiling above the court falling off to the canvas
-          colour at the edges. Static — this is the "arena lighting". */}
+      {/* Arena lighting: bright above the final, falling away to the canvas
+          colour at the edges. This is what gives the flat geometry depth. */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(130% 100% at 50% 6%, #1a2a49 0%, #0e192e 40%, var(--color-canvas) 100%)",
+            "radial-gradient(120% 90% at 50% 4%, #16233d 0%, #0c1526 42%, var(--color-canvas) 100%)",
         }}
       />
 
-      <svg viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 h-full w-full">
-        {/* Playing surface, laid back in perspective. */}
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="xMidYMid slice"
+        className="absolute inset-0 h-full w-full"
+      >
+        <defs>
+          {/* The draw fades toward the outer edges, so the eye is carried
+              inward to the final — and so the busiest part of the geometry
+              (16 entrant lines) never competes with text over it. */}
+          {/* `userSpaceOnUse` is essential here. The default
+              (objectBoundingBox) resolves the gradient against EACH path's
+              own bounding box — and a horizontal bracket stub has a
+              zero-height box, so every segment got a single flat sample and
+              the fade did not read at all. In user space the gradient is
+              measured once across the whole viewBox, which is what makes
+              the draw fade from the edges toward the final. */}
+          <linearGradient id="md-draw-fade" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={W} y2="0">
+            <stop offset="0%" stopColor="var(--color-accent-teal)" stopOpacity="0.15" />
+            <stop offset="30%" stopColor="var(--color-accent-teal)" stopOpacity="0.55" />
+            <stop offset="50%" stopColor="var(--color-accent-teal)" stopOpacity="0.9" />
+            <stop offset="70%" stopColor="var(--color-accent-teal)" stopOpacity="0.55" />
+            <stop offset="100%" stopColor="var(--color-accent-teal)" stopOpacity="0.15" />
+          </linearGradient>
+        </defs>
+
         <g
-          key={sport}
-          opacity="0.3"
-          stroke={config.accent}
-          strokeWidth="1.8"
+          className="md-draw"
+          stroke="url(#md-draw-fade)"
+          strokeWidth="1.5"
           fill="none"
-          style={{ transform: "perspective(900px) rotateX(34deg)", transformOrigin: "50% 62%" }}
+          strokeLinecap="square"
+          // Low enough to sit UNDER copy rather than run through it. The
+          // draw should be recognisable when you look for it and invisible
+          // when you are reading — at 0.85 its connector lines cut straight
+          // through the hero paragraph.
+          opacity="0.26"
         >
-          {config.court.map((shape, i) => <CourtShape key={i} shape={shape} />)}
+          {[...LEFT.paths, ...RIGHT.paths].map((d, i) => (
+            <path key={i} d={d} />
+          ))}
         </g>
 
-        {/* Arena bowl — sport-neutral, always present. */}
-        <g opacity="0.2" stroke="var(--color-line)" strokeWidth="1" fill="none">
-          <ellipse cx="600" cy="440" rx="700" ry="380" />
-          <ellipse cx="600" cy="440" rx="540" ry="290" />
+        {/* Entrant markers. Sixteen a side: the many who enter. */}
+        <g fill="var(--color-accent-teal)" opacity="0.3">
+          {TICKS.map((t, i) => (
+            <circle key={i} cx={t.x} cy={t.y} r="2.5" />
+          ))}
         </g>
 
-        {/* The trace of a rally. Drawn once on mount via a CSS one-shot, then
-            held at rest — a mark left on the surface, not a loop. The dash
-            length is a fixed over-estimate of the path length so no layout
-            measurement (and no animation library) is needed. */}
-        {config.arcs.map((d, i) => (
-          <path
-            key={`${sport}-${i}`}
-            className="sb-arc"
-            d={d}
-            stroke={i === 0 ? "var(--color-accent-teal)" : "var(--color-accent-orange)"}
-            strokeWidth="1.4"
-            strokeLinecap="round"
-            fill="none"
-            opacity="0.28"
-            style={{
-              strokeDasharray: 2400,
-              animation: `sb-draw 1.6s ${0.15 + i * 0.35}s cubic-bezier(0.22,1,0.36,1) both`,
-            }}
-          />
-        ))}
+        {/* The final. One point at the centre, where every line arrives. */}
+        <g>
+          <circle cx={CX} cy={CY} r="5" fill="var(--color-accent-teal)" opacity="0.55" />
+          <circle cx={CX} cy={CY} r="15" fill="none" stroke="var(--color-accent-teal)" strokeWidth="1" opacity="0.4" />
+          <circle cx={CX} cy={CY} r="30" fill="none" stroke="var(--color-accent-teal)" strokeWidth="1" opacity="0.18" />
+        </g>
       </svg>
 
-      {/* Vignette, so content always stays readable over the artwork. */}
+      {/* Vignette, so content always stays readable over the geometry. */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(115% 85% at 50% 42%, transparent 0%, rgba(6,9,17,0.2) 55%, rgba(6,9,17,0.72) 100%)",
+            "radial-gradient(100% 75% at 50% 45%, transparent 0%, rgba(6,9,17,0.45) 45%, rgba(6,9,17,0.9) 100%)",
         }}
       />
 
       <style>{`
-        @keyframes sb-draw {
-          from { stroke-dashoffset: 2400; }
-          to   { stroke-dashoffset: 0; }
+        /* One draw-on at mount: the bracket assembles, then holds forever.
+           A long dash pattern over the whole group reads as the structure
+           being filled in from nothing. */
+        .md-draw path {
+          stroke-dasharray: 1400;
+          stroke-dashoffset: 1400;
+          animation: md-draw-in 2.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
         }
+        @keyframes md-draw-in { to { stroke-dashoffset: 0; } }
         @media (prefers-reduced-motion: reduce) {
-          .sb-arc { animation: none !important; stroke-dashoffset: 0 !important; }
+          .md-draw path { animation: none; stroke-dashoffset: 0; }
         }
       `}</style>
     </div>

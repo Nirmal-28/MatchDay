@@ -176,7 +176,7 @@ function Header() {
             src={logo} alt="" width="28" height="28"
             className="h-7 w-7 rounded-md transition-transform duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:-rotate-6 group-hover:scale-110"
           />
-          <Wordmark className="text-2xl" />
+          <Wordmark className="text-xl sm:text-2xl" />
         </Link>
 
         {/* Desktop switcher. Hidden below `sm`, where MobileSurfaceNav takes
@@ -243,15 +243,14 @@ function Header() {
               {location.pathname !== "/host" && (
                 <Link
                   to="/host"
-                  className="rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-accent-teal hover:text-accent-teal"
+                  className="hidden rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-accent-teal hover:text-accent-teal sm:inline-block"
                 >
-                  <span className="sm:hidden">Host</span>
-                  <span className="hidden sm:inline">Host a tournament</span>
+                  Host a tournament
                 </Link>
               )}
               <Link
                 to="/login"
-                className="rounded-md bg-accent-teal px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-navy-950 transition-[filter] hover:brightness-110"
+                className="hidden rounded-md bg-accent-teal px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-navy-950 transition-[filter] hover:brightness-110 sm:inline-block"
               >
                 Sign in
               </Link>

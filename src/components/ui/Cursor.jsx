@@ -95,24 +95,65 @@ export default function Cursor() {
 
   if (!enabled) return null;
 
+  /* THE MARK: a court-line intersection.
+
+     Two thin strokes crossing with a gap at the centre — the centre mark
+     painted on every court in every sport this platform runs, and the same
+     "court line" motif the design system already uses to mark a section and
+     the leading edge of a card. It reads as precision and as sport, and it
+     is ours rather than a generic ring.
+
+     Over an interactive element the cross draws in a service box around
+     itself: the lines shorten, a square appears, and the whole mark rotates
+     45 degrees to sit as a diamond. One transition, two states, no labels
+     chasing the pointer.
+
+     The centre stays hollow at all times, which is the point — you can
+     always see exactly what you are aiming at. */
+  const size = active ? 40 : 28;
+  const arm = active ? 6 : 10;   // stroke length from the gap outward
+  const gap = active ? 5 : 4;    // hollow centre
+
   return (
     <div
       ref={dotRef}
       aria-hidden="true"
-      className="pointer-events-none fixed left-0 top-0 z-[60] rounded-full border will-change-transform"
+      className="pointer-events-none fixed left-0 top-0 z-[60] will-change-transform"
       style={{
-        width: active ? 44 : 26,
-        height: active ? 44 : 26,
-        borderColor: "rgba(255,255,255,0.75)",
-        borderWidth: active ? 2 : 1,
-        background: active ? "rgba(255,255,255,0.12)" : "transparent",
-        // Inverts whatever is beneath rather than covering it, so the ring
-        // stays visible on both the dark app and the inverted light section
+        width: size,
+        height: size,
+        // Inverts whatever is beneath rather than covering it, so the mark
+        // stays visible on the dark app AND the inverted light section
         // without a single theme-aware branch.
         mixBlendMode: "difference",
         opacity: visible ? 1 : 0,
-        transition: "width 260ms cubic-bezier(0.16,1,0.3,1), height 260ms cubic-bezier(0.16,1,0.3,1), background-color 260ms, opacity 200ms, border-width 200ms",
+        transition: "width 240ms cubic-bezier(0.16,1,0.3,1), height 240ms cubic-bezier(0.16,1,0.3,1), opacity 200ms",
       }}
-    />
+    >
+      <svg
+        viewBox="0 0 40 40"
+        className="h-full w-full"
+        style={{
+          transform: active ? "rotate(45deg)" : "rotate(0deg)",
+          transition: "transform 320ms cubic-bezier(0.16,1,0.3,1)",
+        }}
+      >
+        <g stroke="#fff" strokeWidth={active ? 1.6 : 1.3} strokeLinecap="square" fill="none">
+          {/* The cross: four arms leaving a hollow centre. */}
+          <line x1={20 - gap - arm} y1="20" x2={20 - gap} y2="20" />
+          <line x1={20 + gap} y1="20" x2={20 + gap + arm} y2="20" />
+          <line x1="20" y1={20 - gap - arm} x2="20" y2={20 - gap} />
+          <line x1="20" y1={20 + gap} x2="20" y2={20 + gap + arm} />
+          {/* The service box, drawn only over something you can act on. */}
+          <rect
+            x="6" y="6" width="28" height="28"
+            style={{
+              opacity: active ? 0.85 : 0,
+              transition: "opacity 260ms ease-out",
+            }}
+          />
+        </g>
+      </svg>
+    </div>
   );
 }

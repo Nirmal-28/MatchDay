@@ -155,9 +155,13 @@ function Ticker({ items }) {
    one shape. Everything below is still. */
 function Hero({ liveCount, openCount, query, onQuery, session }) {
   return (
+    // Height is capped, not floored. `min-h` with a large value is what
+    // pushed the search field and the primary CTA off a 900px laptop screen:
+    // the hero must FIT the viewport, not fill it and overflow. The padding
+    // is measured against the 56px sticky header rather than guessed.
     <section className="md-bleed md-court-texture relative -mt-6 overflow-hidden border-b border-line">
-      <div className="mx-auto flex min-h-[88vh] max-w-[110rem] flex-col justify-center px-5 pb-14 pt-24 sm:px-10">
-        <Rise className="mb-7 flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div className="mx-auto flex max-w-[110rem] flex-col justify-center px-5 pb-10 pt-10 sm:px-10 sm:pb-12 sm:pt-14">
+        <Rise immediate className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2">
           {liveCount > 0 && (
             <span className="md-status md-status-live">
               <span className="md-live-dot" />
@@ -179,10 +183,11 @@ function Hero({ liveCount, openCount, query, onQuery, session }) {
           lines={["Play.", "Compete.", "Belong."]}
           lineClassName={(i) => (i === 1 ? "md-outline" : undefined)}
           stagger={0.09}
+          immediate
         />
 
-        <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:items-end">
-          <Rise delay={0.3}>
+        <div className="mt-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,25rem)] lg:items-end">
+          <Rise immediate delay={0.3}>
             <p className="max-w-md text-base leading-relaxed text-ink-2 sm:text-lg">
               Anyone can enter the arena — any age, any level, any sport. Find a
               tournament, enter it, and follow every point live.
@@ -198,13 +203,13 @@ function Hero({ liveCount, openCount, query, onQuery, session }) {
           {/* Search sits in the hero because "what can I play" is the first
               question, and burying the field below marketing sections made
               people scroll past the thing they came for. */}
-          <Rise delay={0.38} className="flex flex-col gap-2.5">
+          <Rise immediate delay={0.38} className="flex flex-col gap-2.5">
             <div className="relative">
               <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink-3" />
               <label className="sr-only" htmlFor="discover-search">Search tournaments</label>
               <input
                 id="discover-search"
-                className="h-14 w-full rounded-xl border border-line bg-surface/70 pl-12 pr-4 text-[15px] text-ink placeholder-ink-3 backdrop-blur focus:border-accent-teal focus:outline-none"
+                className="h-12 w-full rounded-xl border border-line bg-surface/70 pl-12 pr-4 text-[15px] text-ink placeholder-ink-3 backdrop-blur focus:border-accent-teal focus:outline-none"
                 placeholder="Search tournaments, venues, cities"
                 value={query}
                 onChange={(e) => onQuery(e.target.value)}
@@ -216,7 +221,7 @@ function Hero({ liveCount, openCount, query, onQuery, session }) {
             <Magnetic>
               <a
                 href="#tournaments"
-                className="md-group flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-accent-teal text-sm font-bold uppercase tracking-widest text-navy-950 transition-[filter] hover:brightness-110"
+                className="md-group flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent-teal text-sm font-bold uppercase tracking-widest text-navy-950 transition-[filter] hover:brightness-110"
               >
                 Browse every event <ArrowRight size={16} className="md-arrow" />
               </a>
@@ -224,7 +229,7 @@ function Hero({ liveCount, openCount, query, onQuery, session }) {
           </Rise>
         </div>
 
-        <div className="mt-14 flex items-center gap-2 text-ink-3">
+        <div className="mt-8 flex items-center gap-2 text-ink-3">
           <ChevronDown size={16} className="md-cue" aria-hidden="true" />
           <span className="md-eyebrow">Scroll</span>
         </div>
@@ -317,7 +322,7 @@ function Rail({ eyebrow, title, icon: Icon, tone, tournaments }) {
       />
       {/* One markup path, two layouts: the rail scrolls below `sm`, and the
           same children lay out as a grid from `sm` up. */}
-      <Stagger className="md-rail -mx-4 px-4 sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-3 sm:overflow-visible sm:px-0 lg:grid-cols-3">
+      <Stagger className="md-rail -mx-4 px-4 sm:mx-0 sm:grid sm:grid-cols-[repeat(auto-fit,minmax(19rem,1fr))] sm:gap-3 sm:overflow-visible sm:px-0">
         {tournaments.map((t) => (
           <StaggerChild key={t.id} className="w-[78vw] max-w-[320px] sm:w-auto sm:max-w-none">
             <TournamentCard t={t} variant="featured" />

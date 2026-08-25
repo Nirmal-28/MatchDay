@@ -77,15 +77,20 @@ function useHasFinePointer() {
    One-shot by design. The observer disconnects as soon as the element has
    been seen, so a long discovery page does not keep dozens of observers
    alive while someone scrolls back and forth. */
-export function useInView({ threshold = 0.15, rootMargin = "0px 0px -10% 0px" } = {}) {
+export function useInView({ threshold = 0.15, rootMargin = "0px 0px -10% 0px", immediate = false } = {}) {
   const ref = useRef(null);
   const [inView, setInView] = useState(false);
   const reduced = usePrefersReducedMotion();
 
   useEffect(() => {
-    // With reduced motion we never animate, so we never need to observe:
-    // report "in view" immediately and let the content render at rest.
-    if (reduced) { setInView(true); return; }
+    // `immediate` is for content that is above the fold by construction —
+    // a hero. You do not "scroll into" the first screen, so waiting for an
+    // intersection there is both wrong and fragile: on a phone the hero's
+    // lower half sits close enough to the fold that the -10% root margin
+    // can leave the paragraph, the search field and the primary CTA
+    // invisible until the user scrolls, which is exactly the content they
+    // arrived for.
+    if (reduced || immediate) { setInView(true); return; }
 
     const el = ref.current;
     if (!el) return;
@@ -111,7 +116,7 @@ export function useInView({ threshold = 0.15, rootMargin = "0px 0px -10% 0px" } 
     );
     box.io.observe(el);
     return () => box.io?.disconnect();
-  }, [threshold, rootMargin, reduced]);
+  }, [threshold, rootMargin, reduced, immediate]);
 
   return [ref, inView];
 }
@@ -140,8 +145,9 @@ export function MaskText({
   lineClassName,
   stagger = 0.075,
   delay = 0,
+  immediate = false,
 }) {
-  const [ref, inView] = useInView();
+  const [ref, inView] = useInView({ immediate });
   const reduced = usePrefersReducedMotion();
   const arr = Array.isArray(lines) ? lines : [lines];
 
@@ -188,9 +194,9 @@ export function MaskText({
    as it enters. Deliberately small (16px) and deliberately fast — this runs
    on a lot of elements, and anything larger turns a scroll into a parade. */
 export function Rise({
-  children, className, delay = 0, distance = 16, as: As = "div", ...props
+  children, className, delay = 0, distance = 16, immediate = false, as: As = "div", ...props
 }) {
-  const [ref, inView] = useInView();
+  const [ref, inView] = useInView({ immediate });
   const reduced = usePrefersReducedMotion();
 
   return (
