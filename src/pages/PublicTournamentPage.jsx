@@ -223,7 +223,7 @@ export default function PublicTournamentPage() {
           A poster, not a record. The organizer's cover art runs full-bleed
           behind the title with a scrim heavy enough that any uploaded image
           — bright, busy or low-contrast — still leaves the name legible. */}
-      <header className="md-court-texture relative overflow-hidden rounded-2xl border border-line bg-gradient-to-b from-navy-800 to-surface">
+      <header className="md-bleed md-court-texture relative -mt-2 overflow-hidden border-b border-line bg-gradient-to-b from-navy-800 to-surface">
         {tournament.cover_image_url && (
           <div className="absolute inset-0">
             <img src={tournament.cover_image_url} alt="" className="h-full w-full object-cover" />
@@ -231,7 +231,7 @@ export default function PublicTournamentPage() {
           </div>
         )}
 
-        <div className="relative px-5 py-7 sm:px-8 sm:py-10">
+        <div className="relative mx-auto max-w-6xl px-4 py-9 sm:py-12">
           <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
             <span className="flex items-center gap-1.5">
               <SportIcon sport={tournament.sport} className="h-4 w-4" style={{ color: accent }} />
@@ -253,7 +253,7 @@ export default function PublicTournamentPage() {
             <div className="min-w-0 flex-1">
               <MaskText
                 as="h1"
-                className="md-display md-h2 text-ink"
+                className="md-poster-sm text-ink"
                 lines={[tournament.name]}
               />
               {tournament.description && (
@@ -313,6 +313,29 @@ export default function PublicTournamentPage() {
               Share
             </Btn>
           </Rise>
+
+          {/* At a glance. Four counts straight off the rows already loaded —
+              categories, live entries, matches, completed. It gives the hero
+              substance above the tab strip and answers "how big is this
+              event?" without a click. Nothing here is estimated, and the
+              strip is dropped entirely before a draw exists rather than
+              showing a row of zeroes. */}
+          {allMatches.length > 0 && (
+            <Rise delay={0.28} className="mt-8 grid max-w-2xl grid-cols-2 gap-2.5 sm:grid-cols-4">
+              <StatTile label="Categories" value={events.length} />
+              <StatTile
+                label="Entries"
+                value={Object.values(entriesByEvent).flat()
+                  .filter((e) => !["REJECTED", "CANCELLED"].includes(e.reg_status)).length}
+              />
+              <StatTile label="Matches" value={allMatches.length} />
+              <StatTile
+                label="Completed"
+                value={allMatches.filter((m) => ["COMPLETED", "WALKOVER"].includes(m.status)).length}
+                tone="done"
+              />
+            </Rise>
+          )}
         </div>
       </header>
 
