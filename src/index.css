@@ -620,6 +620,11 @@ html { scroll-behavior: smooth; }
 .md-scroll::-webkit-scrollbar-track { background: transparent; }
 
 /* Card titles must never push a card taller than its row. */
+/* 3.25rem — the hero control height. Not a step on Tailwind's scale, and
+   shared by the search field and the primary CTA so they align exactly;
+   defined once here rather than repeated as an arbitrary value. */
+.h-13 { height: 3.25rem; }
+
 .md-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
 .md-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 

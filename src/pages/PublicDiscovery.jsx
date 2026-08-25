@@ -155,13 +155,25 @@ function Ticker({ items }) {
    one shape. Everything below is still. */
 function Hero({ liveCount, openCount, query, onQuery, session }) {
   return (
-    // Height is capped, not floored. `min-h` with a large value is what
-    // pushed the search field and the primary CTA off a 900px laptop screen:
-    // the hero must FIT the viewport, not fill it and overflow. The padding
-    // is measured against the 56px sticky header rather than guessed.
+    /* CENTRED, and for a structural reason rather than a stylistic one.
+
+       The split layout put the headline hard left and the search/CTA hard
+       right, which left a large void through the middle and upper right of
+       every wide screen — the composition had two islands and nothing
+       holding them together.
+
+       Centring resolves that AND aligns the content with the background:
+       the draw behind it converges on a single point at dead centre, so the
+       column of type now sits on the same axis the bracket already points
+       at. The layout and the artwork finally agree about where the middle
+       is.
+
+       Height is capped, not floored. A large `min-h` was what pushed the
+       search field and the primary CTA off a 900px laptop screen: the hero
+       must FIT the viewport, not fill it and overflow. */
     <section className="md-bleed md-court-texture relative -mt-6 overflow-hidden border-b border-line">
-      <div className="mx-auto flex max-w-[110rem] flex-col justify-center px-5 pb-10 pt-10 sm:px-10 sm:pb-12 sm:pt-14">
-        <Rise immediate className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div className="mx-auto flex max-w-5xl flex-col items-center px-5 pb-12 pt-10 text-center sm:px-8 sm:pb-14 sm:pt-14">
+        <Rise immediate className="mb-6 flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
           {liveCount > 0 && (
             <span className="md-status md-status-live">
               <span className="md-live-dot" />
@@ -186,50 +198,55 @@ function Hero({ liveCount, openCount, query, onQuery, session }) {
           immediate
         />
 
-        <div className="mt-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,25rem)] lg:items-end">
-          <Rise immediate delay={0.3}>
-            <p className="max-w-md text-base leading-relaxed text-ink-2 sm:text-lg">
-              Anyone can enter the arena — any age, any level, any sport. Find a
-              tournament, enter it, and follow every point live.
-            </p>
-            <div className="mt-4 text-[13px] text-ink-3">
-              Running one yourself?{" "}
-              <Link to={session ? "/organizer" : "/host"} className="md-underline font-semibold text-accent-teal">
-                Host a tournament
-              </Link>
-            </div>
-          </Rise>
+        <Rise immediate delay={0.3} className="mt-7">
+          <p className="mx-auto max-w-xl text-base leading-relaxed text-ink-2 sm:text-lg">
+            Anyone can enter the arena — any age, any level, any sport. Find a
+            tournament, enter it, and follow every point live.
+          </p>
+        </Rise>
 
-          {/* Search sits in the hero because "what can I play" is the first
-              question, and burying the field below marketing sections made
-              people scroll past the thing they came for. */}
-          <Rise immediate delay={0.38} className="flex flex-col gap-2.5">
-            <div className="relative">
-              <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink-3" />
-              <label className="sr-only" htmlFor="discover-search">Search tournaments</label>
-              <input
-                id="discover-search"
-                className="h-12 w-full rounded-xl border border-line bg-surface/70 pl-12 pr-4 text-[15px] text-ink placeholder-ink-3 backdrop-blur focus:border-accent-teal focus:outline-none"
-                placeholder="Search tournaments, venues, cities"
-                value={query}
-                onChange={(e) => onQuery(e.target.value)}
-              />
-            </div>
-            {/* The one magnetic control in the product — a small reward for
-                aiming at the primary action, and one that would stop meaning
-                anything if every button did it. */}
-            <Magnetic>
-              <a
-                href="#tournaments"
-                className="md-group flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent-teal text-sm font-bold uppercase tracking-widest text-navy-950 transition-[filter] hover:brightness-110"
-              >
-                Browse every event <ArrowRight size={16} className="md-arrow" />
-              </a>
-            </Magnetic>
-          </Rise>
-        </div>
+        {/* Search sits in the hero because "what can I play" is the first
+            question, and burying the field below marketing sections made
+            people scroll past the thing they came for. On one axis now, so
+            the eye runs headline → promise → action without crossing the
+            screen. */}
+        <Rise
+          immediate
+          delay={0.38}
+          className="mt-8 flex w-full max-w-2xl flex-col gap-2.5 sm:flex-row"
+        >
+          <div className="relative flex-1">
+            <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink-3" />
+            <label className="sr-only" htmlFor="discover-search">Search tournaments</label>
+            <input
+              id="discover-search"
+              className="h-13 w-full rounded-xl border border-line bg-surface/70 pl-12 pr-4 text-[15px] text-ink placeholder-ink-3 backdrop-blur focus:border-accent-teal focus:outline-none"
+              placeholder="Search tournaments, venues, cities"
+              value={query}
+              onChange={(e) => onQuery(e.target.value)}
+            />
+          </div>
+          {/* The one magnetic control in the product — a small reward for
+              aiming at the primary action, and one that would stop meaning
+              anything if every button did it. */}
+          <Magnetic>
+            <a
+              href="#tournaments"
+              className="md-group flex h-13 w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-accent-teal px-7 text-sm font-bold uppercase tracking-widest text-navy-950 transition-[filter] hover:brightness-110 sm:w-auto"
+            >
+              Browse events <ArrowRight size={16} className="md-arrow" />
+            </a>
+          </Magnetic>
+        </Rise>
 
-        <div className="mt-8 flex items-center gap-2 text-ink-3">
+        <Rise immediate delay={0.46} className="mt-5 text-[13px] text-ink-3">
+          Running one yourself?{" "}
+          <Link to={session ? "/organizer" : "/host"} className="md-underline font-semibold text-accent-teal">
+            Host a tournament
+          </Link>
+        </Rise>
+
+        <div className="mt-10 flex items-center gap-2 text-ink-3">
           <ChevronDown size={16} className="md-cue" aria-hidden="true" />
           <span className="md-eyebrow">Scroll</span>
         </div>
