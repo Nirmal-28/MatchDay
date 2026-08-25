@@ -20,6 +20,7 @@ import { Badge, Btn, EmptyState } from "../components/ui/primitives";
 import { BrandLoader } from "../components/ui/motion";
 import { SectionHeader, StatTile, StatusPill, Tabs } from "../components/ui/md";
 import { MaskText, Rise, Counter } from "../components/ui/reveal";
+import { pay } from "../lib/payments";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
 
 const DONE = ["COMPLETED", "WALKOVER"];
@@ -47,6 +48,70 @@ const DONE = ["COMPLETED", "WALKOVER"];
    estimated, and an empty history renders empty rather than as zeroes.
    ══════════════════════════════════════════════════════════════════════ */
 
+/* ── Paying for one entry ─────────────────────────────────────────────────
+   The whole result of this component comes from the server. There is no
+   branch anywhere below that marks an entry paid because Checkout closed —
+   `pay()` watches the row and returns what the webhook actually recorded.
+
+   The four outcomes are reported distinctly, and "timeout" in particular is
+   NOT dressed up as failure: the payment may still be in flight, and telling
+   someone their money did not go through when it did is worse than telling
+   them to wait. */
+function PayRow({ entry, player, onDone }) {
+  const [state, setState] = useState("idle"); // idle | paying | paid | failed | pending | error
+  const [message, setMessage] = useState(null);
+  const fee = Number(entry.fee_inr || 0);
+  const tournament = entry.tournament_events?.tournaments;
+
+  const run = async () => {
+    setState("paying");
+    setMessage(null);
+    try {
+      const result = await pay({
+        entry,
+        amountINR: fee,
+        player: { name: player?.name, email: player?.email, phone: player?.phone },
+      });
+      if (result === "paid") { setState("paid"); onDone?.(); }
+      else if (result === "failed") { setState("failed"); }
+      else { setState("pending"); }        // timeout or dismissed-but-maybe-captured
+    } catch (e) {
+      setState("error");
+      setMessage(e.message);
+    }
+  };
+
+  return (
+    <div className="md-card flex flex-wrap items-center justify-between gap-3 px-3.5 py-3">
+      <div className="min-w-0">
+        <div className="truncate text-sm font-semibold text-ink">
+          {tournament?.name || "Tournament"}
+        </div>
+        <div className="truncate text-[11px] text-ink-3">
+          {divisionLabel(entry.tournament_events)} · {inr(fee)}
+        </div>
+      </div>
+
+      {state === "paid" ? (
+        <span className="md-status md-status-open">Paid</span>
+      ) : state === "pending" ? (
+        <span className="text-xs text-ink-2">Confirming with your bank…</span>
+      ) : (
+        <div className="flex items-center gap-2">
+          {(state === "failed" || state === "error") && (
+            <span className="text-xs" style={{ color: "var(--color-live)" }}>
+              {message || "Payment didn't go through"}
+            </span>
+          )}
+          <Btn size="sm" disabled={state === "paying"} onClick={run}>
+            {state === "paying" ? "Opening…" : state === "failed" ? "Try again" : `Pay ${inr(fee)}`}
+          </Btn>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── The answer ─────────────────────────────────────────────────────── */
 
 function NowFrame({ tone = "var(--color-accent-teal)", eyebrow, children, live }) {
@@ -68,7 +133,7 @@ function NowFrame({ tone = "var(--color-accent-teal)", eyebrow, children, live }
   );
 }
 
-function NowCard({ item, player }) {
+function NowCard({ item, player, onRefresh }) {
   if (!item) return null;
   const { kind } = item;
 
@@ -187,15 +252,20 @@ function NowCard({ item, player }) {
       <NowFrame tone="var(--color-closing)" eyebrow="Action needed">
         <div className="flex items-start gap-4">
           <CreditCard size={22} className="mt-1 shrink-0" style={{ color: "var(--color-closing)" }} />
-          <div>
-            <h2 className="md-display text-3xl text-ink">
-              {inr(total)} outstanding
-            </h2>
+          <div className="min-w-0">
+            <h2 className="md-display text-3xl text-ink">{inr(total)} outstanding</h2>
             <p className="mt-2 max-w-lg text-sm leading-relaxed text-ink-2">
               {entries.length} {entries.length === 1 ? "entry is" : "entries are"} awaiting payment.
-              Entry fees are collected by the organizer — contact them from the tournament page to
-              settle, and your status here updates once they record it.
             </p>
+            {/* One Pay button per unpaid entry rather than a single combined
+                total: each entry is a separate order against a separate fee,
+                and the webhook settles them independently. Combining them
+                would need a server-side basket that does not exist. */}
+            <div className="mt-4 space-y-2">
+              {entries.map((e) => (
+                <PayRow key={e.id} entry={e} player={player} onDone={onRefresh} />
+              ))}
+            </div>
           </div>
         </div>
       </NowFrame>
@@ -527,7 +597,7 @@ export default function PlayerDashboard() {
 
       {/* ── THE answer ───────────────────────────────────────────────── */}
       <Rise>
-        <NowCard item={next} player={player} />
+        <NowCard item={next} player={player} onRefresh={load} />
       </Rise>
 
       {/* ── Matches ──────────────────────────────────────────────────── */}

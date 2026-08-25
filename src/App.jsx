@@ -39,6 +39,7 @@ import ResetPassword from "./pages/auth/ResetPassword";
 import NotFound from "./pages/NotFound";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { trackPageView } from "./lib/productAnalytics";
+import { paymentsAreLive } from "./lib/payments";
 import { cx } from "./lib/engines";
 import { Compass, CalendarDays, Trophy, Gavel, User } from "lucide-react";
 
@@ -386,7 +387,10 @@ function Shell() {
         <AnimatedRoutes />
       </main>
       <footer className="mx-auto max-w-6xl px-4 pb-24 pt-4 text-center text-[11px] text-ink-3 sm:pb-8">
-        Payments shown in this build are simulated — no real charge is made.
+        {/* Only shown while the mock provider is active. The moment a real
+            Razorpay key is configured this disappears, because claiming a real
+            charge is simulated is as dishonest as the reverse. */}
+        {!paymentsAreLive() && "Payments shown in this build are simulated — no real charge is made."}
       </footer>
       <MobileSurfaceNav />
     </div>
