@@ -76,7 +76,7 @@ export default function FormatBuilder({ event, confirmedCount, locked, notify, o
 
   return (
     <Card className="space-y-3 p-4">
-      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2">
+      <div className="flex items-center gap-1.5 md-eyebrow">
         <Swords size={13} /> Format for {divisionLabel(event)}
       </div>
 

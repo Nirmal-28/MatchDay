@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { motion } from "motion/react";
 import { Play, Minus, Plus, RotateCcw, Flag, Settings2, X, Trophy } from "lucide-react";
 import { entryName, entryShort, matchStageLabel, BadmintonScoringEngine, toAB, CATEGORY_META } from "../lib/engines";
 import { Badge, Btn, Card } from "./ui/primitives";
@@ -83,14 +82,14 @@ export default function ScorerPanel({ match, event, entriesById, onScore, onUndo
            should never wonder whether the last point registered. */
         <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
           <Trophy size={28} className="text-accent-teal" />
-          <div className="text-[11px] font-semibold uppercase tracking-widest text-accent-teal">
+          <div className="md-eyebrow text-accent-teal">
             {match.retired ? "Match ended — retirement" : "Match complete"}
           </div>
-          <div className="text-lg font-bold text-ink">{entryShort(winner) || "Result recorded"}</div>
-          <div className="font-mono text-2xl font-bold tabular-nums text-ink">{tally.a}–{tally.b}</div>
+          <div className="md-display text-3xl text-ink">{entryShort(winner) || "Result recorded"}</div>
+          <div className="md-score text-5xl text-ink">{tally.a}–{tally.b}</div>
           <div className="flex flex-wrap justify-center gap-1.5">
             {games.map((g, i) => (
-              <span key={i} className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-ink-2">{g.score_a}-{g.score_b}</span>
+              <span key={i} className="md-score rounded bg-surface-2 px-2 py-1 text-sm text-ink-2">{g.score_a}–{g.score_b}</span>
             ))}
           </div>
           <p className="mt-1 max-w-xs text-[11px] text-ink-3">
@@ -115,28 +114,36 @@ export default function ScorerPanel({ match, event, entriesById, onScore, onUndo
               const canScore = !!current && BadmintonScoringEngine.canScore(current.score_a, current.score_b, side);
               const leading = current && (side === "A" ? current.score_a > current.score_b : current.score_b > current.score_a);
               return (
-                <div key={side} className={`flex flex-col rounded-xl border ${leading ? "border-accent-teal/40 bg-accent-teal/[0.06]" : "border-white/10 bg-white/5"}`}>
+                <div className={`flex flex-col rounded-xl border ${leading ? "border-accent-teal/40 bg-accent-teal/[0.06]" : "border-white/10 bg-white/5"}`} key={side}>
                   <div className="truncate px-2 pt-3 text-center text-sm font-semibold text-white" title={entryName(e)}>
                     {entryShort(e)}
                   </div>
-                  <motion.div
+                  {/* Keyed on the value, so React remounts the node when a
+                      point lands and the one-shot bump replays. Moved off
+                      Motion onto the shared `.md-bump` class: this is the
+                      one screen where a scorer taps twice a second, and a
+                      CSS animation costs nothing per tap. Sized fluidly so
+                      the number fills a 390px phone and a tablet alike. */}
+                  <div
                     key={value}
-                    initial={{ scale: 1.3, opacity: 0.4 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ duration: 0.22, ease: "easeOut" }}
-                    className="py-1 text-center font-display text-7xl font-bold leading-none tabular-nums text-white"
+                    className="md-bump md-score py-1 text-center text-white"
+                    style={{ fontSize: "clamp(4rem, 22vw, 7rem)" }}
                   >
                     {value}
-                  </motion.div>
+                  </div>
 
-                  {/* Full-width primary target — comfortably thumb-sized. */}
+                  {/* The primary target, and by far the largest control on
+                      the screen: full width of its column, 88px tall, which
+                      clears the 44px minimum with room for a gloved or wet
+                      thumb in a hall. */}
                   <button
-                    className="m-2 flex h-20 items-center justify-center gap-1.5 rounded-lg bg-accent-teal text-lg font-bold text-navy-950 transition-transform active:scale-[0.97] disabled:opacity-25"
+                    className="m-2 flex items-center justify-center gap-1.5 rounded-lg bg-accent-teal text-lg font-bold uppercase tracking-wide text-navy-950 transition-transform active:scale-[0.97] disabled:opacity-25"
+                    style={{ height: "5.5rem" }}
                     disabled={!canScore}
                     onClick={() => onScore(match.id, side, 1)}
                     aria-label={`Point to ${entryShort(e)}`}
                   >
-                    <Plus size={22} /> Point
+                    <Plus size={24} /> Point
                   </button>
                 </div>
               );
@@ -146,9 +153,9 @@ export default function ScorerPanel({ match, event, entriesById, onScore, onUndo
           {/* Game tally stays visible without scrolling. */}
           <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5 text-xs text-ink-3">
             <span>Games</span>
-            <span className="font-mono text-sm font-bold text-white">{tally.a}–{tally.b}</span>
+            <span className="md-score text-base text-white">{tally.a}–{tally.b}</span>
             {games.map((g, i) => i < games.length - 1 || BadmintonScoringEngine.isGameOver(g.score_a, g.score_b) ? (
-              <span key={i} className="rounded bg-white/10 px-1.5 py-0.5 font-mono">{g.score_a}-{g.score_b}</span>
+              <span key={i} className="md-score rounded bg-white/10 px-1.5 py-0.5">{g.score_a}–{g.score_b}</span>
             ) : null)}
           </div>
 

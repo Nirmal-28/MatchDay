@@ -16,10 +16,8 @@
     "test:all": "npm run lint && npm test && npm run test:scheduling && npm run test:series && npm run test:migrations"
   },
   "dependencies": {
-    "@gsap/react": "^2.1.2",
     "@supabase/supabase-js": "^2.112.3",
     "@tailwindcss/vite": "^4.3.3",
-    "gsap": "^3.15.0",
     "lucide-react": "^1.33.0",
     "motion": "^13.1.0",
     "qrcode": "^1.5.4",

@@ -88,7 +88,7 @@ export default function NotificationCenter({ userId }) {
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute right-0 z-50 mt-2 w-[min(92vw,22rem)] overflow-hidden rounded-lg border border-line bg-surface shadow-2xl">
             <div className="flex items-center justify-between border-b border-line-soft px-3.5 py-2.5">
-              <span className="text-xs font-semibold uppercase tracking-wide text-ink-2">Notifications</span>
+              <span className="md-eyebrow">Notifications</span>
               {unread > 0 && (
                 <button className="flex items-center gap-1 text-[11px] font-medium text-accent-teal hover:underline" onClick={markAll}>
                   <CheckCheck size={12} /> Mark all read

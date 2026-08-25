@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { motion } from "motion/react";
 import { ChevronLeft, MapPin, Trophy, Share2, Building2 } from "lucide-react";
 import { cx, fmtDate, computeCareerStats, currentStreak, computeBadges, topRivals, divisionLabel, BadmintonScoringEngine, toAB } from "../lib/engines";
 import { getPlayer, getPlayerHistory, getPlayersByIds } from "../lib/repository";
@@ -16,11 +15,14 @@ const BADGE_TONES = {
   blue: "text-accent-blue", pink: "text-accent-pink",
 };
 
+// A career figure. Deliberately plain — on an athlete profile the number
+// IS the design, and every one of these is counted from completed matches
+// rather than stored, so it can never drift from the actual results.
 function StatTile({ label, value, accent }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-center">
-      <div className={cx("font-display text-3xl font-bold", accent || "text-white")}>{value}</div>
-      <div className="text-[11px] uppercase tracking-wide text-ink-3">{label}</div>
+    <div className="rounded-lg border border-line bg-surface-2/60 px-3 py-3 text-center">
+      <div className={cx("md-score text-3xl", accent || "text-ink")}>{value}</div>
+      <div className="md-eyebrow mt-1">{label}</div>
     </div>
   );
 }
@@ -106,21 +108,21 @@ export default function PlayerProfile() {
         <CourtGeometry />
         <div className="relative flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-4">
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.4 }}
-              className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl"
-            >
+            {/* Static. The avatar used to scale in on every mount, which on
+                a profile someone opens repeatedly reads as the page being
+                slow rather than as polish. */}
+            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl">
               {player.photo_url ? (
                 <img src={player.photo_url} alt="" className="h-full w-full object-cover" />
               ) : (
-                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-accent-teal to-accent-blue font-display text-2xl font-bold text-white">
+                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-accent-teal to-accent-blue md-display text-3xl text-navy-950">
                   {player.name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()}
                 </div>
               )}
-            </motion.div>
+            </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">{player.name}</h1>
+              <div className="md-eyebrow mb-1">Player</div>
+              <h1 className="md-display md-h2 text-ink">{player.name}</h1>
               {player.bio && <p className="mt-0.5 max-w-md text-sm text-ink-2">{player.bio}</p>}
               <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-3">
                 {player.city && <span className="flex items-center gap-1"><MapPin size={11} />{player.city}</span>}
@@ -154,9 +156,9 @@ export default function PlayerProfile() {
         <div className="relative mt-3 rounded-lg border border-white/10 bg-white/5 p-3.5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-ink-3">Badminton ranking points</div>
+              <div className="md-eyebrow">Badminton ranking points</div>
               {ranking.ranked ? (
-                <div className="font-display text-3xl font-bold text-accent-teal">{ranking.points}</div>
+                <div className="md-score text-4xl text-accent-teal">{ranking.points}</div>
               ) : (
                 <div className="mt-0.5 max-w-xs text-sm text-ink-3">
                   Unranked — {ranking.minMatches} completed matches are needed, {ranking.played} so far.
@@ -207,7 +209,7 @@ export default function PlayerProfile() {
       ) : (
         <div className="grid gap-5 lg:grid-cols-3">
           <Reveal className="lg:col-span-2">
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">Recent matches</h2>
+            <h2 className="md-display md-rule mb-3 text-xl text-ink">Recent matches</h2>
             <div className="overflow-x-auto rounded-md border border-line">
               <table className="w-full text-left text-sm">
                 <thead className="bg-surface-2 text-[11px] uppercase tracking-wide text-ink-2">
@@ -255,7 +257,7 @@ export default function PlayerProfile() {
           <div className="space-y-5">
             {rivals.length > 0 && (
               <Reveal delay={0.1}>
-                <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">Rivals</h2>
+                <h2 className="md-display md-rule mb-3 text-xl text-ink">Rivals</h2>
                 <div className="space-y-2">
                   {rivals.map((r) => (
                     <Card key={r.playerId} className="flex items-center justify-between p-3">
@@ -267,7 +269,7 @@ export default function PlayerProfile() {
               </Reveal>
             )}
             <Reveal delay={0.15}>
-              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">Tournaments</h2>
+              <h2 className="md-display md-rule mb-3 text-xl text-ink">Tournaments</h2>
               <div className="space-y-2">
                 {tournaments.length === 0 && <p className="text-sm text-ink-3">None yet.</p>}
                 {tournaments.map((t) => (

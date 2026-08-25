@@ -23,7 +23,7 @@ export default function StandingsPanel({ event, matches, entriesById, advancePer
         return (
           <div key={label}>
             <div className="mb-2 flex items-center gap-2">
-              <div className="text-xs font-semibold uppercase tracking-wide text-ink-2">
+              <div className="md-eyebrow">
                 {label === "RR" ? "Standings" : `Group ${label}`}
               </div>
               {remaining > 0

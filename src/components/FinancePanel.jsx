@@ -15,7 +15,7 @@ import { Badge, Btn, Card } from "../components/ui/primitives";
 function Money({ label, value, sub, tone }) {
   return (
     <Card className="p-3.5">
-      <div className="text-[10px] uppercase tracking-wide text-ink-3">{label}</div>
+      <div className="md-eyebrow">{label}</div>
       <div className={cx("font-display text-2xl font-bold",
         tone === "teal" ? "text-accent-teal" : tone === "red" ? "text-red-300" : "text-ink")}>
         {value}
@@ -85,7 +85,7 @@ export default function FinancePanel({ tournament, events, entries, notify }) {
       {/* By category */}
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2">
+          <h3 className="flex items-center gap-1.5 md-eyebrow">
             <IndianRupee size={13} /> Revenue by category
           </h3>
           <Btn size="sm" variant="secondary" icon={Download} onClick={exportLedger}>Export CSV</Btn>
@@ -161,7 +161,7 @@ export default function FinancePanel({ tournament, events, entries, notify }) {
       {/* Who still owes */}
       {unpaidEntries.length > 0 && (
         <div>
-          <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2">
+          <h3 className="mb-2 flex items-center gap-1.5 md-eyebrow">
             <AlertCircle size={13} className="text-amber-400" /> Outstanding entries
           </h3>
           {/* Mobile: who owes what, as a list an organizer can work through
@@ -215,7 +215,7 @@ export default function FinancePanel({ tournament, events, entries, notify }) {
 
       {/* Payment ledger + provider honesty */}
       <div>
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">Payment ledger</h3>
+        <h3 className="mb-2 md-eyebrow">Payment ledger</h3>
         {loadError ? (
           <Card className="px-4 py-4 text-sm text-ink-3">Could not load the payment ledger: {loadError}</Card>
         ) : f.ledger.length === 0 ? (

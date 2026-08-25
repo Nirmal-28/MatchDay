@@ -72,7 +72,7 @@ export default function StaffPanel({ tournament, events, matches, entriesById, i
     <div className="space-y-5">
       {/* Current staff */}
       <div>
-        <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2">
+        <h3 className="mb-2 flex items-center gap-1.5 md-eyebrow">
           <Shield size={13} /> Tournament staff
         </h3>
         <Card className="divide-y divide-line-soft">
@@ -126,7 +126,7 @@ export default function StaffPanel({ tournament, events, matches, entriesById, i
       {/* Invites */}
       {isOwner && (
         <div>
-          <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2">
+          <h3 className="mb-2 flex items-center gap-1.5 md-eyebrow">
             <UserPlus size={13} /> Invite staff
           </h3>
           <Card className="p-4">
@@ -176,7 +176,7 @@ export default function StaffPanel({ tournament, events, matches, entriesById, i
 
       {/* Match assignment */}
       <div>
-        <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2">
+        <h3 className="mb-2 flex items-center gap-1.5 md-eyebrow">
           <ClipboardList size={13} /> Match assignments
         </h3>
         {assignable.length === 0 ? (

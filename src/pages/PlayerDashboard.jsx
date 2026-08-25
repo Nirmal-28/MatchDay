@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { motion } from "motion/react";
 import {
-  CalendarClock, MapPin, Trophy, Radio, UserCheck, CreditCard, Compass, ArrowRight,
-  Ticket, ClipboardCheck, User, Heart,
+  MapPin, Trophy, UserCheck, CreditCard, Compass, ArrowRight,
+  Ticket, ClipboardCheck, User, Heart, CalendarClock,
 } from "lucide-react";
 import {
   cx, fmtDate, fmtDateRange, fmtTime, relativeTime, inr, entryShort, divisionLabel,
@@ -17,232 +16,267 @@ import {
 import { useAuth } from "../lib/AuthContext";
 import MatchCenter from "../components/MatchCenter";
 import PlayerSeries from "../components/PlayerSeries";
-import { Badge, Btn, Card, EmptyState } from "../components/ui/primitives";
-import { BrandLoader, LivePulse, Reveal } from "../components/ui/motion";
-import { CourtGeometry } from "../components/ui/atmosphere";
+import { Badge, Btn, EmptyState } from "../components/ui/primitives";
+import { BrandLoader } from "../components/ui/motion";
+import { SectionHeader, StatTile, StatusPill, Tabs } from "../components/ui/md";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
 
 const DONE = ["COMPLETED", "WALKOVER"];
 
-/* The dashboard answers one question above all others: what do I need to do
-   next? Everything else on this page is reference material underneath that
-   answer. Nothing here is generated or estimated — an empty tournament
-   history renders as empty, not as zeroed-out statistics. */
+/* ═══════════════════════════════════════════════════════════════════════
+   PLAYER DASHBOARD
+   ═══════════════════════════════════════════════════════════════════════
 
-function NextUp({ item, player }) {
+   This is a sports app, not an admin console, and it answers exactly one
+   question at the top of the screen: WHAT DO I NEED TO DO NOW?
+
+   <NowCard/> is that answer, and it is the largest thing on the page. It
+   takes one of five shapes depending on the player's real state — on court
+   / next match / payment owed / check in / all clear — and each shape leads
+   with the single fact that matters in that state: the score if you are
+   playing, the time if you are about to, the code if you need to check in.
+
+   The eight flat sections below it used to run to roughly four screens of
+   equal-weight headings. Reference material (registrations, tournaments,
+   organizing, following) now sits behind one tab strip, so the page ends
+   where a player's attention does: their matches.
+
+   All derivation is unchanged from before the redesign — same queries, same
+   realtime subscriptions, same priority order in `view`. Nothing here is
+   estimated, and an empty history renders empty rather than as zeroes.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── The answer ─────────────────────────────────────────────────────── */
+
+function NowFrame({ tone = "var(--color-accent-teal)", eyebrow, children, live }) {
+  return (
+    <section
+      className={cx(
+        "md-court-texture md-edge relative overflow-hidden rounded-2xl border p-5 sm:p-7",
+        live ? "md-live-surface" : "border-line bg-gradient-to-b from-navy-800 to-surface"
+      )}
+      style={{ "--md-edge": tone }}
+      aria-live="polite"
+    >
+      <div className="md-eyebrow mb-3 flex items-center gap-2" style={{ color: tone }}>
+        {live && <span className="md-live-dot" />}
+        {eyebrow}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function NowCard({ item, player }) {
   if (!item) return null;
   const { kind } = item;
 
+  /* ON COURT — the score is the headline. A player checking their phone
+     between rallies should read it without focusing. */
   if (kind === "LIVE") {
     const { match, event, opponent, score } = item;
     return (
-      <Reveal className="relative overflow-hidden rounded-2xl border border-red-500/40 bg-navy-900 p-5 sm:p-6">
-        <CourtGeometry />
-        <div className="relative">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-red-300">
-            <LivePulse label="" /> You are on court now
-          </div>
-          <h2 className="mt-2 text-2xl font-bold text-white sm:text-3xl">{match.court || match.courts?.name || "Court TBD"}</h2>
-          <div className="mt-1 text-sm text-ink-2">{divisionLabel(event)} · {matchStageLabel(match, event)}</div>
-          <div className="mt-4 flex items-end justify-between gap-4">
-            <div>
-              <div className="text-xs uppercase tracking-wide text-ink-3">Opponent</div>
-              <div className="text-lg font-semibold text-white">{entryShort(opponent) || "TBD"}</div>
+      <NowFrame tone="var(--color-live)" eyebrow="You are on court now" live>
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <div className="min-w-0">
+            <div className="md-display text-4xl text-ink sm:text-5xl">
+              {match.court || match.courts?.name || "Court TBD"}
             </div>
-            <div className="font-display text-4xl font-bold tabular-nums text-white">{score.a}–{score.b}</div>
+            <div className="mt-2 text-sm text-ink-2">
+              {divisionLabel(event)} · {matchStageLabel(match, event)}
+            </div>
+            <div className="mt-4">
+              <div className="md-eyebrow">Opponent</div>
+              <div className="mt-0.5 text-lg font-semibold text-ink">{entryShort(opponent) || "TBD"}</div>
+            </div>
           </div>
-          <Link to={`/m/${match.id}`} className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-accent-teal hover:underline">
-            Follow this match <ArrowRight size={14} />
-          </Link>
+          {/* Keyed on the score so React remounts it when a point lands and
+              the bump animation replays — motion that reports an event, not
+              a loop that runs regardless. */}
+          <div key={`${score.a}-${score.b}`} className="md-bump md-score text-6xl text-ink sm:text-7xl">
+            {score.a}<span className="mx-1 text-ink-3">–</span>{score.b}
+          </div>
         </div>
-      </Reveal>
+        <Link
+          to={`/m/${match.id}`}
+          className="mt-6 inline-flex h-11 items-center gap-2 rounded-lg bg-accent-teal px-5 text-sm font-bold uppercase tracking-wide text-navy-950 transition-[filter] hover:brightness-110"
+        >
+          Follow this match <ArrowRight size={15} />
+        </Link>
+      </NowFrame>
     );
   }
 
+  /* NEXT MATCH — the time is the headline, with the countdown beside it.
+     Court and opponent are the two facts a player needs to actually get to
+     the right place against the right person. */
   if (kind === "MATCH") {
     const { match, event, opponent, entry, tournament } = item;
     const checkedIn = entry?.check_in_status === "CHECKED_IN";
     return (
-      <Reveal className="relative overflow-hidden rounded-2xl border border-accent-teal/40 bg-navy-900 p-5 sm:p-6">
-        <CourtGeometry />
-        <div className="relative">
-          <div className="text-[11px] font-semibold uppercase tracking-widest text-accent-teal">Your next match</div>
-          <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h2 className="font-display text-3xl font-bold text-white sm:text-4xl">
-              {match.scheduled_at ? fmtTime(match.scheduled_at) : "Time TBD"}
-            </h2>
-            {match.scheduled_at && (
-              <span className="text-sm font-medium text-accent-teal">{relativeTime(match.scheduled_at)}</span>
-            )}
+      <NowFrame eyebrow="Your next match">
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <div className="md-display text-5xl text-ink sm:text-6xl">
+            {match.scheduled_at ? fmtTime(match.scheduled_at) : "TBD"}
           </div>
-          <div className="mt-1 text-sm text-ink-2">
-            {match.scheduled_at ? fmtDate(match.scheduled_at) : ""} · {tournament?.name}
-          </div>
+          {match.scheduled_at && (
+            <div className="text-base font-semibold text-accent-teal">{relativeTime(match.scheduled_at)}</div>
+          )}
+        </div>
+        <div className="mt-1.5 text-sm text-ink-2">
+          {match.scheduled_at ? `${fmtDate(match.scheduled_at)} · ` : ""}{tournament?.name}
+        </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-              <div className="text-[10px] uppercase tracking-wide text-ink-3">Court</div>
-              <div className="text-base font-semibold text-white">{match.court || match.courts?.name || "TBD"}</div>
-            </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-              <div className="text-[10px] uppercase tracking-wide text-ink-3">Opponent</div>
-              <div className="truncate text-base font-semibold text-white">{entryShort(opponent) || "TBD"}</div>
-            </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-              <div className="text-[10px] uppercase tracking-wide text-ink-3">Category</div>
-              <div className="truncate text-base font-semibold text-white">{divisionLabel(event)}</div>
-            </div>
+        {/* The matchup, in the same net-divided form the shared MatchCard
+            uses — so a player recognises the shape everywhere it appears. */}
+        <div className="mt-5 rounded-xl border border-line bg-surface/70 p-4">
+          <div className="text-base font-semibold text-ink">{player?.name || "You"}</div>
+          <div className="my-2 flex items-center gap-2">
+            <span className="h-px flex-1 bg-line-soft" />
+            <span className="md-eyebrow text-[9px]">vs</span>
+            <span className="h-px flex-1 bg-line-soft" />
           </div>
+          <div className="text-base font-semibold text-ink">{entryShort(opponent) || "TBD"}</div>
+        </div>
 
-          {!checkedIn && entry?.check_in_code && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2.5">
-              <ClipboardCheck size={15} className="text-amber-300" />
-              <span className="text-sm text-amber-200">Not checked in yet — show this code at the desk:</span>
-              <span className="rounded bg-amber-400/20 px-2 py-0.5 font-mono text-sm font-bold tracking-widest text-amber-100">
+        <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
+          <div className="rounded-lg border border-line bg-surface-2/60 px-3.5 py-2.5">
+            <div className="md-eyebrow">Court</div>
+            <div className="md-display mt-0.5 text-2xl text-ink">{match.court || match.courts?.name || "TBD"}</div>
+          </div>
+          <div className="rounded-lg border border-line bg-surface-2/60 px-3.5 py-2.5">
+            <div className="md-eyebrow">Category</div>
+            <div className="mt-1 truncate text-sm font-semibold text-ink">{divisionLabel(event)}</div>
+          </div>
+        </div>
+
+        {/* Check-in is the one thing that can cost a player the match before
+            they play it, so when it is outstanding it gets the accent colour
+            and the code is set large enough to read across a desk. */}
+        {!checkedIn && entry?.check_in_code && (
+          <div
+            className="md-edge mt-3 rounded-lg border border-line bg-surface px-4 py-3 pl-5"
+            style={{ "--md-edge": "var(--color-closing)" }}
+          >
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <ClipboardCheck size={16} style={{ color: "var(--color-closing)" }} />
+              <span className="text-sm font-semibold text-ink">Not checked in yet</span>
+              <span className="md-score rounded bg-surface-2 px-2.5 py-1 text-xl tracking-[0.2em] text-ink">
                 {entry.check_in_code}
               </span>
+              <span className="text-xs text-ink-3">Show this at the desk</span>
             </div>
-          )}
+          </div>
+        )}
 
-          <Link to={`/m/${match.id}`} className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-accent-teal hover:underline">
-            Match details <ArrowRight size={14} />
-          </Link>
-        </div>
-      </Reveal>
+        <Link
+          to={`/m/${match.id}`}
+          className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-accent-teal hover:underline"
+        >
+          Match details <ArrowRight size={14} />
+        </Link>
+      </NowFrame>
     );
   }
 
+  /* PAYMENT OWED */
   if (kind === "PAY") {
     const { entries, total } = item;
     return (
-      <Reveal className="rounded-2xl border border-amber-400/40 bg-amber-400/[0.07] p-5">
-        <div className="flex items-start gap-3">
-          <CreditCard size={20} className="mt-0.5 shrink-0 text-amber-300" />
+      <NowFrame tone="var(--color-closing)" eyebrow="Action needed">
+        <div className="flex items-start gap-4">
+          <CreditCard size={22} className="mt-1 shrink-0" style={{ color: "var(--color-closing)" }} />
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-widest text-amber-300">Action needed</div>
-            <h2 className="mt-1 text-lg font-bold text-ink">
-              {entries.length} {entries.length === 1 ? "entry is" : "entries are"} awaiting payment
+            <h2 className="md-display text-3xl text-ink">
+              {inr(total)} outstanding
             </h2>
-            <p className="mt-1 text-sm text-ink-2">
-              {inr(total)} outstanding. Entry fees are collected by the organizer — contact them from the
-              tournament page to settle, and your status here updates once they record it.
+            <p className="mt-2 max-w-lg text-sm leading-relaxed text-ink-2">
+              {entries.length} {entries.length === 1 ? "entry is" : "entries are"} awaiting payment.
+              Entry fees are collected by the organizer — contact them from the tournament page to
+              settle, and your status here updates once they record it.
             </p>
           </div>
         </div>
-      </Reveal>
+      </NowFrame>
     );
   }
 
+  /* CHECK IN — the code is the headline, because it is the only thing the
+     player has to produce. */
   if (kind === "CHECKIN") {
     const { entry, tournament } = item;
     return (
-      <Reveal className="rounded-2xl border border-accent-teal/40 bg-accent-teal/[0.07] p-5">
-        <div className="flex items-start gap-3">
-          <UserCheck size={20} className="mt-0.5 shrink-0 text-accent-teal" />
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-widest text-accent-teal">Action needed</div>
-            <h2 className="mt-1 text-lg font-bold text-ink">Check in for {tournament?.name}</h2>
-            <p className="mt-1 text-sm text-ink-2">The tournament is under way. Show this code at the check-in desk:</p>
+      <NowFrame eyebrow="Action needed">
+        <div className="flex items-start gap-4">
+          <UserCheck size={22} className="mt-1 shrink-0 text-accent-teal" />
+          <div className="min-w-0">
+            <h2 className="md-display text-3xl text-ink">Check in now</h2>
+            <p className="mt-1.5 text-sm text-ink-2">
+              {tournament?.name} is under way. Show this code at the check-in desk.
+            </p>
             {entry?.check_in_code && (
-              <div className="mt-2 inline-block rounded-md border border-accent-teal/40 bg-accent-teal/10 px-3 py-1.5 font-mono text-lg font-bold tracking-widest text-accent-teal">
+              <div className="md-score mt-4 inline-block rounded-xl border border-accent-teal/40 bg-accent-teal/10 px-5 py-3 text-4xl tracking-[0.22em] text-accent-teal">
                 {entry.check_in_code}
               </div>
             )}
           </div>
         </div>
-      </Reveal>
+      </NowFrame>
     );
   }
 
-  // Nothing outstanding.
+  /* ALL CLEAR — an empty state that points somewhere rather than just
+     reporting emptiness. */
   return (
-    <Reveal className="rounded-2xl border border-line bg-surface p-5">
-      <div className="flex items-start gap-3">
-        <Compass size={20} className="mt-0.5 shrink-0 text-accent-teal" />
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-widest text-accent-teal">You are all set</div>
-          <h2 className="mt-1 text-lg font-bold text-ink">
-            {player?.name ? `Nothing needs your attention, ${player.name.split(" ")[0]}.` : "Nothing needs your attention."}
-          </h2>
-          <p className="mt-1 text-sm text-ink-2">No upcoming matches or outstanding actions right now.</p>
-          <Link to="/" className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-accent-teal hover:underline">
-            Find a tournament <ArrowRight size={14} />
-          </Link>
-        </div>
-      </div>
-    </Reveal>
+    <NowFrame eyebrow="You are all set">
+      <h2 className="md-display text-3xl text-ink sm:text-4xl">
+        {player?.name ? `Nothing needs you right now, ${player.name.split(" ")[0]}.` : "Nothing needs you right now."}
+      </h2>
+      <p className="mt-2.5 max-w-md text-sm text-ink-2">
+        No upcoming matches and no outstanding actions. The next one could be a
+        tournament you have not entered yet.
+      </p>
+      <Link
+        to="/"
+        className="mt-5 inline-flex h-11 items-center gap-2 rounded-lg bg-accent-teal px-5 text-sm font-bold uppercase tracking-wide text-navy-950 transition-[filter] hover:brightness-110"
+      >
+        <Compass size={16} /> Find a tournament
+      </Link>
+    </NowFrame>
   );
 }
 
-/* Your season — the numbers that make a dashboard feel like a competitive
-   record rather than an account page. Every figure is derived from completed
-   matches the player actually played; nothing here is estimated, and the whole
-   block is hidden rather than showing a row of zeroes to someone who has not
-   played yet. */
+/* ── Season record ──────────────────────────────────────────────────────
+   Real figures from completed matches only. Hidden entirely rather than
+   showing a row of zeroes to someone who has not played yet. */
 function SeasonStats({ completed, wins, tournaments, titles }) {
   if (!completed.length) return null;
   const winPct = Math.round((wins / completed.length) * 100);
-
-  const tiles = [
-    { label: "Matches", value: completed.length },
-    { label: "Won", value: wins, accent: "text-accent-teal" },
-    { label: "Win %", value: `${winPct}%` },
-    { label: "Tournaments", value: tournaments.length },
-    { label: "Titles", value: titles, accent: "text-accent-yellow" },
-  ];
-
   return (
     <section>
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">Your season</h2>
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-        {tiles.map((t) => (
-          <Card key={t.label} className="p-3">
-            <div className="text-[10px] uppercase tracking-wide text-ink-3">{t.label}</div>
-            <div className={cx("font-display text-2xl font-bold leading-tight", t.accent || "text-ink")}>{t.value}</div>
-          </Card>
-        ))}
+      <SectionHeader eyebrow="Real results only" title="Your record" />
+      <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-5">
+        <StatTile label="Played" value={completed.length} />
+        <StatTile label="Won" value={wins} tone="open" />
+        <StatTile label="Win rate" value={`${winPct}%`} />
+        <StatTile label="Tournaments" value={tournaments.length} />
+        <StatTile label="Titles" value={titles} tone={titles > 0 ? "closing" : undefined} />
       </div>
     </section>
   );
 }
 
-/* Tournaments this player follows. Kept to a compact strip: following exists
-   so a player can keep an eye on an event they aren't entered in, not to
-   become a feed. */
-function FollowingStrip({ tournaments }) {
-  if (!tournaments.length) return null;
-  return (
-    <section>
-      <h2 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2">
-        <Heart size={12} className="text-accent-teal" /> Following
-      </h2>
-      <div className="grid gap-2 sm:grid-cols-2">
-        {tournaments.map((t) => (
-          <Link key={t.id} to={t.slug ? `/t/${t.slug}` : `/tournament/${t.id}`}>
-            <Card className="flex items-center justify-between gap-3 px-3.5 py-2.5 transition-colors hover:border-accent-teal/50">
-              <div className="min-w-0">
-                <div className="truncate text-sm font-medium text-ink">{t.name}</div>
-                <div className="truncate text-[11px] text-ink-3">
-                  {t.venue}{t.location ? `, ${t.location}` : ""} · {fmtDateRange(t.start_date, t.end_date)}
-                </div>
-              </div>
-              {t.status === "LIVE"
-                ? <LivePulse />
-                : <Badge tone={TOURNAMENT_STATUS_META[t.status]?.tone || "slate"}>{TOURNAMENT_STATUS_META[t.status]?.label || t.status}</Badge>}
-            </Card>
-          </Link>
-        ))}
-      </div>
-    </section>
-  );
-}
+/* ── Reference rows ─────────────────────────────────────────────────── */
 
 function EntryRow({ entry, event, tournament }) {
   return (
-    <Card className="p-3.5">
+    <div className="md-card p-3.5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <Link to={tournament?.slug ? `/t/${tournament.slug}` : "#"} className="truncate font-semibold text-ink hover:text-accent-teal">
+          <Link
+            to={tournament?.slug ? `/t/${tournament.slug}` : "#"}
+            className="truncate font-semibold text-ink hover:text-accent-teal"
+          >
             {tournament?.name || "Tournament"}
           </Link>
           <div className="mt-0.5 text-xs text-ink-2">{divisionLabel(event)}</div>
@@ -253,18 +287,47 @@ function EntryRow({ entry, event, tournament }) {
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge tone={REG_STATUS_META[entry.reg_status]?.tone ?? "amber"}>
-            {entry.reg_status === "WAITLISTED" ? `Waitlist #${entry.waitlist_position ?? "—"}` : (REG_STATUS_META[entry.reg_status]?.label ?? entry.reg_status)}
+            {entry.reg_status === "WAITLISTED"
+              ? `Waitlist #${entry.waitlist_position ?? "—"}`
+              : (REG_STATUS_META[entry.reg_status]?.label ?? entry.reg_status)}
           </Badge>
           {Number(entry.fee_inr || 0) > 0 && (
-            <Badge tone={PAY_STATUS_META[entry.payment_status]?.tone ?? "slate"}>{PAY_STATUS_META[entry.payment_status]?.label ?? entry.payment_status}</Badge>
+            <Badge tone={PAY_STATUS_META[entry.payment_status]?.tone ?? "slate"}>
+              {PAY_STATUS_META[entry.payment_status]?.label ?? entry.payment_status}
+            </Badge>
           )}
           <Badge tone={CHECK_IN_META[entry.check_in_status || "NOT_CHECKED_IN"]?.tone ?? "slate"}>
             {CHECK_IN_META[entry.check_in_status || "NOT_CHECKED_IN"]?.label}
           </Badge>
         </div>
       </div>
-    </Card>
+    </div>
   );
+}
+
+function TournamentRow({ t, to, right }) {
+  return (
+    <Link to={to} className="block">
+      <div className="md-card md-card-link flex items-center justify-between gap-3 px-3.5 py-3">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-ink">{t.name}</div>
+          <div className="truncate text-[11px] text-ink-3">
+            {[t.venue, t.location].filter(Boolean).join(", ")}
+            {t.start_date ? ` · ${fmtDateRange(t.start_date, t.end_date)}` : ""}
+          </div>
+        </div>
+        <div className="shrink-0">{right}</div>
+      </div>
+    </Link>
+  );
+}
+
+function statusRight(t) {
+  return t.status === "LIVE"
+    ? <StatusPill status="live" />
+    : <Badge tone={TOURNAMENT_STATUS_META[t.status]?.tone ?? "slate"}>
+        {TOURNAMENT_STATUS_META[t.status]?.label ?? t.status}
+      </Badge>;
 }
 
 export default function PlayerDashboard() {
@@ -276,6 +339,7 @@ export default function PlayerDashboard() {
   const [organized, setOrganized] = useState([]);
   const [followed, setFollowed] = useState([]);
   const [error, setError] = useState(null);
+  const [tab, setTab] = useState("entries");
 
   const load = useCallback(async () => {
     try {
@@ -427,135 +491,155 @@ export default function PlayerDashboard() {
   const upcomingTournaments = tournaments.filter((t) => ["REGISTRATION_OPEN", "REGISTRATION_CLOSED", "LIVE"].includes(t.status));
   const pastTournaments = tournaments.filter((t) => ["COMPLETED", "CANCELLED"].includes(t.status));
 
+  const tabs = [
+    { key: "entries", label: "Registrations", count: entries.length },
+    { key: "tournaments", label: "Tournaments", count: tournaments.length },
+    { key: "following", label: "Following", count: followed.length },
+    { key: "organizing", label: "Organizing", count: organized.length },
+  ];
+
   return (
-    <div className="space-y-6">
-      {/* Identity strip */}
+    <div className="space-y-8">
+      {/* ── Identity ─────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3.5">
           {player.photo_url ? (
-            <img src={player.photo_url} alt="" className="h-12 w-12 rounded-xl object-cover" />
+            <img src={player.photo_url} alt="" className="h-14 w-14 rounded-xl object-cover" />
           ) : (
-            <motion.div
-              initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.3 }}
-              className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-accent-teal to-accent-blue font-display text-lg font-bold text-white"
-            >
+            <div className="md-display flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-accent-teal to-accent-blue text-xl text-navy-950">
               {player.name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()}
-            </motion.div>
+            </div>
           )}
-          <div>
-            <h1 className="text-xl font-bold text-ink">{player.name}</h1>
-            <div className="text-xs text-ink-2">
+          <div className="min-w-0">
+            <h1 className="md-display text-3xl text-ink">{player.name}</h1>
+            <div className="mt-0.5 text-xs text-ink-2">
               {entries.length} {entries.length === 1 ? "entry" : "entries"} · {completed.length} played · {wins} won
             </div>
           </div>
         </div>
         <div className="flex gap-2">
-          <Link to="/me/profile"><Btn size="sm" variant="secondary" icon={User}>Edit profile</Btn></Link>
-          <Link to={`/p/${player.id}`}><Btn size="sm" variant="ghost">Public profile</Btn></Link>
+          <Link to={`/p/${player.id}`}><Btn size="sm" variant="secondary">Public profile</Btn></Link>
+          <Link to="/me/profile"><Btn size="sm" variant="ghost" icon={User}>Edit</Btn></Link>
         </div>
       </div>
 
-      {/* THE answer */}
-      <NextUp item={next} player={player} />
+      {/* ── THE answer ───────────────────────────────────────────────── */}
+      <NowCard item={next} player={player} />
 
-      {/* Match center */}
+      {/* ── Matches ──────────────────────────────────────────────────── */}
       <MatchCenter live={live} upcoming={upcoming} completed={completed} updatedMatchIds={updatedMatchIds} />
 
       <SeasonStats completed={completed} wins={wins} tournaments={tournaments} titles={titles} />
 
-      <FollowingStrip tournaments={followed} />
-
       <PlayerSeries playerId={player.id} />
 
-      {/* Organizing is a capability of the same account, not a second one. */}
+      {/* ── Reference material ───────────────────────────────────────────
+          Four sections that each used to carry their own heading in one long
+          column. They are reference, not action, so they share a tab strip
+          and the page ends at a predictable height. */}
       <section>
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-2">Tournaments I organize</h2>
-          <Link to="/organizer" className="text-xs font-medium text-accent-teal hover:underline">Organizer workspace →</Link>
-        </div>
-        {organized.length === 0 ? (
-          <Card className="px-4 py-6 text-center">
-            <div className="text-sm font-semibold text-ink">You haven&apos;t organized a tournament yet</div>
-            <p className="mx-auto mt-1 max-w-sm text-sm text-ink-2">
-              You can run one from this same account — creating a tournament makes you its organizer without
-              changing anything about your player profile.
-            </p>
-            <Link to="/organizer" className="mt-3 inline-block">
-              <Btn size="sm" icon={Trophy}>Create a tournament</Btn>
-            </Link>
-          </Card>
-        ) : (
-          <div className="grid gap-2 sm:grid-cols-2">
-            {organized.slice(0, 6).map((t) => (
-              <Link key={t.id} to={`/organizer/${t.id}`} className="block">
-                <Card className="flex items-center justify-between gap-2 p-3 transition-colors hover:border-accent-teal/50">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-ink">{t.name}</div>
-                    <div className="text-xs text-ink-3">{fmtDate(t.start_date)} · {t.venue}</div>
-                  </div>
-                  <Badge tone={TOURNAMENT_STATUS_META[t.status]?.tone ?? "slate"}>
-                    {TOURNAMENT_STATUS_META[t.status]?.label ?? t.status}
-                  </Badge>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
+        <SectionHeader eyebrow="Everything else" title="Your MatchDay" />
+        <Tabs tabs={tabs} value={tab} onChange={setTab} ariaLabel="Your MatchDay sections" />
 
-      {/* Registrations */}
-      <section>
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">My registrations</h2>
-        {entries.length === 0 ? (
-          <EmptyState icon={Ticket} title="No registrations yet"
-            hint="Browse tournaments and enter a category to get started."
-            action={<Link to="/" className="mt-2"><Btn size="sm" icon={Compass}>Find a tournament</Btn></Link>} />
-        ) : (
-          <div className="space-y-2">
-            {entries.map((e) => (
-              <EntryRow key={e.id} entry={e} event={e.tournament_events} tournament={e.tournament_events?.tournaments} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Tournaments */}
-      {tournaments.length > 0 && (
-        <section className="grid gap-5 sm:grid-cols-2">
-          <div>
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">Current & upcoming tournaments</h2>
-            {upcomingTournaments.length === 0 ? <p className="text-sm text-ink-3">None right now.</p> : (
+        <div className="pt-4">
+          {tab === "entries" && (
+            entries.length === 0 ? (
+              <EmptyState
+                icon={Ticket} title="No registrations yet"
+                hint="Browse tournaments and enter a category to get started."
+                action={<Link to="/" className="mt-2"><Btn size="sm" icon={Compass}>Find a tournament</Btn></Link>}
+              />
+            ) : (
               <div className="space-y-2">
-                {upcomingTournaments.map((t) => (
-                  <Card key={t.id} className="flex items-center justify-between gap-2 p-3">
-                    <div className="min-w-0">
-                      <Link to={`/t/${t.slug}`} className="truncate text-sm font-medium text-ink hover:text-accent-teal">{t.name}</Link>
-                      <div className="text-xs text-ink-3">{fmtDate(t.start_date)} · {t.venue}</div>
+                {entries.map((e) => (
+                  <EntryRow key={e.id} entry={e} event={e.tournament_events} tournament={e.tournament_events?.tournaments} />
+                ))}
+              </div>
+            )
+          )}
+
+          {tab === "tournaments" && (
+            tournaments.length === 0 ? (
+              <EmptyState icon={Trophy} title="No tournaments yet" hint="Tournaments you enter will be listed here." />
+            ) : (
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div>
+                  <div className="md-eyebrow mb-2">Current &amp; upcoming</div>
+                  {upcomingTournaments.length === 0 ? (
+                    <p className="text-sm text-ink-3">None right now.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {upcomingTournaments.map((t) => (
+                        <TournamentRow key={t.id} t={t} to={`/t/${t.slug}`} right={statusRight(t)} />
+                      ))}
                     </div>
-                    <Badge tone={TOURNAMENT_STATUS_META[t.status]?.tone ?? "slate"}>
-                      {t.status === "LIVE" ? <><Radio size={10} className="animate-pulse" /> Live</> : TOURNAMENT_STATUS_META[t.status]?.label}
-                    </Badge>
-                  </Card>
-                ))}
+                  )}
+                </div>
+                <div>
+                  <div className="md-eyebrow mb-2">Past</div>
+                  {pastTournaments.length === 0 ? (
+                    <p className="text-sm text-ink-3">None yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {pastTournaments.map((t) => (
+                        <TournamentRow key={t.id} t={t} to={`/t/${t.slug}`} right={statusRight(t)} />
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
-          <div>
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">Past tournaments</h2>
-            {pastTournaments.length === 0 ? <p className="text-sm text-ink-3">None yet.</p> : (
-              <div className="space-y-2">
-                {pastTournaments.map((t) => (
-                  <Card key={t.id} className="p-3">
-                    <Link to={`/t/${t.slug}`} className="text-sm font-medium text-ink hover:text-accent-teal">{t.name}</Link>
-                    <div className="text-xs text-ink-3">{fmtDate(t.start_date)}</div>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-      )}
+            )
+          )}
 
+          {tab === "following" && (
+            followed.length === 0 ? (
+              <EmptyState
+                icon={Heart} title="Not following anything yet"
+                hint="Follow a tournament to keep an eye on it without entering — results and schedule changes show up here."
+                action={<Link to="/" className="mt-2"><Btn size="sm" icon={Compass}>Browse tournaments</Btn></Link>}
+              />
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {followed.map((t) => (
+                  <TournamentRow
+                    key={t.id} t={t}
+                    to={t.slug ? `/t/${t.slug}` : `/tournament/${t.id}`}
+                    right={statusRight(t)}
+                  />
+                ))}
+              </div>
+            )
+          )}
+
+          {tab === "organizing" && (
+            organized.length === 0 ? (
+              <div className="md-card px-4 py-8 text-center">
+                <div className="md-display text-2xl text-ink">You haven&apos;t organized a tournament yet</div>
+                <p className="mx-auto mt-2 max-w-sm text-sm text-ink-2">
+                  You can run one from this same account — creating a tournament makes you its
+                  organizer without changing anything about your player profile.
+                </p>
+                <Link to="/organizer" className="mt-4 inline-block">
+                  <Btn size="sm" icon={Trophy}>Create a tournament</Btn>
+                </Link>
+              </div>
+            ) : (
+              <>
+                <div className="mb-2 flex justify-end">
+                  <Link to="/organizer" className="text-xs font-semibold text-accent-teal hover:underline">
+                    Organizer workspace →
+                  </Link>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {organized.slice(0, 6).map((t) => (
+                    <TournamentRow key={t.id} t={t} to={`/organizer/${t.id}`} right={statusRight(t)} />
+                  ))}
+                </div>
+              </>
+            )
+          )}
+        </div>
+      </section>
     </div>
   );
 }

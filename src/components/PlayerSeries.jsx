@@ -89,7 +89,7 @@ function SeriesRow({ series, playerId }) {
 
       {upcoming.length > 0 && (
         <div className="mt-2 border-t border-line-soft pt-2">
-          <div className="mb-1 text-[10px] uppercase tracking-wide text-ink-3">Next matchday</div>
+          <div className="mb-1 md-eyebrow">Next matchday</div>
           <Link to={`/t/${upcoming[0].slug || ""}`} className="flex items-center gap-1.5 text-sm text-ink hover:text-accent-teal">
             <CalendarDays size={12} className="text-ink-3" />
             {upcoming[0].name}
@@ -120,7 +120,7 @@ export default function PlayerSeries({ playerId }) {
 
   return (
     <section>
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">My series</h2>
+      <h2 className="mb-2 md-eyebrow">My series</h2>
       <div className="grid gap-2 sm:grid-cols-2">
         {series.map((s) => <SeriesRow key={s.id} series={s} playerId={playerId} />)}
       </div>

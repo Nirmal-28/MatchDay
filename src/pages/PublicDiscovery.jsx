@@ -1,183 +1,351 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { motion, useScroll, useTransform, useInView } from "motion/react";
 import {
-  Trophy, MapPin, Calendar, Radio, ArrowRight, Compass, Search, SlidersHorizontal, IndianRupee, Users,
+  Trophy, ArrowRight, Search, SlidersHorizontal, X, Radio, Flame, Timer,
 } from "lucide-react";
 import {
-  cx, fmtDate, fmtDateRange, inr, divisionLabel, TOURNAMENT_STATUS_META,
+  cx, fmtDateRange, inr, TOURNAMENT_STATUS_META,
   CATEGORY_META, AGE_GROUPS, SKILL_GRADES, todayLocal,
 } from "../lib/engines";
 import { listDiscoverableTournaments, listEvents, listMatches, listCourts } from "../lib/repository";
 import { useAuth } from "../lib/AuthContext";
 import { tournamentRegistrationState } from "../lib/lifecycle";
-import { Badge, EmptyState, inputCls } from "../components/ui/primitives";
-import { BrandLoader, Reveal, StaggerList, StaggerItem, SportIcon, LogoAssembly, LivePulse, SPORT_KEYS } from "../components/ui/motion";
-import { CourtGeometry } from "../components/ui/atmosphere";
+import { EmptyState, inputCls } from "../components/ui/primitives";
+import { SportIcon, SPORT_KEYS } from "../components/ui/motion";
+import {
+  SectionHeader, TournamentCard, CardSkeletonGrid, StatusPill, sportAccent,
+} from "../components/ui/md";
+import { sportMeta } from "../lib/sports";
 import logo from "../assets/logo.png";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
 
-const JOURNEY = ["Discover", "Register", "Draw", "Schedule", "Compete", "Score", "Advance", "Win"];
+/* ═══════════════════════════════════════════════════════════════════════
+   DISCOVERY
+   ═══════════════════════════════════════════════════════════════════════
 
-// Badminton is the only sport with real data today; the rest are shown as
-// genuine (dimmed) sports rather than fabricated ones, so the multi-sport
-// intent is visible without implying they're usable yet.
-const SPORTS = [
-  { key: "badminton", name: "Badminton", angle: -90, active: true },
-  { key: "tennis", name: "Tennis", angle: -38 },
-  { key: "tableTennis", name: "Table Tennis", angle: 12 },
-  { key: "volleyball", name: "Volleyball", angle: 64 },
-  { key: "basketball", name: "Basketball", angle: 116 },
-  { key: "football", name: "Football", angle: 168 },
-  { key: "cricket", name: "Cricket", angle: -142 },
-];
+   Rebuilt around the five questions a visitor actually arrives with:
 
-function HowItWorks() {
-  const ref = useRef(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start 0.8", "end 0.3"] });
-  const fillWidth = useTransform(scrollYProgress, [0, 1], ["2%", "100%"]);
+     What can I play?      → sport chips, first control on the page
+     What's happening?     → LIVE NOW, above everything else, when real
+     What's open?          → OPEN FOR ENTRY rail
+     What's closing soon?  → CLOSING SOON rail, computed from the real
+                             registration deadline
+     What's nearly gone?   → ALMOST FULL rail, computed from real capacity
 
+   Every rail is derived from data the database already returns. There is no
+   popularity, trending, attendance or "hot right now" signal anywhere on
+   this page: MatchDay does not have that data, and inventing it on the most
+   public screen in the product would be a lie.
+
+   The hero used to be an 85vh column that played a 1.3-second logo assembly
+   before the headline appeared, with the first tournament roughly two
+   screens down. It is now a single screen-top block that carries the
+   headline, the live counts and the search field — a visitor reaches real
+   tournaments without scrolling on a laptop, and after one swipe on a phone.
+   ══════════════════════════════════════════════════════════════════════ */
+
+const EMPTY_FILTERS = {
+  q: "", sport: "ALL", status: "ALL", category: "ALL", age: "ALL",
+  gender: "ALL", grade: "ALL", maxFee: "", fromDate: "", toDate: "", openOnly: false,
+};
+
+// Days out from today, or null when there is no date. Used for "closing soon".
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  const today = todayLocal();
+  const ms = new Date(`${dateStr}T00:00:00`) - new Date(`${today}T00:00:00`);
+  return Math.round(ms / 86400000);
+}
+
+// One tournament row → the shape <TournamentCard/> renders. Kept in one place
+// so discovery, a player's list and an organizer's list cannot drift apart.
+function toCardModel(t) {
+  const reg = tournamentRegistrationState(t, t.events);
+  const meta = TOURNAMENT_STATUS_META[t.status];
+  const live = t.status === "LIVE";
+
+  const status = live ? "live"
+    : reg.canRegister ? "open"
+    : t.status === "COMPLETED" ? "done"
+    : "full";
+
+  return {
+    id: t.id,
+    slug: t.slug,
+    name: t.name,
+    sport: t.sport || "badminton",
+    sportLabel: sportMeta(t.sport).label,
+    dateLabel: fmtDateRange(t.start_date, t.end_date),
+    venue: t.venue,
+    location: t.location,
+    live,
+    status,
+    statusLabel: live ? "Live" : reg.canRegister ? reg.label : meta?.label || t.status,
+    capacity: t.capacity,
+    filled: t.capacity ? t.capacity - t.spotsLeft : null,
+    fee: t.maxFee === 0 ? "Free entry"
+      : t.minFee === t.maxFee ? inr(t.minFee)
+      : `${inr(t.minFee)}–${inr(t.maxFee)}`,
+    reg,
+  };
+}
+
+/* ── Hero ───────────────────────────────────────────────────────────────
+   Editorial, static, and mostly type. Depth comes from the court texture
+   and the app-wide background behind it, not from anything that moves. */
+function Hero({ liveCount, openCount, query, onQuery, session }) {
   return (
-    <section ref={ref} className="my-16">
-      <Reveal className="mb-10 text-center">
-        <h2 className="text-2xl font-bold text-ink sm:text-3xl">How MatchDay works</h2>
-        <p className="mt-1 text-sm text-ink-2">From first click to champion — one connected journey.</p>
-      </Reveal>
-      <div className="relative">
-        <div className="absolute left-4 right-4 top-4 hidden h-0.5 bg-line sm:block" />
-        <motion.div className="absolute left-4 top-4 hidden h-0.5 bg-gradient-to-r from-accent-teal via-accent-blue to-accent-purple sm:block" style={{ width: fillWidth }} />
-        <div className="grid grid-cols-2 gap-y-8 sm:grid-cols-4 lg:grid-cols-8">
-          {JOURNEY.map((stage, i) => (
-            <Reveal key={stage} delay={i * 0.05} className="flex flex-col items-center gap-2 text-center">
-              <div className="relative z-10 flex h-9 w-9 items-center justify-center rounded-full border-2 border-accent-teal bg-surface text-xs font-bold text-accent-teal">{i + 1}</div>
-              <div className="text-xs font-semibold text-ink-2">{stage}</div>
-            </Reveal>
-          ))}
+    <section className="md-court-texture relative -mx-4 -mt-6 overflow-hidden border-b border-line px-4 pb-10 pt-12 sm:px-8 sm:pb-14 sm:pt-16">
+      <div className="mx-auto max-w-4xl">
+        <div className="md-eyebrow mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+          {liveCount > 0 && (
+            <span className="md-status md-status-live">
+              <span className="md-live-dot" />
+              {liveCount} tournament{liveCount === 1 ? "" : "s"} live
+            </span>
+          )}
+          {openCount > 0 && (
+            <span className="md-status md-status-open">{openCount} open for entry</span>
+          )}
+          {liveCount === 0 && openCount === 0 && <span>Multi-sport competition platform</span>}
+        </div>
+
+        <h1 className="md-display md-h1 text-ink">
+          Everyone
+          <br />
+          can compete.
+        </h1>
+
+        <p className="mt-5 max-w-lg text-[15px] leading-relaxed text-ink-2">
+          Find a tournament, enter it, and follow every point live. One account to
+          play, to organize, and to officiate.
+        </p>
+
+        {/* Search sits in the hero because "what can I play" is the first
+            question, and burying the field below three marketing sections
+            made people scroll past the thing they came for. */}
+        <div className="mt-7 flex flex-col gap-2.5 sm:flex-row">
+          <div className="relative flex-1">
+            <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-3" />
+            <label className="sr-only" htmlFor="discover-search">Search tournaments</label>
+            <input
+              id="discover-search"
+              className="h-12 w-full rounded-lg border border-line bg-surface/80 pl-11 pr-4 text-sm text-ink placeholder-ink-3 backdrop-blur focus:border-accent-teal focus:outline-none"
+              placeholder="Search by tournament, venue or city"
+              value={query}
+              onChange={(e) => onQuery(e.target.value)}
+            />
+          </div>
+          <a
+            href="#tournaments"
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-accent-teal px-6 text-sm font-bold uppercase tracking-wide text-navy-950 transition-[filter] hover:brightness-110"
+          >
+            Browse events <ArrowRight size={15} />
+          </a>
+        </div>
+
+        <div className="mt-4 text-[13px] text-ink-3">
+          Running one yourself?{" "}
+          <Link to={session ? "/organizer" : "/host"} className="font-semibold text-accent-teal hover:underline">
+            Host a tournament on MatchDay
+          </Link>
         </div>
       </div>
     </section>
   );
 }
 
-function LiveShowcase({ tournament, matches, courts }) {
+/* ── Live strip ─────────────────────────────────────────────────────────
+   Only rendered when a tournament really is live. The counts are actual
+   row counts from the live tournament's matches and courts. */
+function LiveStrip({ tournament, matches, courts }) {
   const live = matches.filter((m) => m.status === "LIVE");
   const completed = matches.filter((m) => m.status === "COMPLETED" || m.status === "WALKOVER");
+  const accent = sportAccent(tournament.sport);
+
   return (
-    <Reveal className="relative my-16 overflow-hidden rounded-2xl border border-line bg-surface/70 p-6 backdrop-blur-sm sm:p-8">
-      <CourtGeometry />
-      <div className="relative">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-widest text-accent-teal">Tournament live</div>
-            <h3 className="text-xl font-bold text-ink">{tournament.name}</h3>
-          </div>
-          <LivePulse />
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {[
-            { label: "Courts", value: courts.length },
-            { label: "Matches", value: matches.length },
-            { label: "Live now", value: live.length },
-            { label: "Completed", value: completed.length },
-          ].map((s) => (
-            <div key={s.label} className="rounded-lg border border-line bg-surface-2/60 p-3 text-center">
-              <div className="font-display text-3xl font-bold text-ink">{s.value}</div>
-              <div className="text-[11px] uppercase tracking-wide text-ink-3">{s.label}</div>
+    <section className="mt-10">
+      <SectionHeader
+        eyebrow="Happening now"
+        title="Live on court"
+        action={
+          <Link to={`/t/${tournament.slug}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-accent-teal hover:underline">
+            Watch <ArrowRight size={14} />
+          </Link>
+        }
+      />
+      <Link to={`/t/${tournament.slug}`} className="block">
+        <div
+          className="md-card md-card-link md-edge md-live-surface p-5 pl-6"
+          style={{ "--md-edge": "var(--color-live)" }}
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="mb-1.5 flex items-center gap-2">
+                <SportIcon sport={tournament.sport} className="h-4 w-4" style={{ color: accent }} />
+                <span className="md-eyebrow" style={{ color: accent }}>{sportMeta(tournament.sport).label}</span>
+              </div>
+              <h3 className="md-display text-2xl text-ink sm:text-3xl">{tournament.name}</h3>
+              <div className="mt-1 text-[13px] text-ink-2">
+                {[tournament.venue, tournament.location].filter(Boolean).join(" · ")}
+              </div>
             </div>
-          ))}
+            <StatusPill status="live" />
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              { label: "On court now", value: live.length, live: true },
+              { label: "Courts", value: courts.length },
+              { label: "Completed", value: completed.length },
+              { label: "Total matches", value: matches.length },
+            ].map((s) => (
+              <div key={s.label} className="rounded-lg border border-line bg-surface-2/60 px-3 py-2.5">
+                <div
+                  className="md-score text-3xl"
+                  style={{ color: s.live && s.value > 0 ? "var(--color-live)" : "var(--color-ink)" }}
+                >
+                  {s.value}
+                </div>
+                <div className="md-eyebrow mt-0.5">{s.label}</div>
+              </div>
+            ))}
+          </div>
         </div>
-        <Link to={`/t/${tournament.slug}`} className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-accent-teal hover:underline">
-          Watch it live <ArrowRight size={14} />
-        </Link>
-      </div>
-    </Reveal>
-  );
-}
-
-function NoLiveTournament() {
-  return (
-    <Reveal className="relative my-16 overflow-hidden rounded-2xl border border-line bg-surface p-8 text-center">
-      <div className="mb-2 text-sm font-semibold uppercase tracking-widest text-accent-teal">Tournament live</div>
-      <h3 className="text-xl font-bold text-ink">No tournament is live right now</h3>
-      <p className="mx-auto mt-1 max-w-md text-sm text-ink-2">Browse what's upcoming, or start your own — the next live match could be yours.</p>
-    </Reveal>
-  );
-}
-
-function EveryoneCanPlay() {
-  const figures = [0.6, 0.85, 1, 0.75, 0.9, 0.65, 0.8];
-  return (
-    <section className="relative my-16 overflow-hidden rounded-2xl border border-line bg-surface/70 px-6 py-16 text-center backdrop-blur-sm">
-      <div className="relative mx-auto mb-6 flex h-20 items-end justify-center gap-3">
-        {figures.map((scale, i) => (
-          <motion.svg
-            key={i}
-            viewBox="0 0 24 24"
-            fill="none"
-            style={{ height: 56 * scale, width: 28 * scale }}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 0.5 + scale * 0.3, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: i * 0.08 }}
-          >
-            <circle cx="12" cy="5" r="3.2" stroke="var(--color-accent-teal)" strokeWidth="1.5" />
-            <path d="M6 21c0-4 2.5-7 6-7s6 3 6 7" stroke="var(--color-accent-teal)" strokeWidth="1.5" strokeLinecap="round" />
-          </motion.svg>
-        ))}
-      </div>
-      <Reveal>
-        <h2 className="text-2xl font-bold text-ink sm:text-3xl">Everyone can play.</h2>
-        <p className="mx-auto mt-2 max-w-lg text-sm text-ink-2">
-          No matter your age, background, or skill level — there's a place for you on the court. Different people, different sports, one competition.
-        </p>
-      </Reveal>
-      <Reveal delay={0.15} className="mt-6 flex justify-center">
-        <img src={logo} alt="MatchDay" className="h-14 w-14 rounded-xl" />
-      </Reveal>
+      </Link>
     </section>
   );
 }
 
-function SportsUniverse() {
+/* ── Curated rail ───────────────────────────────────────────────────────
+   A horizontally scrolling row on a phone, a grid on a laptop. Renders
+   nothing at all when its list is empty — an empty "Closing soon" shelf
+   would be a worse signal than no shelf. */
+function Rail({ eyebrow, title, icon: Icon, tone, tournaments }) {
+  if (!tournaments.length) return null;
   return (
-    <section className="my-16 text-center">
-      <Reveal className="mb-8">
-        <h2 className="text-2xl font-bold text-ink sm:text-3xl">One platform. Every sport.</h2>
-        <p className="mt-1 text-sm text-ink-2">Badminton is live today. More sports are on the way.</p>
-      </Reveal>
-      <Reveal className="relative mx-auto aspect-square w-full max-w-md">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-line bg-surface shadow-lg">
-            <img src={logo} alt="" className="h-14 w-14 rounded-lg" />
+    <section className="mt-12">
+      <SectionHeader
+        eyebrow={eyebrow}
+        title={
+          <span className="flex items-center gap-2">
+            {Icon && <Icon size={20} style={{ color: tone }} aria-hidden="true" />}
+            {title}
+          </span>
+        }
+      />
+      {/* One markup path, two layouts: the rail scrolls below `sm`, and the
+          same children lay out as a grid from `sm` up. */}
+      <div className="md-rail -mx-4 px-4 sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-3 sm:overflow-visible sm:px-0 lg:grid-cols-3">
+        {tournaments.map((t) => (
+          <div key={t.id} className="w-[78vw] max-w-[320px] sm:w-auto sm:max-w-none">
+            <TournamentCard t={t} variant="featured" />
           </div>
-        </div>
-        {SPORTS.map((s) => {
-          const rad = (s.angle * Math.PI) / 180;
-          const x = 50 + Math.cos(rad) * 38;
-          const y = 50 + Math.sin(rad) * 38;
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ── Sport chips ───────────────────────────────────────────────────────
+   The primary filter, and the clearest statement that MatchDay is not a
+   badminton app. A sport with no tournaments is shown disabled with its
+   real count rather than hidden — that is honest about coverage without
+   pretending the sport does not exist. */
+function SportChips({ value, onChange, counts }) {
+  const all = ["ALL", ...SPORT_KEYS];
+  return (
+    <div className="md-rail -mx-4 px-4 pb-1" role="group" aria-label="Filter by sport">
+      {all.map((key) => {
+        const on = value === key;
+        const count = key === "ALL"
+          ? Object.values(counts).reduce((a, b) => a + b, 0)
+          : counts[key] || 0;
+        const accent = key === "ALL" ? "var(--color-accent-teal)" : sportAccent(key);
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onChange(key)}
+            disabled={count === 0 && key !== "ALL" && !on}
+            aria-pressed={on}
+            className={cx(
+              "flex items-center gap-2 rounded-lg border px-3.5 py-2.5 text-[13px] font-semibold transition-colors",
+              on
+                ? "border-transparent text-navy-950"
+                : count === 0
+                  ? "border-line-soft text-ink-3 opacity-45"
+                  : "border-line bg-surface text-ink-2 hover:border-accent-teal/50 hover:text-ink"
+            )}
+            style={on ? { background: accent } : undefined}
+          >
+            {key !== "ALL" && <SportIcon sport={key} className="h-4 w-4" />}
+            {key === "ALL" ? "All sports" : sportMeta(key).label}
+            <span className={cx("text-[11px] tabular-nums", on ? "opacity-70" : "text-ink-3")}>{count}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── Brand statement ────────────────────────────────────────────────────
+   Was a row of seven human figures animating in on scroll. It is now a
+   still composition — the sentence is the point, and it reads better
+   without seven things sliding underneath it. */
+function EveryoneCanPlay() {
+  return (
+    <section className="md-hatch relative mt-16 overflow-hidden rounded-2xl border border-line bg-gradient-to-b from-navy-800 to-surface px-6 py-14 text-center">
+      <img src={logo} alt="" className="mx-auto mb-6 h-14 w-14 rounded-xl" width="56" height="56" />
+      <h2 className="md-display md-h2 text-ink">Everyone can play.</h2>
+      <p className="mx-auto mt-3 max-w-lg text-[15px] leading-relaxed text-ink-2">
+        No matter your age, background or skill level, there is a place for you on the
+        court. Different people, different sports, one competition.
+      </p>
+    </section>
+  );
+}
+
+/* ── Sport coverage ─────────────────────────────────────────────────────
+   Reads its truth from the sport registry rather than a hardcoded list, so
+   the moment a sport gains a real scoring engine it moves out of "coming
+   soon" here with no edit to this file. */
+function SportCoverage() {
+  const sports = SPORT_KEYS.map((k) => ({ key: k, ...sportMeta(k) }));
+  return (
+    <section className="mt-16">
+      <SectionHeader eyebrow="Built for every sport" title="One platform. Every competition." />
+      <p className="-mt-1 mb-5 max-w-xl text-sm text-ink-2">
+        Draws, seeding, scheduling, check-in and rankings are sport-agnostic and work
+        today. Scoring is the part that differs per sport, and it ships one sport at a time.
+      </p>
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+        {sports.map((s) => {
+          const ready = s.hasScoringEngine;
           return (
             <div
-              key={s.name}
-              className="absolute -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${x}%`, top: `${y}%` }}
-              title={s.active ? s.name : `${s.name} — coming soon`}
-            >
-              {s.active ? (
-                <a href="#tournaments" className="group flex flex-col items-center gap-1.5 rounded-lg border border-accent-teal/30 bg-accent-teal/10 px-2.5 py-2 transition-all hover:border-accent-teal/60 hover:bg-accent-teal/20">
-                  <SportIcon sport={s.key} className="h-6 w-6 text-accent-teal transition-transform group-hover:scale-110" />
-                  <span className="text-xs font-semibold text-ink">{s.name}</span>
-                </a>
-              ) : (
-                <div className="flex cursor-default flex-col items-center gap-1.5 px-2.5 py-2 opacity-40 transition-opacity hover:opacity-70">
-                  <SportIcon sport={s.key} className="h-6 w-6 text-ink-3" />
-                  <span className="text-xs font-medium text-ink-3">{s.name}</span>
-                  <span className="text-[9px] uppercase tracking-wide text-ink-3">Soon</span>
-                </div>
+              key={s.key}
+              className={cx(
+                "md-card md-edge flex items-center gap-3 px-3.5 py-3 pl-5",
+                !ready && "opacity-55"
               )}
+              style={{ "--md-edge": ready ? sportAccent(s.key) : "var(--color-line)" }}
+            >
+              <SportIcon
+                sport={s.key}
+                className="h-6 w-6 shrink-0"
+                style={{ color: ready ? sportAccent(s.key) : "var(--color-ink-3)" }}
+              />
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-ink">{s.label}</div>
+                <div className="md-eyebrow mt-0.5" style={ready ? { color: "var(--color-open)" } : undefined}>
+                  {ready ? "Live" : "Scoring soon"}
+                </div>
+              </div>
             </div>
           );
         })}
-      </Reveal>
+      </div>
     </section>
   );
 }
@@ -187,25 +355,13 @@ export default function PublicDiscovery() {
   useDocumentMeta();
   const [liveData, setLiveData] = useState(undefined); // undefined = loading, null = none live
   const { session } = useAuth();
-  // Discovery filters. Every one of these reads a real column or a real
-  // per-category aggregate — nothing filters on a field the data doesn't have.
-  const [filters, setFilters] = useState({
-    q: "", sport: "ALL", status: "ALL", category: "ALL", age: "ALL",
-    gender: "ALL", grade: "ALL", maxFee: "", fromDate: "", toDate: "", openOnly: false,
-  });
-  const setFilter = (k, v) => setFilters((f) => ({ ...f, [k]: v }));
-  const resetFilters = () => setFilters({
-    q: "", sport: "ALL", status: "ALL", category: "ALL", age: "ALL",
-    gender: "ALL", grade: "ALL", maxFee: "", fromDate: "", toDate: "", openOnly: false,
-  });
-  const [showAllFilters, setShowAllFilters] = useState(false);
 
-  // Replay the hero's entrance animation every time it scrolls back into
-  // view, not just on first page load — bump a key to force a remount.
-  const heroRef = useRef(null);
-  const heroInView = useInView(heroRef, { amount: 0.6 });
-  const [heroPlay, setHeroPlay] = useState(0);
-  useEffect(() => { if (heroInView) setHeroPlay((k) => k + 1); }, [heroInView]);
+  // Discovery filters. Every one reads a real column or a real per-category
+  // aggregate — nothing filters on a field the data does not have.
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const setFilter = (k, v) => setFilters((f) => ({ ...f, [k]: v }));
+  const resetFilters = () => setFilters(EMPTY_FILTERS);
+  const [showAllFilters, setShowAllFilters] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -224,302 +380,308 @@ export default function PublicDiscovery() {
     return () => { cancelled = true; };
   }, []);
 
-  const liveCount = tournaments?.filter((t) => t.status === "LIVE").length ?? 0;
-  const openCount = tournaments?.filter((t) => t.status === "REGISTRATION_OPEN").length ?? 0;
+  // Memoised so the derived rails below have a stable dependency — a fresh
+  // [] each render would recompute every rail on every keystroke in search.
+  const all = useMemo(() => tournaments || [], [tournaments]);
+  const liveCount = all.filter((t) => t.status === "LIVE").length;
+  const openCount = all.filter((t) => t.status === "REGISTRATION_OPEN").length;
+
+  const sportCounts = useMemo(() => {
+    const c = {};
+    all.forEach((t) => { const k = t.sport || "badminton"; c[k] = (c[k] || 0) + 1; });
+    return c;
+  }, [all]);
+
+  /* The curated rails. Each is a straightforward derivation of real fields:
+       closing soon → registration_deadline within the next 7 days, and
+                      registration actually still open
+       almost full  → the registration state engine already classifies this
+       open now     → can register, and not in either rail above  */
+  const rails = useMemo(() => {
+    const open = all.filter((t) => tournamentRegistrationState(t, t.events).canRegister);
+
+    const closingSoon = open
+      .filter((t) => {
+        const d = daysUntil(t.registration_deadline);
+        return d != null && d >= 0 && d <= 7;
+      })
+      .sort((a, b) => (a.registration_deadline || "").localeCompare(b.registration_deadline || ""));
+
+    const almostFull = open
+      .filter((t) => !closingSoon.includes(t))
+      .filter((t) => {
+        const key = tournamentRegistrationState(t, t.events).key;
+        return key === "ALMOST_FULL" || key === "WAITLIST";
+      });
+
+    const openNow = open
+      .filter((t) => !closingSoon.includes(t) && !almostFull.includes(t))
+      .sort((a, b) => (a.start_date || "").localeCompare(b.start_date || ""));
+
+    return {
+      // The only urgency cue on the page, and it is a real date: the
+      // tournament's own registration_deadline, counted in whole days.
+      closingSoon: closingSoon.slice(0, 3).map((t) => {
+        const d = daysUntil(t.registration_deadline);
+        return {
+          ...toCardModel(t),
+          note: d === 0 ? "Entries close today" : `Entries close in ${d} day${d === 1 ? "" : "s"}`,
+        };
+      }),
+      almostFull: almostFull.slice(0, 3).map(toCardModel),
+      openNow: openNow.slice(0, 3).map(toCardModel),
+    };
+  }, [all]);
+
+  // Category codes carry the gender split: MS/MD are men's, WS/WD are
+  // women's, XD is mixed. That is the only gender information a tournament
+  // actually has, so the filter reads it from there.
+  const genderOf = (code) => (code === "XD" ? "X" : code.startsWith("M") ? "M" : "W");
+
+  const filtered = all.filter((t) => {
+    if (filters.sport !== "ALL" && (t.sport || "badminton") !== filters.sport) return false;
+    if (filters.status !== "ALL" && t.status !== filters.status) return false;
+    if (filters.openOnly && !tournamentRegistrationState(t, t.events).canRegister) return false;
+    if (filters.q) {
+      const q = filters.q.toLowerCase();
+      const hay = `${t.name} ${t.location || ""} ${t.venue || ""} ${t.organizer_name || ""}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (filters.fromDate && (!t.start_date || t.start_date < filters.fromDate)) return false;
+    if (filters.toDate && (!t.start_date || t.start_date > filters.toDate)) return false;
+    if (filters.maxFee !== "" && t.minFee > Number(filters.maxFee)) return false;
+
+    // The remaining filters are about the categories a tournament offers, so
+    // a tournament matches when at least one of its categories satisfies all
+    // of them together.
+    const catFilters = ["category", "age", "gender", "grade"].some((k) => filters[k] !== "ALL");
+    if (catFilters) {
+      const ok = (t.events || []).some((ev) =>
+        (filters.category === "ALL" || ev.category === filters.category) &&
+        (filters.age === "ALL" || (ev.age_group || "OPEN") === filters.age) &&
+        (filters.gender === "ALL" || genderOf(ev.category) === filters.gender) &&
+        (filters.grade === "ALL" || ev.skill_grade === filters.grade)
+      );
+      if (!ok) return false;
+    }
+    return true;
+  });
+
+  const activeFilterCount = Object.entries(filters).filter(([k, v]) => {
+    if (k === "sport" || k === "q") return false;
+    return v !== EMPTY_FILTERS[k];
+  }).length;
 
   return (
     <div>
-      {/* ── Hero ───────────────────────────────────────────────────────── */}
-      {/* The app-wide <SportsBackground/> already paints the court, rally arcs
-          and motes behind everything, so the hero stays transparent rather
-          than stacking a second set of the same artwork on top of it. */}
-      <div ref={heroRef} className="relative -mx-4 -mt-6 flex min-h-[85vh] flex-col items-center justify-center overflow-hidden px-6 py-20 text-center sm:px-10">
-        <div key={heroPlay} className="relative flex flex-col items-center">
-          <LogoAssembly size={140} />
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 1.3 }}
-            className="wordmark mt-4 text-3xl uppercase leading-none text-white sm:text-4xl"
-          >
-            Matchday
-          </motion.div>
-          <motion.h1
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 1.45 }}
-            className="mx-auto mt-5 max-w-3xl text-3xl font-bold leading-tight text-white sm:text-5xl"
-          >
-            Everyone can play.
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 1.55 }}
-            className="mx-auto mt-3 max-w-xl text-sm text-ink-2 sm:text-base"
-          >
-            One platform for every match, every tournament, and every competitor.
-          </motion.p>
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 1.65 }}
-            className="mt-7 flex flex-wrap items-center justify-center gap-3"
-          >
-            <Link to={session ? "/organizer" : "/signup"} className="inline-flex items-center gap-1.5 rounded-md bg-accent-teal px-5 py-2.5 text-sm font-semibold text-navy-950 hover:brightness-110">
-              Create a Tournament <ArrowRight size={15} />
-            </Link>
-            <a href="#tournaments" className="inline-flex items-center gap-1.5 rounded-md border border-white/20 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white hover:bg-white/10">
-              <Compass size={15} /> Explore Tournaments
-            </a>
-          </motion.div>
-          {tournaments && (liveCount > 0 || openCount > 0) && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5, delay: 1.8 }}
-              className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs font-medium uppercase tracking-wide text-ink-3"
-            >
-              {liveCount > 0 && <span className="flex items-center gap-1.5 text-white"><LivePulse label={`${liveCount} live now`} /></span>}
-              {openCount > 0 && <span>{openCount} open for registration</span>}
-            </motion.div>
-          )}
-        </div>
-      </div>
+      <Hero
+        liveCount={liveCount}
+        openCount={openCount}
+        query={filters.q}
+        onQuery={(v) => setFilter("q", v)}
+        session={session}
+      />
 
-      <HowItWorks />
-
-      {liveData ? <LiveShowcase tournament={liveData.tournament} matches={liveData.matches} courts={liveData.courts} /> : liveData === null ? <NoLiveTournament /> : null}
-
-      <EveryoneCanPlay />
-      <SportsUniverse />
-
-      {/* ── Tournament listing ────────────────────────────────────────── */}
-      <div id="tournaments" className="mb-5 scroll-mt-20">
-        <h2 className="text-lg font-bold text-ink">Find a tournament</h2>
-        <p className="mt-0.5 text-sm text-ink-2">Browse live and upcoming tournaments — no account needed to follow along.</p>
-      </div>
-
-      {tournaments && tournaments.length > 0 && (
-        <div className="mb-4 space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-[180px] flex-1">
-              <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-3" />
-              <input className={`${inputCls} pl-8`} placeholder="Search by name, venue or city"
-                value={filters.q} onChange={(e) => setFilter("q", e.target.value)} />
-            </div>
-            {/* `inputCls` opens with `w-full`; appending a bare `w-auto` after
-                it does NOT reliably win (Tailwind utilities of equal
-                specificity are ordered by the compiled stylesheet, not by
-                position in the class string), which was forcing both selects
-                to full width and wrapping the whole row onto separate lines
-                even at desktop widths (audit finding F2). `sm:w-auto` is the
-                actual fix: Tailwind always emits responsive variants after
-                their bare counterpart, so this reliably overrides w-full from
-                the sm breakpoint (640px) up, while phones narrower than that
-                keep the full-width, stacked layout that already suits them. */}
-            <select className={`${inputCls} sm:w-auto`} value={filters.sport} onChange={(e) => setFilter("sport", e.target.value)}>
-              <option value="ALL">All sports</option>
-              {SPORT_KEYS.map((s) => <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
-            </select>
-            <select className={`${inputCls} sm:w-auto`} value={filters.status} onChange={(e) => setFilter("status", e.target.value)}>
-              <option value="ALL">Any status</option>
-              <option value="LIVE">Live</option>
-              <option value="REGISTRATION_OPEN">Registration open</option>
-              <option value="REGISTRATION_CLOSED">Registration closed</option>
-              <option value="COMPLETED">Completed</option>
-            </select>
-            <button onClick={() => setShowAllFilters((s) => !s)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-line bg-surface px-3 py-2 text-xs font-medium text-ink-2 hover:text-ink">
-              <SlidersHorizontal size={13} /> {showAllFilters ? "Fewer filters" : "More filters"}
-            </button>
-          </div>
-
-          {showAllFilters && (
-            <div className="grid gap-2 rounded-lg border border-line bg-surface p-3 sm:grid-cols-3 lg:grid-cols-4">
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-medium text-ink-2">Category</span>
-                <select className={inputCls} value={filters.category} onChange={(e) => setFilter("category", e.target.value)}>
-                  <option value="ALL">Any category</option>
-                  {Object.entries(CATEGORY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                </select>
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-medium text-ink-2">Age group</span>
-                <select className={inputCls} value={filters.age} onChange={(e) => setFilter("age", e.target.value)}>
-                  <option value="ALL">Any age</option>
-                  {AGE_GROUPS.map((a) => <option key={a} value={a}>{a === "OPEN" ? "Open" : a}</option>)}
-                </select>
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-medium text-ink-2">Gender</span>
-                <select className={inputCls} value={filters.gender} onChange={(e) => setFilter("gender", e.target.value)}>
-                  <option value="ALL">Any</option>
-                  <option value="M">Men&apos;s events</option>
-                  <option value="W">Women&apos;s events</option>
-                  <option value="X">Mixed events</option>
-                </select>
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-medium text-ink-2">Skill grade</span>
-                <select className={inputCls} value={filters.grade} onChange={(e) => setFilter("grade", e.target.value)}>
-                  <option value="ALL">Any grade</option>
-                  {SKILL_GRADES.map((g) => <option key={g} value={g}>Grade {g}</option>)}
-                </select>
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-medium text-ink-2">Starting on or after</span>
-                <input type="date" className={inputCls} value={filters.fromDate} onChange={(e) => setFilter("fromDate", e.target.value)} />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-medium text-ink-2">Starting on or before</span>
-                <input type="date" className={inputCls} value={filters.toDate} onChange={(e) => setFilter("toDate", e.target.value)} />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-medium text-ink-2">Max entry fee (₹)</span>
-                <input type="number" min="0" placeholder="Any" className={inputCls}
-                  value={filters.maxFee} onChange={(e) => setFilter("maxFee", e.target.value)} />
-              </label>
-              <label className="flex items-end gap-2 pb-2">
-                <input type="checkbox" className="h-4 w-4 accent-[var(--color-accent-teal)]"
-                  checked={filters.openOnly} onChange={(e) => setFilter("openOnly", e.target.checked)} />
-                <span className="text-xs text-ink-2">Only with spots available</span>
-              </label>
-              <div className="flex items-end sm:col-span-3 lg:col-span-4">
-                <button onClick={resetFilters} className="text-xs font-medium text-accent-teal hover:underline">Clear all filters</button>
-              </div>
-            </div>
-          )}
-        </div>
+      {liveData && (
+        <LiveStrip tournament={liveData.tournament} matches={liveData.matches} courts={liveData.courts} />
       )}
 
-      {(() => {
-        // Category codes carry the gender split: MS/MD are men's, WS/WD are
-        // women's, XD is mixed. That is the only gender information a
-        // tournament actually has, so the filter reads it from there.
-        const genderOf = (code) => (code === "XD" ? "X" : code.startsWith("M") ? "M" : "W");
+      <Rail
+        eyebrow="Enter before it closes"
+        title="Closing soon"
+        icon={Timer}
+        tone="var(--color-closing)"
+        tournaments={rails.closingSoon}
+      />
+      <Rail
+        eyebrow="Filling up"
+        title="Almost full"
+        icon={Flame}
+        tone="var(--color-closing)"
+        tournaments={rails.almostFull}
+      />
+      <Rail
+        eyebrow="Take your pick"
+        title="Open for entry"
+        icon={Radio}
+        tone="var(--color-open)"
+        tournaments={rails.openNow}
+      />
 
-        const filtered = (tournaments || []).filter((t) => {
-          if (filters.sport !== "ALL" && (t.sport || "badminton") !== filters.sport) return false;
-          if (filters.status !== "ALL" && t.status !== filters.status) return false;
-          if (filters.openOnly && !tournamentRegistrationState(t, t.events).canRegister) return false;
-          if (filters.q) {
-            const q = filters.q.toLowerCase();
-            const hay = `${t.name} ${t.location || ""} ${t.venue || ""} ${t.organizer_name || ""}`.toLowerCase();
-            if (!hay.includes(q)) return false;
+      {/* ── Full listing ─────────────────────────────────────────────── */}
+      <section id="tournaments" className="mt-16 scroll-mt-20">
+        <SectionHeader
+          eyebrow="Every event"
+          title="Find a tournament"
+          action={
+            tournaments ? (
+              <span className="text-xs text-ink-3 tabular-nums">
+                {filtered.length} of {all.length}
+              </span>
+            ) : null
           }
-          if (filters.fromDate && (!t.start_date || t.start_date < filters.fromDate)) return false;
-          if (filters.toDate && (!t.start_date || t.start_date > filters.toDate)) return false;
-          if (filters.maxFee !== "" && t.minFee > Number(filters.maxFee)) return false;
+        />
 
-          // The remaining filters are about the categories a tournament
-          // offers, so a tournament matches when at least one of its
-          // categories satisfies all of them together.
-          const catFilters = ["category", "age", "gender", "grade"].some((k) => filters[k] !== "ALL");
-          if (catFilters) {
-            const ok = (t.events || []).some((ev) =>
-              (filters.category === "ALL" || ev.category === filters.category) &&
-              (filters.age === "ALL" || (ev.age_group || "OPEN") === filters.age) &&
-              (filters.gender === "ALL" || genderOf(ev.category) === filters.gender) &&
-              (filters.grade === "ALL" || ev.skill_grade === filters.grade)
-            );
-            if (!ok) return false;
-          }
-          return true;
-        });
+        {tournaments && all.length > 0 && (
+          <div className="mb-5 space-y-3">
+            <SportChips
+              value={filters.sport}
+              onChange={(v) => setFilter("sport", v)}
+              counts={sportCounts}
+            />
 
-        if (!tournaments) return <BrandLoader />;
-        if (tournaments.length === 0) return <EmptyState icon={Trophy} title="Your next match starts here" hint="No tournaments published yet — check back soon." />;
-        if (filtered.length === 0) return <EmptyState icon={Search} title="No tournaments match those filters" hint="Try widening the date range, category or fee." action={<button onClick={resetFilters} className="mt-2 text-sm font-medium text-accent-teal hover:underline">Clear all filters</button>} />;
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                className={`${inputCls} sm:w-auto`}
+                aria-label="Tournament status"
+                value={filters.status}
+                onChange={(e) => setFilter("status", e.target.value)}
+              >
+                <option value="ALL">Any status</option>
+                <option value="LIVE">Live</option>
+                <option value="REGISTRATION_OPEN">Registration open</option>
+                <option value="REGISTRATION_CLOSED">Registration closed</option>
+                <option value="COMPLETED">Completed</option>
+              </select>
 
-        return (
-        <>
-          <div className="mb-2 text-xs text-ink-3">
-            {filtered.length} of {tournaments.length} tournament{tournaments.length === 1 ? "" : "s"}
+              <label className="flex items-center gap-2 rounded-md border border-line bg-surface px-3 py-2 text-xs font-medium text-ink-2">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-[var(--color-accent-teal)]"
+                  checked={filters.openOnly}
+                  onChange={(e) => setFilter("openOnly", e.target.checked)}
+                />
+                Spots available
+              </label>
+
+              <button
+                onClick={() => setShowAllFilters((s) => !s)}
+                aria-expanded={showAllFilters}
+                className={cx(
+                  "inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-semibold transition-colors",
+                  activeFilterCount > 0
+                    ? "border-accent-teal/50 bg-accent-teal/10 text-accent-teal"
+                    : "border-line bg-surface text-ink-2 hover:text-ink"
+                )}
+              >
+                <SlidersHorizontal size={13} />
+                Filters
+                {activeFilterCount > 0 && <span className="tabular-nums">({activeFilterCount})</span>}
+              </button>
+
+              {(activeFilterCount > 0 || filters.sport !== "ALL" || filters.q) && (
+                <button
+                  onClick={resetFilters}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-ink-3 hover:text-ink"
+                >
+                  <X size={12} /> Clear
+                </button>
+              )}
+            </div>
+
+            {showAllFilters && (
+              <div className="md-card grid gap-3 p-4 sm:grid-cols-3 lg:grid-cols-4">
+                <label className="block">
+                  <span className="md-eyebrow mb-1.5 block">Category</span>
+                  <select className={inputCls} value={filters.category} onChange={(e) => setFilter("category", e.target.value)}>
+                    <option value="ALL">Any category</option>
+                    {Object.entries(CATEGORY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="md-eyebrow mb-1.5 block">Age group</span>
+                  <select className={inputCls} value={filters.age} onChange={(e) => setFilter("age", e.target.value)}>
+                    <option value="ALL">Any age</option>
+                    {AGE_GROUPS.map((a) => <option key={a} value={a}>{a === "OPEN" ? "Open" : a}</option>)}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="md-eyebrow mb-1.5 block">Gender</span>
+                  <select className={inputCls} value={filters.gender} onChange={(e) => setFilter("gender", e.target.value)}>
+                    <option value="ALL">Any</option>
+                    <option value="M">Men&apos;s events</option>
+                    <option value="W">Women&apos;s events</option>
+                    <option value="X">Mixed events</option>
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="md-eyebrow mb-1.5 block">Skill grade</span>
+                  <select className={inputCls} value={filters.grade} onChange={(e) => setFilter("grade", e.target.value)}>
+                    <option value="ALL">Any grade</option>
+                    {SKILL_GRADES.map((g) => <option key={g} value={g}>Grade {g}</option>)}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="md-eyebrow mb-1.5 block">Starting on or after</span>
+                  <input type="date" className={inputCls} value={filters.fromDate} onChange={(e) => setFilter("fromDate", e.target.value)} />
+                </label>
+                <label className="block">
+                  <span className="md-eyebrow mb-1.5 block">Starting on or before</span>
+                  <input type="date" className={inputCls} value={filters.toDate} onChange={(e) => setFilter("toDate", e.target.value)} />
+                </label>
+                <label className="block">
+                  <span className="md-eyebrow mb-1.5 block">Max entry fee (₹)</span>
+                  <input type="number" min="0" placeholder="Any" className={inputCls}
+                    value={filters.maxFee} onChange={(e) => setFilter("maxFee", e.target.value)} />
+                </label>
+                <div className="flex items-end sm:col-span-3 lg:col-span-4">
+                  <button onClick={resetFilters} className="text-xs font-semibold text-accent-teal hover:underline">
+                    Clear all filters
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-          <StaggerList className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        )}
+
+        {!tournaments ? (
+          <CardSkeletonGrid count={6} />
+        ) : all.length === 0 ? (
+          <EmptyState icon={Trophy} title="Your next match starts here" hint="No tournaments published yet — check back soon." />
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon={Search}
+            title="No tournaments match those filters"
+            hint="Try widening the date range, category or fee."
+            action={<button onClick={resetFilters} className="mt-2 text-sm font-semibold text-accent-teal hover:underline">Clear all filters</button>}
+          />
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((t) => {
-              const deadlinePassed = t.registration_deadline && t.registration_deadline < todayLocal();
-              // Best availability across this tournament's categories, using
-              // the same rules the registration form and RLS apply.
-              const reg = tournamentRegistrationState(t, t.events);
+              const model = toCardModel(t);
               return (
-                <StaggerItem key={t.id}>
-                  <Link to={`/t/${t.slug}`} className="flex h-full flex-col rounded-lg border border-line bg-surface p-4 text-left shadow-sm transition-all hover:border-accent-teal/50 hover:shadow-md">
-                    <div className="mb-2 flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-1.5 font-semibold text-ink">
-                        <SportIcon sport={t.sport} className="h-4 w-4 shrink-0 text-accent-teal" />
-                        {t.name}
-                      </div>
-                      <Badge tone={TOURNAMENT_STATUS_META[t.status].tone}>{t.status === "LIVE" ? <><Radio size={10} className="animate-pulse" /> Live</> : TOURNAMENT_STATUS_META[t.status].label}</Badge>
-                    </div>
-
-                    {t.description && <p className="mb-2 line-clamp-2 text-xs text-ink-2">{t.description}</p>}
-
-                    <div className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-2">
-                      <span className="flex items-center gap-1"><MapPin size={11} />{t.location || t.venue}</span>
-                      <span className="flex items-center gap-1"><Calendar size={11} />{fmtDateRange(t.start_date, t.end_date)}</span>
-                    </div>
-
-                    {/* Categories offered */}
-                    {t.events.length > 0 && (
-                      <div className="mb-2 flex flex-wrap gap-1">
-                        {t.events.slice(0, 4).map((ev) => (
-                          <span key={ev.id} className="rounded border border-line bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-ink-2">
-                            {divisionLabel(ev)}
-                          </span>
-                        ))}
-                        {t.events.length > 4 && (
-                          <span className="rounded border border-line bg-surface-2 px-1.5 py-0.5 text-[10px] text-ink-3">
-                            +{t.events.length - 4} more
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-line-soft pt-2 text-xs">
-                      <span className="flex items-center gap-1 font-medium text-ink">
-                        <IndianRupee size={11} />
-                        {t.maxFee === 0 ? "Free entry" : t.minFee === t.maxFee ? inr(t.minFee) : `${inr(t.minFee)}–${inr(t.maxFee)}`}
-                      </span>
-                      <span className={cx("flex items-center gap-1",
-                        reg.key === "OPEN" ? "text-accent-teal"
-                          : reg.key === "ALMOST_FULL" || reg.key === "WAITLIST" ? "text-amber-300" : "text-ink-3")}>
-                        <Users size={11} />
-                        {reg.key === "OPEN" || reg.key === "ALMOST_FULL"
-                          ? `${t.spotsLeft} spot${t.spotsLeft === 1 ? "" : "s"} left`
-                          : reg.key === "WAITLIST" ? "Waitlist only"
-                          : reg.label}
-                      </span>
-                    </div>
-
-                    {reg.canRegister && t.registration_deadline && (
-                      <div className={cx("mt-1 text-[11px]", deadlinePassed ? "text-red-300" : "text-ink-3")}>
-                        {deadlinePassed ? "Deadline passed" : `Register by ${fmtDate(t.registration_deadline)}`}
-                      </div>
-                    )}
-
-                    {/* Every card ends in an unambiguous action. */}
-                    <div className={cx(
-                      "mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs font-semibold",
-                      reg.canRegister ? "bg-accent-teal text-navy-950"
-                        : t.status === "LIVE" ? "border border-red-400/40 bg-red-400/10 text-red-300"
-                        : "border border-line bg-surface-2 text-ink-2"
-                    )}>
-                      {reg.key === "WAITLIST" ? "Join the waitlist"
-                        : reg.canRegister ? "Register now"
-                        : t.status === "LIVE" ? <><Radio size={11} className="animate-pulse" /> Watch live</>
-                        : "View tournament"}
+                <TournamentCard
+                  key={t.id}
+                  t={model}
+                  footer={
+                    <span
+                      className={cx(
+                        "inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wide",
+                        model.reg.canRegister ? "text-accent-teal"
+                          : model.live ? "text-[color:var(--color-live)]"
+                          : "text-ink-3"
+                      )}
+                    >
+                      {model.reg.key === "WAITLIST" ? "Join waitlist"
+                        : model.reg.canRegister ? "Enter now"
+                        : model.live ? "Watch live"
+                        : "View"}
                       <ArrowRight size={12} />
-                    </div>
-                  </Link>
-                </StaggerItem>
+                    </span>
+                  }
+                />
               );
             })}
-          </StaggerList>
-        </>
-        );
-      })()}
+          </div>
+        )}
+
+        {/* Category chips and deadlines are detail a card should not carry —
+            they live on the tournament page. The one exception kept here is
+            the deadline warning, and only while it is genuinely imminent. */}
+      </section>
+
+      <EveryoneCanPlay />
+      <SportCoverage />
     </div>
   );
 }

@@ -52,7 +52,7 @@ function CustomFields({ fields, answers, errors, onChange }) {
   if (!fields.length) return null;
   return (
     <div className="space-y-3">
-      <div className="text-xs font-semibold uppercase tracking-wide text-ink-2">
+      <div className="md-eyebrow">
         {"A few questions from the organizer"}
       </div>
       {fields.map((f) => {
@@ -108,7 +108,7 @@ function CustomFields({ fields, answers, errors, onChange }) {
 function PlayerFields({ label, value, onChange, hint }) {
   return (
     <div className="space-y-3">
-      <div className="text-xs font-semibold uppercase tracking-wide text-ink-2">{label}</div>
+      <div className="md-eyebrow">{label}</div>
       {hint && <p className="-mt-1 text-[11px] text-ink-3">{hint}</p>}
       <Field label="Full name" required>
         <input className={inputCls} value={value.name} onChange={(e) => onChange({ ...value, name: e.target.value })} />
@@ -235,7 +235,7 @@ export default function RegistrationModal({ open, onClose, event, tournament, on
           </div>
 
           <div className="rounded-lg border border-line bg-surface-2 p-3">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">What happens next</div>
+            <div className="mb-2 md-eyebrow">What happens next</div>
             <ol className="space-y-1.5 text-sm text-ink-2">
               <li><span className="font-medium text-ink">1.</span> The organizer reviews and confirms your entry.</li>
               {Number(event.fee_inr) > 0 && (
@@ -301,11 +301,11 @@ export default function RegistrationModal({ open, onClose, event, tournament, on
 
             <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
               <div>
-                <dt className="text-[11px] uppercase tracking-wide text-ink-3">Entry fee</dt>
+                <dt className="md-eyebrow">Entry fee</dt>
                 <dd className="font-semibold text-ink">{Number(event.fee_inr) > 0 ? inr(event.fee_inr) : "Free"}</dd>
               </div>
               <div>
-                <dt className="text-[11px] uppercase tracking-wide text-ink-3">Places</dt>
+                <dt className="md-eyebrow">Places</dt>
                 <dd className="text-ink">
                   {capacity === null ? "…"
                     : willWaitlist ? `Full — ${capacity.waitlisted} on the waitlist`
@@ -314,17 +314,17 @@ export default function RegistrationModal({ open, onClose, event, tournament, on
               </div>
               {tournament?.registration_closes_at ? (
                 <div>
-                  <dt className="text-[11px] uppercase tracking-wide text-ink-3">Registration closes</dt>
+                  <dt className="md-eyebrow">Registration closes</dt>
                   <dd className="text-ink">{fmtDateTime(tournament.registration_closes_at)}</dd>
                 </div>
               ) : tournament?.registration_deadline ? (
                 <div>
-                  <dt className="text-[11px] uppercase tracking-wide text-ink-3">Deadline</dt>
+                  <dt className="md-eyebrow">Deadline</dt>
                   <dd className="text-ink">{fmtDate(tournament.registration_deadline)}</dd>
                 </div>
               ) : null}
               <div>
-                <dt className="text-[11px] uppercase tracking-wide text-ink-3">Tournament dates</dt>
+                <dt className="md-eyebrow">Tournament dates</dt>
                 <dd className="flex items-center gap-1 text-ink"><CalendarDays size={12} className="text-ink-3" />{fmtDate(tournament?.start_date)}</dd>
               </div>
             </dl>
@@ -390,7 +390,7 @@ export default function RegistrationModal({ open, onClose, event, tournament, on
       {step === reviewStep && (
         <div className="space-y-3">
           <div className="rounded-lg border border-line bg-surface-2 p-3.5">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">Review your entry</div>
+            <div className="mb-2 md-eyebrow">Review your entry</div>
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between gap-3">
                 <dt className="text-ink-2">Category</dt><dd className="text-right font-medium text-ink">{divisionLabel(event)}</dd>

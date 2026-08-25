@@ -20,7 +20,7 @@ import { Badge, Card } from "./ui/primitives";
 function Metric({ label, value, sub, tone = "ink", icon: Icon }) {
   return (
     <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-ink-3">
+      <div className="flex items-center gap-1.5 md-eyebrow">
         {Icon && <Icon size={11} />} {label}
       </div>
       <div className={cx(
@@ -61,7 +61,7 @@ export default function TournamentHealthPanel({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2">
+        <h3 className="flex items-center gap-1.5 md-eyebrow">
           <Gauge size={13} /> Tournament health
         </h3>
         <Badge tone={statusMeta.tone}>{statusMeta.label}</Badge>
@@ -115,7 +115,7 @@ export default function TournamentHealthPanel({
       {/* ── Attention ───────────────────────────────────────────────────── */}
       {issues.length > 0 ? (
         <div>
-          <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-2">
+          <div className="mb-2 flex items-center gap-1.5 md-eyebrow">
             <AlertTriangle size={12} className="text-amber-400" /> Attention
           </div>
           <div className="space-y-1.5">

@@ -171,7 +171,7 @@ export default function ScorerMode() {
                   </div>
                   {m.status === "LIVE" ? <LivePulse /> : <Badge tone="teal">Ready</Badge>}
                 </div>
-                <div className="text-[11px] uppercase tracking-wide text-ink-3">{CATEGORY_META[ev.category].label} · {matchStageLabel(m, ev)}</div>
+                <div className="md-eyebrow">{CATEGORY_META[ev.category].label} · {matchStageLabel(m, ev)}</div>
                 <div className="mt-1 text-base font-semibold">{entryShort(entriesById[m.entry_a])} <span className="text-ink-3">vs</span> {entryShort(entriesById[m.entry_b])}</div>
               </button>
             );

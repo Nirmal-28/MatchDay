@@ -45,7 +45,7 @@ function MatchRow({ m }) {
       <Link to={m.tournament?.slug ? `/t/${m.tournament.slug}` : "#"} className="text-[11px] text-ink-3 hover:text-accent-teal">
         {m.tournament?.name}
       </Link>
-      <div className="text-[11px] uppercase tracking-wide text-ink-3">
+      <div className="md-eyebrow">
         {divisionLabel(m.event)} · {matchStageLabel(m, m.event)}
       </div>
 
@@ -133,7 +133,7 @@ export default function Officiate() {
   return (
     <div className="space-y-6">
       <div>
-        <div className="text-[11px] font-semibold uppercase tracking-widest text-accent-teal">Officiate</div>
+        <div className="md-eyebrow text-accent-teal">Officiate</div>
         <h1 className="text-2xl font-bold text-ink">Your assigned matches</h1>
         <p className="mt-0.5 text-sm text-ink-2">
           {matches.length} across {new Set(matches.map((m) => m.tournament?.id)).size} tournament

@@ -101,7 +101,7 @@ export default function BrandingPanel({ tournament, notify, onChanged }) {
   return (
     <div className="max-w-2xl space-y-4">
       <Card className="space-y-4 p-5">
-        <div className="text-xs font-semibold uppercase tracking-wide text-ink-2">Identity</div>
+        <div className="md-eyebrow">Identity</div>
         <ImageField
           label="Tournament logo" value={form.logo_url}
           hint="Square works best. Shown beside the tournament name on the public page and venue display."
@@ -118,7 +118,7 @@ export default function BrandingPanel({ tournament, notify, onChanged }) {
       </Card>
 
       <Card className="space-y-3 p-5">
-        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2">
+        <div className="flex items-center gap-1.5 md-eyebrow">
           <Palette size={13} /> Accent colour
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -138,7 +138,7 @@ export default function BrandingPanel({ tournament, notify, onChanged }) {
 
         {/* Live preview of exactly how the accent gets used. */}
         <div className="rounded-lg border border-line bg-surface-2 p-3">
-          <div className="mb-2 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-ink-3">
+          <div className="mb-2 flex items-center gap-1.5 md-eyebrow">
             <Eye size={11} /> Preview
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -161,7 +161,7 @@ export default function BrandingPanel({ tournament, notify, onChanged }) {
       </Card>
 
       <Card className="space-y-3 p-5">
-        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2">
+        <div className="flex items-center gap-1.5 md-eyebrow">
           <Megaphone size={13} /> Announcement
         </div>
         <Field label="Venue announcement" hint="Shown as a banner on the public page and across the top of the venue display. Leave blank to hide.">
@@ -172,7 +172,7 @@ export default function BrandingPanel({ tournament, notify, onChanged }) {
 
       <Card className="space-y-3 p-5">
         <div className="flex items-center justify-between">
-          <div className="text-xs font-semibold uppercase tracking-wide text-ink-2">Sponsors</div>
+          <div className="md-eyebrow">Sponsors</div>
           <Btn size="sm" variant="secondary" icon={Plus}
             onClick={() => set("sponsors", [...form.sponsors, { name: "", logoUrl: "", url: "" }])}>
             Add sponsor

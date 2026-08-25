@@ -73,17 +73,17 @@ export function StaggerItem({ children, className, as = "div" }) {
   );
 }
 
+// Live indicator. The dot itself is `.md-live-dot` from index.css, so a live
+// match looks identical here, on a MatchCard, on the venue display and in the
+// header — one pulse, one red, defined in one place. It is the only looping
+// animation in the product, and it stops under prefers-reduced-motion.
 export function LivePulse({ label = "LIVE", className = "" }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold text-red-600 ${className}`}>
-      <span className="relative flex h-2 w-2">
-        <motion.span
-          className="absolute inline-flex h-full w-full rounded-full bg-red-500"
-          animate={{ scale: [1, 2.2], opacity: [0.6, 0] }}
-          transition={{ duration: 1.4, repeat: Infinity, ease: "easeOut" }}
-        />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-red-600" />
-      </span>
+    <span
+      className={`inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider ${className}`}
+      style={{ color: "var(--color-live)" }}
+    >
+      <span className="md-live-dot" />
       {label}
     </span>
   );
@@ -204,6 +204,24 @@ const SPORT_GLYPHS = {
       <path d="M12 3.5c-3 4-3.5 9 1 17M20.4 10c-4.6 1.4-9 4.2-11.7 10M3.6 13.5c4.5-2 8-5.5 9.8-9.8" strokeWidth="1.5" strokeLinecap="round" />
     </>
   ),
+  // Paddle plus a perforated ball — the detail that keeps it from reading
+  // as tennis at glyph size.
+  pickleball: (
+    <>
+      <path d="M4.5 9.5a5.5 5.5 0 0 1 11 0c0 3-2.2 5-5.5 5S4.5 12.5 4.5 9.5Z" strokeWidth="1.5" />
+      <path d="M8.5 14.5L7 20.5" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="18.5" cy="16" r="3" strokeWidth="1.5" />
+      <path d="M18.5 15v.01M17.3 17.2v.01M19.7 17.2v.01" strokeWidth="1.5" strokeLinecap="round" />
+    </>
+  ),
+  // Smaller head and a longer throat than the tennis racket above.
+  squash: (
+    <>
+      <ellipse cx="14.5" cy="8" rx="4.2" ry="5.4" strokeWidth="1.5" transform="rotate(35 14.5 8)" />
+      <path d="M11 12.5L4.5 20" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="5.2" cy="8.6" r="1.7" strokeWidth="1.5" />
+    </>
+  ),
   cricket: (
     <>
       <path d="M14.5 3.5l6 6-9 9-6-6 9-9z" strokeWidth="1.5" strokeLinejoin="round" />
@@ -215,9 +233,12 @@ const SPORT_GLYPHS = {
 
 export const SPORT_KEYS = Object.keys(SPORT_GLYPHS);
 
-export function SportIcon({ sport = "badminton", className = "" }) {
+export function SportIcon({ sport = "badminton", className = "", ...props }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={className} aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      className={className} aria-hidden="true" {...props}
+    >
       {SPORT_GLYPHS[sport] || SPORT_GLYPHS.badminton}
     </svg>
   );

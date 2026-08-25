@@ -27,3 +27,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local UI audit captures (55MB of PNGs, regenerated on demand)
+audit-screenshots/

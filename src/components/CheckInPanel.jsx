@@ -42,7 +42,7 @@ export default function CheckInPanel({ entries, onSetStatus, onCheckInByCode }) 
       <Card className="p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-ink-2">Check-in progress</div>
+            <div className="md-eyebrow">Check-in progress</div>
             <div className="font-display text-3xl font-bold text-ink">{checkedIn} / {entries.length}</div>
           </div>
           <form onSubmit={submitCode} className="flex items-center gap-2">

@@ -33,7 +33,7 @@ export function Card({ children, className, ...props }) {
 }
 
 export function Eyebrow({ children }) {
-  return <div className="text-[11px] font-semibold uppercase tracking-widest text-accent-teal">{children}</div>;
+  return <div className="md-eyebrow text-accent-teal">{children}</div>;
 }
 
 export function EmptyState({ icon: Icon, title, hint, action }) {

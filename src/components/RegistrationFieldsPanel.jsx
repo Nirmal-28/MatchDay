@@ -191,7 +191,7 @@ export default function RegistrationFieldsPanel({ tournament, notify, onChanged 
   return (
     <Card className="space-y-4 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2">
+        <div className="flex items-center gap-1.5 md-eyebrow">
           <ClipboardList size={13} /> Registration form
         </div>
         <Badge tone="slate">{fields.length} extra question{fields.length === 1 ? "" : "s"}</Badge>

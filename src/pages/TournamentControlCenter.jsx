@@ -4,7 +4,7 @@ import {
   ChevronLeft, MapPin, Calendar, Home, Users, Swords, LayoutGrid, Radio, Trophy, Settings, Play, ArrowRight,
   UserCheck, ClipboardList, ShieldAlert, Shield, IndianRupee, BarChart3, Download, Palette,
 } from "lucide-react";
-import { fmtDateRange, inr, EVENT_STATUS_META, FORMAT_META, divisionLabel } from "../lib/engines";
+import { cx, fmtDateRange, inr, EVENT_STATUS_META, FORMAT_META, divisionLabel } from "../lib/engines";
 import {
   getTournament, listEvents, listCourts, listEntries, listMatches, listNotifications, markNotificationsRead,
   publishTournament, closeRegistration, startTournament, completeTournament, cancelTournament, updateTournament,
@@ -220,12 +220,16 @@ export default function TournamentControlCenter() {
         </div>
       </div>
 
-      <div className="relative mb-5 overflow-hidden rounded-2xl bg-navy-900 p-5 sm:p-6">
+      {/* The operations header. Same court texture and condensed type as
+          every other MatchDay hero, but the content is operational: what
+          this tournament IS, followed immediately by the one state-changing
+          action legal right now. */}
+      <div className="md-court-texture relative mb-6 overflow-hidden rounded-2xl border border-line bg-gradient-to-b from-navy-800 to-surface p-5 sm:p-6">
         <div className="relative flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-widest text-accent-teal">Matchday control center</div>
+            <div className="md-eyebrow text-accent-teal">Matchday control center</div>
             <div className="mt-1 flex items-center gap-2">
-              <h1 className="text-xl font-bold text-white">{tournament.name}</h1>
+              <h1 className="md-display md-h3 text-ink">{tournament.name}</h1>
               <Badge tone={stage.tone}>{stage.label}</Badge>
               {tournament.status === "LIVE" && <LivePulse />}
             </div>
@@ -261,11 +265,17 @@ export default function TournamentControlCenter() {
             { label: "Entries", value: Object.values(entriesByEvent).flat().length },
             { label: "Matches", value: allMatches.length },
             { label: "Courts", value: courts.length },
-            { label: "Live now", value: allMatches.filter((m) => m.status === "LIVE").length },
+            {
+              label: "Live now",
+              value: allMatches.filter((m) => m.status === "LIVE").length,
+              // Only tinted when it is non-zero: a red 0 would read as a
+              // problem rather than as "nothing on court".
+              tone: allMatches.some((m) => m.status === "LIVE") ? "var(--color-live)" : null,
+            },
           ].map((s) => (
-            <div key={s.label} className="rounded-lg border border-white/10 bg-white/5 p-3 text-center sm:text-left">
-              <div className="font-display text-3xl font-bold text-white">{s.value}</div>
-              <div className="text-[11px] uppercase tracking-wide text-ink-3">{s.label}</div>
+            <div key={s.label} className="rounded-lg border border-line bg-surface-2/60 px-3.5 py-3">
+              <div className="md-eyebrow">{s.label}</div>
+              <div className="md-score mt-1.5 text-3xl text-ink" style={s.tone ? { color: s.tone } : undefined}>{s.value}</div>
             </div>
           ))}
         </div>
@@ -283,8 +293,23 @@ export default function TournamentControlCenter() {
           innerClassName="flex gap-1 lg:flex-col lg:overflow-visible"
         >
           {visibleTabs.map((t) => (
-            <button key={t.key} onClick={() => setTab(t.key)} className={`flex flex-shrink-0 items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium transition-colors ${activeTab === t.key ? "bg-accent-teal/10 text-accent-teal" : "text-ink-2 hover:bg-surface-2"}`}>
-              <t.icon size={15} />{t.label}
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              aria-current={activeTab === t.key ? "page" : undefined}
+              className={cx(
+                "relative flex flex-shrink-0 items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition-colors",
+                activeTab === t.key
+                  ? "bg-surface-2 text-ink"
+                  : "text-ink-3 hover:bg-surface-2/60 hover:text-ink-2"
+              )}
+            >
+              {/* The court line again, as the active marker: a left edge in
+                  the sidebar, a top edge on the phone rail. */}
+              {activeTab === t.key && (
+                <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-accent-teal max-lg:inset-x-3 max-lg:inset-y-auto max-lg:bottom-0 max-lg:top-auto max-lg:h-0.5 max-lg:w-auto" />
+              )}
+              <t.icon size={16} />{t.label}
             </button>
           ))}
         </ScrollFade>
@@ -293,7 +318,7 @@ export default function TournamentControlCenter() {
           {["participants", "draw", "results"].includes(activeTab) && events.length > 1 && (
             <div className="mb-3 flex flex-wrap gap-1.5">
               {events.map((e) => (
-                <button key={e.id} onClick={() => setEventId(e.id)} className={`rounded-full border px-3 py-1 text-xs font-medium ${eventId === e.id ? "border-accent-teal bg-accent-teal text-white" : "border-line text-ink-2 hover:bg-surface-2"}`}>
+                <button key={e.id} onClick={() => setEventId(e.id)} aria-pressed={eventId === e.id} className={`rounded-lg border px-3.5 py-2 text-xs font-semibold transition-colors ${eventId === e.id ? "border-transparent bg-accent-teal text-navy-950" : "border-line bg-surface text-ink-2 hover:border-accent-teal/50 hover:text-ink"}`}>
                   {divisionLabel(e)}
                 </button>
               ))}
@@ -308,7 +333,7 @@ export default function TournamentControlCenter() {
                 members={members} onGoToTab={setTab}
               />
               <div>
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">Categories</div>
+                <div className="mb-2 md-eyebrow">Categories</div>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {events.map((e) => {
                     const c = (entriesByEvent[e.id] || []).length;
@@ -525,7 +550,7 @@ export default function TournamentControlCenter() {
                   gate public entry — the RLS insert policy checks them — so
                   registration opens and closes on its own. */}
               <Card className="space-y-3 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-ink-2">Registration window</div>
+                <div className="md-eyebrow">Registration window</div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="Opens at" hint="Leave blank to open as soon as you publish.">
                     <input
@@ -564,7 +589,7 @@ export default function TournamentControlCenter() {
               )}
 
               <Card className="space-y-2 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-ink-2">Lifecycle</div>
+                <div className="md-eyebrow">Lifecycle</div>
                 <div className="mb-1 flex items-center gap-2">
                   <Badge tone={stage.tone}>{stage.label}</Badge>
                   {stage.hint && <span className="text-[11px] text-ink-3">{stage.hint}</span>}

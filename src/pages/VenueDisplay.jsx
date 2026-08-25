@@ -39,34 +39,77 @@ function Clock() {
   );
 }
 
+/* One live match, sized to be read from the back of a hall.
+
+   The score is the largest thing on the board by a wide margin, and the
+   leading side is the only one rendered in full white — at 20 metres colour
+   weight carries further than any badge. Game pips below give the match
+   shape (21-18, 19-21) without a second row of numerals competing with
+   the running score. */
 function LiveCard({ m, event, entriesById, accent }) {
   const games = [...(m.games || [])].sort((x, y) => x.game_number - y.game_number);
   const current = games[games.length - 1];
   const tally = BadmintonScoringEngine.gameTally(toAB(games));
   const a = current?.score_a ?? 0;
   const b = current?.score_b ?? 0;
-  const lead = a === b ? null : a > b ? "A" : "B";
+  const lead = a === b ? null : a > b ? 'A' : 'B';
   return (
-    <div className="rounded-[1.2vw] border-2 bg-white/[0.06] p-[1.6vw]" style={{ borderColor: `${accent}66` }}>
-      <div className="mb-[0.8vw] flex items-baseline justify-between">
-        <span className="font-display text-[2vw] font-bold leading-none" style={{ color: accent }}>{m.court || "Court"}</span>
-        <span className="text-[1vw] uppercase tracking-wide text-white/50">
+    <div
+      className="relative overflow-hidden rounded-[1.2vw] border-2 bg-white/[0.06] p-[1.6vw]"
+      style={{ borderColor: `${accent}66` }}
+    >
+      {/* Court number is what a spectator scans for first — it is set in
+          display type at headline size, not as a label. */}
+      <div className="mb-[1vw] flex items-baseline justify-between gap-[1vw]">
+        <span className="md-display text-[2.6vw] leading-none" style={{ color: accent }}>
+          {m.court || 'Court'}
+        </span>
+        <span className="truncate text-[1vw] uppercase tracking-widest text-white/45">
           {divisionLabel(event)} · {matchStageLabel(m, event)}
         </span>
       </div>
-      <div className="space-y-[0.5vw]">
-        {[["A", m.entry_a, a], ["B", m.entry_b, b]].map(([side, entryId, score]) => (
+
+      <div className="space-y-[0.7vw]">
+        {[['A', m.entry_a, a], ['B', m.entry_b, b]].map(([side, entryId, score]) => (
           <div key={side} className="flex items-center justify-between gap-[1vw]">
-            <span className={cx("truncate text-[2.1vw] font-semibold leading-tight", lead === side ? "text-white" : "text-white/75")}>
-              {entryShort(entriesById[entryId]) || "TBD"}
+            <span className={cx(
+              'truncate text-[2.2vw] font-semibold leading-tight',
+              lead === side ? 'text-white' : 'text-white/60'
+            )}>
+              {entryShort(entriesById[entryId]) || 'TBD'}
             </span>
-            <span className={cx("font-display text-[3.4vw] font-bold leading-none tabular-nums", lead === side ? "text-white" : "text-white/60")}>
+            {/* Keyed on the value so a point landing replays the one-shot
+                bump — the only motion on this board, and it reports an
+                actual event rather than looping for decoration. */}
+            <span
+              key={score}
+              className={cx(
+                'md-bump md-score shrink-0 text-[4.6vw] leading-none',
+                lead === side ? 'text-white' : 'text-white/55'
+              )}
+            >
               {score}
             </span>
           </div>
         ))}
       </div>
-      <div className="mt-[0.8vw] text-[1vw] text-white/45">Games {tally.a}–{tally.b}</div>
+
+      {/* Completed games as pips, so the match's shape is visible at a glance. */}
+      {games.length > 1 && (
+        <div className="mt-[1vw] flex flex-wrap items-center gap-[0.6vw]">
+          {games.slice(0, -1).map((g, i) => (
+            <span
+              key={i}
+              className="md-score rounded-[0.4vw] bg-white/10 px-[0.7vw] py-[0.25vw] text-[1.2vw] text-white/70"
+            >
+              {g.score_a}–{g.score_b}
+            </span>
+          ))}
+          <span className="text-[1vw] uppercase tracking-widest text-white/35">
+            Games {tally.a}–{tally.b}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -213,8 +256,15 @@ export default function VenueDisplay() {
 
       {/* ── Live ─────────────────────────────────────────────────────── */}
       <div className="mb-[1vw] flex items-center gap-[0.8vw]">
-        <span className="inline-block rounded-full bg-red-500" style={{ width: "1vw", height: "1vw", animation: "pulse 1.6s ease-in-out infinite" }} />
-        <span className="text-[1.6vw] font-bold uppercase tracking-widest text-red-300">Live now</span>
+        {/* The shared `.md-live-dot`, scaled to the board. It previously
+            named a `pulse` keyframe that no stylesheet defined — Tailwind v4
+            emits keyframes only for the utilities actually used — so the dot
+            sat static and the one piece of "this is happening now" signal on
+            the whole display did nothing. */}
+        <span className="md-live-dot" style={{ width: "1vw", height: "1vw" }} />
+        <span className="text-[1.6vw] font-bold uppercase tracking-widest" style={{ color: "var(--color-live)" }}>
+          Live now
+        </span>
       </div>
       {live.length === 0 ? (
         <div className="mb-[1.5vw] rounded-[1.2vw] border-2 border-white/10 bg-white/[0.04] py-[3vw] text-center text-[1.8vw] text-white/40">
@@ -330,7 +380,9 @@ export default function VenueDisplay() {
         </div>
         <div className="flex shrink-0 items-center gap-[0.6vw] opacity-60">
           <img src={logo} alt="" className="h-[2vw] w-[2vw] rounded" />
-          <span className="wordmark text-[1.4vw] uppercase leading-none">Matchday</span>
+          <span className="wordmark text-[1.4vw] uppercase leading-none">
+            Match<span className="wordmark-accent">day</span>
+          </span>
         </div>
       </footer>
     </div>

@@ -39,8 +39,12 @@ function Side({ entry, side, won, showLive, showFinal, liveScore, finalGames }) 
         )}
       </div>
       <div className="shrink-0 text-right">
-        {showLive && <div className="font-display text-3xl font-bold tabular-nums text-ink">{liveScore ?? 0}</div>}
-        {showFinal && <div className="font-display text-3xl font-bold tabular-nums text-ink">{finalGames}</div>}
+        {/* Keyed on the value so a point landing replays the one-shot bump.
+            This page is what a spectator keeps open during a live match, so
+            the score changing needs to be visible without a refresh — but it
+            is a single 340ms animation, not a loop. */}
+        {showLive && <div key={liveScore ?? 0} className="md-bump md-score text-5xl text-ink">{liveScore ?? 0}</div>}
+        {showFinal && <div className="md-score text-5xl text-ink">{finalGames}</div>}
         {won && <Badge tone="emerald" className="mt-1">Winner</Badge>}
         <span className="sr-only">{side}</span>
       </div>
@@ -98,8 +102,10 @@ export default function MatchDetail() {
         <ChevronLeft size={14} /> Back
       </button>
 
-      {/* Header */}
-      <div className="mb-4 rounded-2xl border border-line bg-surface p-5">
+      {/* Header. Same court texture and condensed type as every other
+          MatchDay hero — a shared match link should feel like part of the
+          product, not like a database row rendered on its own. */}
+      <div className="md-court-texture relative mb-5 overflow-hidden rounded-2xl border border-line bg-gradient-to-b from-navy-800 to-surface p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -110,7 +116,7 @@ export default function MatchDetail() {
               {match.retired && <Badge tone="amber">Retired</Badge>}
               {match.is_bye && <Badge tone="slate">Bye</Badge>}
             </div>
-            <h1 className="mt-2 text-lg font-bold text-ink">{matchStageLabel(match, event)}</h1>
+            <h1 className="md-display mt-2.5 text-3xl text-ink">{matchStageLabel(match, event)}</h1>
             <div className="mt-0.5 text-sm text-ink-2">{divisionLabel(event)}</div>
             {tournament && (
               <Link to={tournament.slug ? `/t/${tournament.slug}` : "#"} className="mt-1 inline-block text-xs font-medium text-accent-teal hover:underline">
@@ -126,8 +132,13 @@ export default function MatchDetail() {
             {match.scheduled_at && !isDone && (
               <div className="mt-0.5 text-accent-teal">{relativeTime(match.scheduled_at)}</div>
             )}
-            <div className="mt-1 flex items-center justify-end gap-1">
-              <MapPin size={12} />{match.court || match.courts?.name || "Court TBD"}
+            {/* Court in display type: at a venue this is the one fact
+                someone is scanning the page for. */}
+            <div className="mt-1.5 flex items-center justify-end gap-1.5">
+              <MapPin size={12} />
+              <span className="md-display text-xl leading-none text-ink">
+                {match.court || match.courts?.name || "Court TBD"}
+              </span>
             </div>
           </div>
         </div>
@@ -143,10 +154,10 @@ export default function MatchDetail() {
       {/* Game-by-game */}
       {games.length > 0 && (
         <Card className="mb-4 p-4">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">Game by game</div>
+          <div className="mb-2 md-eyebrow">Game by game</div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="text-[11px] uppercase tracking-wide text-ink-3">
+              <thead className="md-eyebrow">
                 <tr>
                   <th className="py-1.5 pr-3 font-medium">Side</th>
                   {games.map((g) => <th key={g.id} className="px-2 py-1.5 text-center font-medium">Game {g.game_number}</th>)}
@@ -184,7 +195,7 @@ export default function MatchDetail() {
       <div className="grid gap-4 sm:grid-cols-2">
         {(officials?.scorer || officials?.referee) && (
           <Card className="p-4">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">Officials</div>
+            <div className="mb-2 md-eyebrow">Officials</div>
             <div className="space-y-1.5 text-sm">
               {officials.referee && (
                 <div className="flex items-center gap-2 text-ink-2">
@@ -202,7 +213,7 @@ export default function MatchDetail() {
 
         {(feeders?.length > 0 || nextMatch) && (
           <Card className="p-4">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">Path through the draw</div>
+            <div className="mb-2 md-eyebrow">Path through the draw</div>
             <div className="space-y-1.5 text-sm">
               {feeders?.map((f) => (
                 <Link key={f.id} to={`/m/${f.id}`} className="flex items-center gap-1.5 text-ink-2 hover:text-accent-teal">

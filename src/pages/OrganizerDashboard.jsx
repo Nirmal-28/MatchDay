@@ -3,8 +3,9 @@ import { Link, useNavigate } from "react-router-dom";
 import { Plus, Trophy, MapPin, Calendar, Layers, Users, Radio } from "lucide-react";
 import { fmtDate, fmtDateRange, TOURNAMENT_STATUS_META } from "../lib/engines";
 import { listMyTournaments, createTournament, publishTournament, listMySeries, createSeries } from "../lib/repository";
-import { Btn, Badge, Card, Eyebrow, Field, inputCls, useToasts, Toasts } from "../components/ui/primitives";
+import { Btn, Badge, Card, Field, inputCls, useToasts, Toasts } from "../components/ui/primitives";
 import { BrandLoader, Reveal, StaggerList, StaggerItem } from "../components/ui/motion";
+import { StatusPill, sportAccent } from "../components/ui/md";
 import CreateTournamentWizard from "../components/CreateTournamentWizard";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
 
@@ -97,8 +98,8 @@ export default function OrganizerDashboard() {
     <div>
       <Reveal className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Eyebrow>Organize</Eyebrow>
-          <h1 className="text-2xl font-bold text-ink">Tournaments I organize</h1>
+          <div className="md-eyebrow mb-1 text-accent-teal">Organize</div>
+          <h1 className="md-display md-h2 text-ink">Tournaments I organize</h1>
           <p className="mt-0.5 text-sm text-ink-2">
             Tournaments you own or help run. Your player profile is unaffected — it&apos;s the same account.
           </p>
@@ -111,10 +112,19 @@ export default function OrganizerDashboard() {
         <StaggerList className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {tournaments.map((t) => (
             <StaggerItem key={t.id}>
-              <button onClick={() => navigate(`/organizer/${t.id}`)} className="w-full rounded-lg border border-line bg-surface p-4 text-left shadow-sm transition-all hover:border-accent-teal/50 hover:shadow-md">
+              {/* The same card language discovery uses, with the sport's
+                  accent on the leading court line — an organizer running
+                  events in two sports can tell them apart at a glance. */}
+              <button
+                onClick={() => navigate(`/organizer/${t.id}`)}
+                className="md-card md-card-link md-edge h-full w-full p-4 pl-5 text-left"
+                style={{ "--md-edge": t.status === "LIVE" ? "var(--color-live)" : sportAccent(t.sport) }}
+              >
                 <div className="mb-2 flex items-start justify-between gap-2">
-                  <div className="font-semibold text-ink">{t.name}</div>
-                  <Badge tone={TOURNAMENT_STATUS_META[t.status].tone}>{TOURNAMENT_STATUS_META[t.status].label}</Badge>
+                  <div className="md-display md-clamp-2 text-xl text-ink">{t.name}</div>
+                  {t.status === "LIVE"
+                    ? <StatusPill status="live" />
+                    : <Badge tone={TOURNAMENT_STATUS_META[t.status].tone}>{TOURNAMENT_STATUS_META[t.status].label}</Badge>}
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-2">
                   <span className="flex items-center gap-1"><MapPin size={11} />{t.venue}</span>
@@ -129,7 +139,7 @@ export default function OrganizerDashboard() {
       <Reveal className="mt-8">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="flex items-center gap-1.5 text-sm font-bold text-ink"><Layers size={15} /> Series</h2>
+            <h2 className="md-display md-rule flex items-center gap-2 text-xl text-ink"><Layers size={17} /> Series</h2>
             <p className="text-xs text-ink-2">Group tournaments into matchdays with standings that carry across them.</p>
           </div>
           <Btn size="sm" variant="secondary" icon={Plus} onClick={() => setSeriesOpen((o) => !o)}>New series</Btn>
@@ -166,11 +176,16 @@ export default function OrganizerDashboard() {
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {series.map((s) => (
               <Link key={s.id} to={`/series/${s.id}`} className="block">
-                <Card className="p-3.5 transition-colors hover:border-accent-teal/50">
-                  <div className="font-semibold text-ink">{s.name}</div>
+                {/* Purple is the series accent throughout the product, so a
+                    circuit never reads as just another tournament. */}
+                <div
+                  className="md-card md-card-link md-edge h-full p-3.5 pl-5"
+                  style={{ "--md-edge": "var(--color-accent-purple)" }}
+                >
+                  <div className="md-display text-lg text-ink">{s.name}</div>
                   {s.description && <p className="mt-0.5 line-clamp-2 text-xs text-ink-2">{s.description}</p>}
-                  <div className="mt-1 text-[11px] text-ink-3">Created {fmtDate(s.created_at)}</div>
-                </Card>
+                  <div className="md-eyebrow mt-1.5">Created {fmtDate(s.created_at)}</div>
+                </div>
               </Link>
             ))}
           </div>

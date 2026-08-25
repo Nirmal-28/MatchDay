@@ -15,7 +15,7 @@ export default function NotificationBell({ notifications, onMarkRead }) {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute right-0 z-50 mt-2 w-80 rounded-lg border border-line bg-surface shadow-lg">
-            <div className="border-b border-line-soft px-3.5 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink-2">Notifications</div>
+            <div className="border-b border-line-soft px-3.5 py-2.5 md-eyebrow">Notifications</div>
             <div className="max-h-80 overflow-y-auto">
               {notifications.length === 0 ? (
                 <div className="px-3.5 py-6 text-center text-xs text-ink-3">Nothing yet</div>

@@ -25,7 +25,7 @@ function Estimate({ estimate }) {
   return (
     <div className="space-y-3">
       <div className="rounded-lg border border-line bg-surface-2 p-3.5">
-        <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2">
+        <div className="mb-2 flex items-center gap-1.5 md-eyebrow">
           <Gauge size={13} /> What this will take
         </div>
         {totalMatches === 0 ? (
@@ -40,7 +40,7 @@ function Estimate({ estimate }) {
                 { label: "Likely finish", value: estimatedFinish || "Past midnight" },
               ].map((s) => (
                 <div key={s.label}>
-                  <div className="text-[10px] uppercase tracking-wide text-ink-3">{s.label}</div>
+                  <div className="md-eyebrow">{s.label}</div>
                   <div className="font-display text-lg font-bold text-ink">{s.value}</div>
                 </div>
               ))}
@@ -63,7 +63,7 @@ function Estimate({ estimate }) {
       ))}
 
       <div className="rounded-lg border border-line bg-surface-2 p-3.5">
-        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">MatchDay handles</div>
+        <div className="mb-2 md-eyebrow">MatchDay handles</div>
         <div className="grid gap-1 sm:grid-cols-2">
           {HANDLED.map((h) => (
             <div key={h} className="flex items-center gap-1.5 text-xs text-ink-2">
@@ -303,7 +303,7 @@ export default function CreateTournamentWizard({ open, onClose, onSubmit }) {
               arithmetic is done here, before anything is committed. */}
           <Estimate estimate={estimate} />
           <div>
-            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2">Categories</div>
+            <div className="mb-1.5 md-eyebrow">Categories</div>
             <div className="flex flex-wrap gap-1.5">
               {categories.map((c) => (
                 <Badge key={`${c.category}-${c.ageGroup}-${c.skillGrade ?? ""}`} tone="teal">

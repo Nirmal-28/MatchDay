@@ -3,10 +3,10 @@ import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from "react
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import { AuthProvider, useAuth } from "./lib/AuthContext";
 import { BrandLoader } from "./components/ui/motion";
-// Purely decorative, and it pulls in GSAP — the single largest dependency in
-// the app. Loading it lazily keeps ~100KB of animation library off the path
-// between a shared tournament link and the score someone opened it to see.
-// It fades in a moment later; nothing depends on it being present.
+// Purely decorative. It is now static SVG rather than the GSAP timelines it
+// used to run, so the chunk is small — but it is still off the critical path
+// between a shared tournament link and the score someone opened it to see,
+// and nothing depends on it being present.
 const SportsBackground = lazy(() => import("./components/ui/SportsBackground"));
 import logo from "./assets/logo.png";
 import { signOut } from "./lib/repository";
@@ -38,7 +38,7 @@ import NotFound from "./pages/NotFound";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { trackPageView } from "./lib/productAnalytics";
 import { cx } from "./lib/engines";
-import { Compass, CalendarDays, Trophy, Gavel } from "lucide-react";
+import { Compass, CalendarDays, Trophy, Gavel, User } from "lucide-react";
 
 function RequireAuth({ children }) {
   const { session, loading } = useAuth();
@@ -48,11 +48,22 @@ function RequireAuth({ children }) {
   return children;
 }
 
-// One account, many roles — so the header shows the capabilities this user
-// actually has rather than a fixed set of "account modes". Discover and Play
-// are always there; Organize appears for everyone (creating a tournament is
-// how you become an organizer, not a separate signup); Officiate appears only
-// once someone has actually been assigned a refereeing or scoring role.
+// ═══════════════════════════════════════════════════════════════════════
+// NAVIGATION — capability-driven, one account
+// ═══════════════════════════════════════════════════════════════════════
+//
+// MatchDay is one account that can simultaneously play, organize and
+// officiate, so navigation is a list of the surfaces this person actually
+// has, not an account type chosen at signup. Discover is always present;
+// Play and Organize appear once signed in (creating a tournament is how you
+// become an organizer, not a separate registration); Officiate appears only
+// once someone has been assigned a refereeing or scoring role.
+//
+// The switcher is rendered as underlined display-type tabs rather than the
+// segmented pill it used to be. A pill reads as a settings toggle — three
+// equal options, pick one. These are destinations, and the condensed caps
+// treatment matches the headline type used across the product.
+
 function surfacesFor(caps) {
   const list = [
     { key: "public", label: "Discover", to: "/", icon: Compass },
@@ -69,13 +80,21 @@ function surfaceOf(pathname) {
   if (pathname.startsWith("/organizer")) return "organizer";
   if (pathname.startsWith("/officiate")) return "officiate";
   if (pathname.startsWith("/me")) return "player";
+  if (pathname.startsWith("/leaderboard")) return "rankings";
   return "public";
 }
 
-// The desktop header hides its surface switcher below `sm`, which left a
-// phone user with no way to move between playing, organizing and officiating
-// at all. This is that switcher, as the bottom bar the pattern calls for on a
-// phone — same capability list, same single account.
+function Wordmark({ className = "" }) {
+  return (
+    <span className={cx("wordmark uppercase leading-none", className)}>
+      Match<span className="wordmark-accent">day</span>
+    </span>
+  );
+}
+
+// The bottom bar a phone gets in place of the header's switcher. Sized for
+// thumbs: 56px of height plus the safe-area inset, and the whole cell is the
+// tap target rather than just the label.
 function MobileSurfaceNav() {
   const { caps } = useAuth();
   const location = useLocation();
@@ -95,14 +114,18 @@ function MobileSurfaceNav() {
           const on = current === s.key;
           return (
             <Link
-              key={s.key} to={s.to}
+              key={s.key}
+              to={s.to}
               aria-current={on ? "page" : undefined}
               className={cx(
-                "flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium transition-colors",
+                "relative flex min-h-14 flex-1 flex-col items-center justify-center gap-1 text-[10px] font-semibold uppercase tracking-wide transition-colors",
                 on ? "text-accent-teal" : "text-ink-3"
               )}
             >
-              <s.icon size={18} />
+              {/* The active court line sits on top of the bar, echoing the
+                  same marker used by tabs and section headers. */}
+              {on && <span className="absolute inset-x-5 top-0 h-0.5 rounded-full bg-accent-teal" />}
+              <s.icon size={19} strokeWidth={on ? 2.4 : 2} />
               {s.label}
             </Link>
           );
@@ -117,41 +140,68 @@ function Header() {
   const location = useLocation();
   const surfaces = surfacesFor(caps);
   const surface = surfaceOf(location.pathname);
-  const rawIndex = surfaces.findIndex((s) => s.key === surface);
-  const surfaceIndex = rawIndex < 0 ? 0 : rawIndex;
 
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-canvas/80 backdrop-blur-md">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-        <Link to="/" className="flex items-center gap-2">
-          <motion.img
-            src={logo} alt="" className="h-8 w-8 rounded-md"
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
-          />
-          <span className="wordmark text-2xl uppercase leading-none">Matchday</span>
+    <header className="sticky top-0 z-30 border-b border-line bg-canvas/85 backdrop-blur-xl">
+      <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4">
+        <Link to="/" className="flex shrink-0 items-center gap-2" aria-label="MatchDay home">
+          <img src={logo} alt="" className="h-7 w-7 rounded-md" width="28" height="28" />
+          <Wordmark className="text-2xl" />
         </Link>
-        <div className="flex items-center gap-3">
-          <Link to="/leaderboard" className={cx("hidden text-xs font-medium sm:inline", location.pathname === "/leaderboard" ? "text-accent-teal" : "text-ink-2 hover:text-ink")}>Leaderboard</Link>
-          <div className="relative hidden items-center gap-0.5 rounded-md border border-line bg-surface p-0.5 sm:flex">
-            <motion.div
-              className="absolute inset-y-0.5 left-0.5 rounded bg-surface-3"
-              style={{ width: `calc(${100 / surfaces.length}% - 2px)` }}
-              animate={{ x: `${surfaceIndex * 100}%` }}
-              transition={{ type: "spring", stiffness: 500, damping: 35 }}
-            />
-            {surfaces.map((s) => (
-              <Link key={s.key} to={s.to}
-                className={cx("relative z-10 rounded px-3 py-1.5 text-xs font-medium", surface === s.key ? "text-ink" : "text-ink-3")}>
+
+        {/* Desktop switcher. Hidden below `sm`, where MobileSurfaceNav takes
+            over at the bottom of the screen. */}
+        <nav className="hidden items-center gap-5 sm:flex" aria-label="Experience">
+          {surfaces.map((s) => {
+            const on = surface === s.key;
+            return (
+              <Link
+                key={s.key}
+                to={s.to}
+                aria-current={on ? "page" : undefined}
+                className={cx(
+                  "relative py-4 text-[13px] font-semibold uppercase tracking-wider transition-colors",
+                  on ? "text-ink" : "text-ink-3 hover:text-ink-2"
+                )}
+              >
                 {s.label}
+                {on && <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-accent-teal" />}
               </Link>
-            ))}
-          </div>
+            );
+          })}
+          <Link
+            to="/leaderboard"
+            aria-current={surface === "rankings" ? "page" : undefined}
+            className={cx(
+              "relative py-4 text-[13px] font-semibold uppercase tracking-wider transition-colors",
+              surface === "rankings" ? "text-ink" : "text-ink-3 hover:text-ink-2"
+            )}
+          >
+            Rankings
+            {surface === "rankings" && <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-accent-teal" />}
+          </Link>
+        </nav>
+
+        <div className="ml-auto flex items-center gap-2.5">
           {session ? (
             <>
               <NotificationCenter userId={session.user.id} />
-              <button className="text-xs font-medium text-ink-2 hover:text-ink" onClick={() => signOut()}>Sign out</button>
+              {/* The account entry point. An avatar-shaped target rather than
+                  a text link: it is the one control whose position should be
+                  identical on every screen in the product. */}
+              <Link
+                to="/me/profile"
+                aria-label="Your profile and settings"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-line bg-surface-2 text-ink-2 transition-colors hover:border-accent-teal hover:text-ink"
+              >
+                <User size={15} />
+              </Link>
+              <button
+                className="hidden text-xs font-medium text-ink-3 transition-colors hover:text-ink sm:block"
+                onClick={() => signOut()}
+              >
+                Sign out
+              </button>
             </>
           ) : (
             <>
@@ -159,20 +209,22 @@ function Header() {
                   that they can run their own tournament here, not just browse
                   other people's. Hidden on /host, where it would point at the
                   page already being read. Visible at every width — a mobile
-                  visitor is not less likely to want to organize, and this was
-                  previously invisible below 640px with no other way to find
-                  it (audit finding F1). The label shortens on narrow screens
-                  so it sits comfortably next to "Sign in" without wrapping. */}
+                  visitor is not less likely to want to organize. */}
               {location.pathname !== "/host" && (
                 <Link
                   to="/host"
-                  className="inline-block rounded-md bg-accent-teal px-2.5 py-1.5 text-xs font-semibold text-navy-950 hover:brightness-110"
+                  className="rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-accent-teal hover:text-accent-teal"
                 >
                   <span className="sm:hidden">Host</span>
                   <span className="hidden sm:inline">Host a tournament</span>
                 </Link>
               )}
-              <Link to="/login" className="text-xs font-medium text-ink-2 hover:text-ink">Sign in</Link>
+              <Link
+                to="/login"
+                className="rounded-md bg-accent-teal px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-navy-950 transition-[filter] hover:brightness-110"
+              >
+                Sign in
+              </Link>
             </>
           )}
         </div>

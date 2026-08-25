@@ -1,48 +1,81 @@
 @import "tailwindcss";
 
-/* ── MatchDay design tokens ──────────────────────────────────────────────
-   Navy scale + accent colors sampled from the official logo (the
-   multicolor "people in a circle" mark on navy). Accents are meant to be
-   used sparingly — live indicators, category badges, active states,
-   gradients — not as the base palette of every surface.
+/* ═══════════════════════════════════════════════════════════════════════
+   MATCHDAY DESIGN SYSTEM
+   ═══════════════════════════════════════════════════════════════════════
 
-   The semantic tokens below (surface/line/ink) are what components should
-   actually use. Flipping the theme means changing them here, not hunting
-   down bg-white across every file. */
+   Four environments, one language:
+
+     DISCOVERY  expressive · editorial · large type · imagery
+     PLAYER     personal · action-first · mobile-shaped
+     ORGANIZER  operational · dense · scannable · status-led
+     COURTSIDE  (scorer + venue display) extreme contrast, no ornament
+
+   The identity anchors are:
+     1. CONDENSED DISPLAY TYPE — athletic, broadcast, and the thing that
+        separates MatchDay from the rounded-Inter look every SaaS shares.
+     2. THE COURT LINE — a painted-boundary rule at the leading edge of a
+        block. It is how a MatchDay section announces itself, in place of
+        a drop shadow.
+     3. STATUS AS COLOUR — live / open / closing / full / done are a fixed,
+        learned palette used identically on every surface.
+
+   Motion is EVENT-DRIVEN. Nothing here loops except `.md-live-dot`,
+   because "is this match live right now" is information a still image
+   cannot carry — and it stops under prefers-reduced-motion.
+   ══════════════════════════════════════════════════════════════════════ */
+
 @theme {
+  /* ── Brand navy scale (sampled from the logo) ─────────────────────── */
   --color-navy-950: #05070d;
   --color-navy-900: #0a1120;
   --color-navy-800: #101a30;
   --color-navy-700: #182545;
   --color-navy-600: #22335e;
 
-  --color-accent-teal: #14b8a6;
+  /* ── Logo accents. Sport identity and category only, never the base
+        palette of a surface. ─────────────────────────────────────────── */
+  --color-accent-teal: #16c5b0;
   --color-accent-blue: #3b82f6;
   --color-accent-purple: #8b5cf6;
   --color-accent-pink: #ec4899;
   --color-accent-orange: #f97316;
   --color-accent-yellow: #eab308;
 
-  /* Semantic surfaces — dark theme */
-  --color-canvas: #070b14;        /* page background */
-  --color-surface: #0e1626;     /* cards, panels */
-  --color-surface-2: #141e33;   /* table headers, elevated rows */
-  --color-surface-3: #1b2740;   /* hover states */
-  --color-line: #22304d;        /* borders */
-  --color-line-soft: #1a2438;   /* subtle dividers */
+  /* ── Semantic surfaces ────────────────────────────────────────────── */
+  --color-canvas: #060911;      /* page ground */
+  --color-surface: #0d1523;     /* cards, panels */
+  --color-surface-2: #131e30;   /* table headers, elevated rows, inputs */
+  --color-surface-3: #1b2840;   /* hover */
+  --color-line: #223251;        /* borders */
+  --color-line-soft: #182338;   /* subtle dividers */
 
-  /* Semantic text */
-  --color-ink: #eef2f9;         /* primary text */
-  --color-ink-2: #a8b6cf;       /* secondary text */
-  --color-ink-3: #6b7d9c;       /* muted / metadata */
+  /* ── Semantic text ────────────────────────────────────────────────── */
+  --color-ink: #eef3fa;
+  --color-ink-2: #a4b3cd;
+  --color-ink-3: #67799a;
 
-  --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  /* ── Status palette. One meaning, one colour, everywhere. ─────────── */
+  --color-live: #ff2d55;        /* in progress right now */
+  --color-open: #22c55e;        /* registration open */
+  --color-closing: #f59e0b;     /* closing soon / needs attention */
+  --color-full: #64748b;        /* full / closed / neutral-negative */
+  --color-done: #60a5fa;        /* completed */
+
+  --font-display: "Barlow Condensed", "Oswald", "Arial Narrow", sans-serif;
   --font-body: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  /* Motion tokens — short and purposeful. Nothing exceeds 400ms. */
+  --md-fast: 120ms;
+  --md-base: 200ms;
+  --md-slow: 340ms;
+  --md-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 html {
   background: var(--color-canvas);
   color-scheme: dark;
+  -webkit-text-size-adjust: 100%;
 }
 
 /* The base colour lives on <html> only. If <body> also painted an opaque
@@ -54,6 +87,7 @@ body {
   font-family: var(--font-body);
   background: transparent;
   color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
 }
 
 /* Inputs/selects render with the OS light palette otherwise. */
@@ -62,23 +96,310 @@ select option {
   color: var(--color-ink);
 }
 
-@keyframes fadein {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: none; }
+/* One consistent focus ring on every interactive element. :focus-visible,
+   so a mouse click does not leave a ring behind but a Tab does. */
+:focus-visible {
+  outline: 2px solid var(--color-accent-teal);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
-/* Athletic scoreboard-style wordmark. Teal reads well on the dark base. */
+/* ═══════════════════════════════════════════════════════════════════════
+   1. TYPOGRAPHY
+   Condensed uppercase display type is the strongest MatchDay signal. It
+   carries headlines, scores, court numbers and section labels — never
+   body copy, which stays Inter for readability.
+   ══════════════════════════════════════════════════════════════════════ */
+
+.md-display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  line-height: 0.92;
+  letter-spacing: -0.005em;
+}
+
+/* Fluid, so 390px and 1440px each get a headline that fills its measure
+   rather than a desktop size scaled down. */
+.md-h1 { font-size: clamp(2.5rem, 7vw, 4.75rem); }
+.md-h2 { font-size: clamp(1.75rem, 4vw, 2.75rem); }
+.md-h3 { font-size: clamp(1.25rem, 2.4vw, 1.6rem); }
+
+.md-eyebrow {
+  font-family: var(--font-body);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-ink-3);
+}
+
+/* Scoreboard numerals — tabular, so a score never reflows as it ticks. */
+.md-score {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
 .wordmark {
-  font-family: "Barlow Condensed", "Arial Narrow", sans-serif;
+  font-family: var(--font-display);
   font-weight: 700;
   font-style: italic;
-  letter-spacing: 0.02em;
-  color: var(--color-accent-teal);
+  letter-spacing: 0.01em;
+  color: var(--color-ink);
+}
+.wordmark-accent { color: var(--color-accent-teal); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   2. THE COURT LINE — MatchDay's signature block marker
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Section header: a short painted court line above the title. */
+.md-rule::before {
+  content: "";
+  display: block;
+  width: 2.25rem;
+  height: 3px;
+  margin-bottom: 0.625rem;
+  background: var(--color-accent-teal);
+  border-radius: 2px;
 }
 
-/* Only elements the sports background actually animates get promoted. */
-.sb-arc,
-.sb-dot,
-.sb-court {
-  will-change: transform, opacity;
+/* Leading edge on a card. `--md-edge` lets one class carry any sport or
+   status colour instead of a bespoke class per combination. */
+.md-edge { position: relative; }
+.md-edge::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  border-radius: 0.75rem 0 0 0.75rem;
+  background: var(--md-edge, var(--color-accent-teal));
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   3. SURFACES
+   Depth comes from a hairline border plus a 1px inner top highlight — the
+   way a physical panel catches light — not from stacked blurry shadows.
+   ══════════════════════════════════════════════════════════════════════ */
+
+.md-card {
+  position: relative;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: 0.75rem;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+}
+
+/* Interactive card. Border + translate only: no layout shift, and no
+   shadow repaint storm in a long list. */
+.md-card-link {
+  transition:
+    border-color var(--md-base) var(--md-ease),
+    background-color var(--md-base) var(--md-ease),
+    transform var(--md-base) var(--md-ease);
+}
+.md-card-link:hover {
+  border-color: color-mix(in oklab, var(--color-accent-teal) 45%, var(--color-line));
+  background: var(--color-surface-2);
+  transform: translateY(-2px);
+}
+.md-card-link:active { transform: translateY(0); }
+
+.md-panel {
+  background: linear-gradient(180deg, var(--color-navy-800) 0%, var(--color-surface) 100%);
+  border: 1px solid var(--color-line);
+  border-radius: 1rem;
+}
+
+/* Static court-line texture — a painted-boundary grid, composited once, no
+   animation, no SVG payload. This is where immersion comes from now that
+   the background has stopped moving. */
+.md-court-texture { position: relative; isolation: isolate; }
+.md-court-texture::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.045) 1px, transparent 1px);
+  background-size: 68px 68px;
+  /* Fades toward the bottom so text never sits on live grid lines. */
+  -webkit-mask-image: radial-gradient(120% 90% at 50% 0%, #000 0%, transparent 78%);
+  mask-image: radial-gradient(120% 90% at 50% 0%, #000 0%, transparent 78%);
+}
+
+/* Diagonal service-court hatch, for hero corners. */
+.md-hatch { position: relative; isolation: isolate; }
+.md-hatch::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.4;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgb(255 255 255 / 0.05) 0 1px,
+    transparent 1px 11px
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   4. STATUS
+   ══════════════════════════════════════════════════════════════════════ */
+
+.md-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.1875rem 0.5rem;
+  border-radius: 0.3125rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border: 1px solid color-mix(in oklab, var(--md-status, var(--color-full)) 35%, transparent);
+  background: color-mix(in oklab, var(--md-status, var(--color-full)) 14%, transparent);
+  color: color-mix(in oklab, var(--md-status, var(--color-full)) 76%, white);
+}
+.md-status-live    { --md-status: var(--color-live); }
+.md-status-open    { --md-status: var(--color-open); }
+.md-status-closing { --md-status: var(--color-closing); }
+.md-status-full    { --md-status: var(--color-full); }
+.md-status-done    { --md-status: var(--color-done); }
+
+/* The one looping animation in the system. A live match is a state that
+   changes second to second; a static badge cannot say "right now". */
+.md-live-dot {
+  position: relative;
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--color-live);
+  flex: none;
+}
+.md-live-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--color-live);
+  animation: md-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes md-ping {
+  0%        { transform: scale(1);   opacity: 0.55; }
+  75%, 100% { transform: scale(2.6); opacity: 0; }
+}
+
+/* A LIVE card reads as live from across the room without moving. */
+.md-live-surface {
+  border-color: color-mix(in oklab, var(--color-live) 45%, var(--color-line));
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-live) 9%, var(--color-surface)) 0%,
+    var(--color-surface) 60%
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   5. EVENT-DRIVEN MOTION — each of these fires ONCE, on something happening
+   ══════════════════════════════════════════════════════════════════════ */
+
+@keyframes fadein {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* A score just changed. */
+@keyframes md-score-bump {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.22); }
+  100% { transform: scale(1); }
+}
+.md-bump { animation: md-score-bump 340ms var(--md-ease); }
+
+/* Something in a list changed (schedule moved, bracket advanced). */
+@keyframes md-flash {
+  from { background-color: color-mix(in oklab, var(--color-accent-teal) 22%, transparent); }
+  to   { background-color: transparent; }
+}
+.md-flash { animation: md-flash 1.2s ease-out; }
+
+/* Content arriving. */
+@keyframes md-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+.md-rise { animation: md-rise var(--md-slow) var(--md-ease) both; }
+
+/* Loading placeholder. Sweeps rather than pulses — a page of pulsing
+   skeletons is the "constantly pulsing cards" problem by another name. */
+.md-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-2) 25%,
+    var(--color-surface-3) 37%,
+    var(--color-surface-2) 63%
+  );
+  background-size: 400% 100%;
+  animation: md-sweep 1.4s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
+@keyframes md-sweep {
+  from { background-position: 100% 50%; }
+  to   { background-position: 0 50%; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   6. REDUCED MOTION — global backstop. Components also check in JS;
+   anything that slips through is neutralised here.
+   ══════════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .md-live-dot::after { display: none; }
+  .md-skeleton { animation: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   7. UTILITIES
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Horizontal rails (featured tournaments, matchdays, court lanes). Snaps
+   so a swipe lands on a card edge rather than mid-card. */
+.md-rail {
+  display: flex;
+  gap: 0.875rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.md-rail::-webkit-scrollbar { display: none; }
+.md-rail > * { scroll-snap-align: start; flex: none; }
+
+/* Thin scrollbar for panes that should still show one (the schedule grid). */
+.md-scroll { scrollbar-width: thin; scrollbar-color: var(--color-line) transparent; }
+.md-scroll::-webkit-scrollbar { height: 8px; width: 8px; }
+.md-scroll::-webkit-scrollbar-thumb { background: var(--color-line); border-radius: 999px; }
+.md-scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* Card titles must never push a card taller than its row. */
+.md-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.md-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Only elements the sports background actually animates get promoted. */
+.sb-arc { will-change: stroke-dashoffset, opacity; }

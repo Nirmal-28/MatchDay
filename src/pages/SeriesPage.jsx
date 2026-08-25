@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft, Layers, Plus, Trash2, ArrowUp, ArrowDown, MapPin, CalendarDays,
-  Trophy, Settings2, Radio, Info,
+  Trophy, Settings2, Info,
 } from "lucide-react";
 import {
   cx, fmtDate, fmtDateRange,
@@ -15,6 +15,7 @@ import {
 } from "../lib/repository";
 import { Badge, Btn, Card, Field, EmptyState, inputCls, useToasts, Toasts } from "../components/ui/primitives";
 import { BrandLoader } from "../components/ui/motion";
+import { StatTile, Tabs, StatusPill } from "../components/ui/md";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
 
 /* A series is a set of matchdays. Each matchday is an ordinary tournament with
@@ -33,12 +34,26 @@ const TABS = [
 function MatchdayCard({ t, index, total, canManage, onMove, onRemove, events }) {
   const stage = tournamentStage(t, events);
   const evs = events.filter((e) => e.tournament_id === t.id);
+  const isFinal = index === total - 1;
   return (
-    <Card className="p-3.5">
+    <div
+      className="md-card md-edge p-3.5 pl-5"
+      style={{ "--md-edge": t.status === "LIVE" ? "var(--color-live)" : "var(--color-accent-purple)" }}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-3 font-display text-sm font-bold text-ink-2">
-            {t.series_round ?? index + 1}
+          {/* The leg number, set like a race number. The last matchday is
+              labelled FINAL rather than given an ordinal — that is what a
+              circuit calls it, and it is the one leg people look for. */}
+          <div className="md-display flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg bg-surface-2 leading-none text-ink">
+            {isFinal ? (
+              <span className="text-[10px] tracking-wide text-accent-purple">Final</span>
+            ) : (
+              <>
+                <span className="text-[9px] text-ink-3">MD</span>
+                <span className="text-lg">{t.series_round ?? index + 1}</span>
+              </>
+            )}
           </div>
           <div className="min-w-0">
             <Link
@@ -55,7 +70,7 @@ function MatchdayCard({ t, index, total, canManage, onMove, onRemove, events }) 
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <Badge tone={stage.tone}>{t.status === "LIVE" ? <><Radio size={10} className="animate-pulse" /> Live</> : stage.label}</Badge>
+          {t.status === "LIVE" ? <StatusPill status="live" /> : <Badge tone={stage.tone}>{stage.label}</Badge>}
         </div>
       </div>
 
@@ -77,7 +92,7 @@ function MatchdayCard({ t, index, total, canManage, onMove, onRemove, events }) 
           </div>
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -143,42 +158,72 @@ export default function SeriesPage() {
         <ChevronLeft size={14} /> Back
       </button>
 
-      {/* Header */}
-      <div className="mb-5 rounded-2xl bg-navy-900 p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-accent-teal">
-              <Layers size={12} /> Series
+      {/* ── Circuit header ───────────────────────────────────────────────
+          A series is not a bigger tournament, it is a season, so it gets its
+          own identity: the matchday rail below the title reads as a circuit
+          — played legs filled, the live leg marked, the rest still to come.
+          That single row is the difference between "a list of tournaments"
+          and "a competition with a shape". */}
+      <header className="md-court-texture relative mb-6 overflow-hidden rounded-2xl border border-line bg-gradient-to-b from-navy-800 to-surface p-5 sm:p-7">
+        <div className="md-eyebrow mb-2.5 flex items-center gap-1.5 text-accent-purple">
+          <Layers size={12} /> Series
+        </div>
+        <h1 className="md-display md-h2 text-ink">{series.name}</h1>
+        {series.description && (
+          <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-ink-2">{series.description}</p>
+        )}
+
+        {/* The circuit rail. Each segment is one matchday, coloured by what
+            has actually happened to it — no progress is inferred. */}
+        {ordered.length > 0 && (
+          <div className="mt-6">
+            <div className="md-eyebrow mb-2">
+              Matchday {Math.min(completed + 1, ordered.length)} of {ordered.length}
             </div>
-            <h1 className="mt-1 text-2xl font-bold text-white">{series.name}</h1>
-            {series.description && <p className="mt-1 max-w-xl text-sm text-ink-2">{series.description}</p>}
+            <div className="flex gap-1.5">
+              {ordered.map((t, i) => {
+                const done = ["COMPLETED", "ARCHIVED"].includes(t.status);
+                const live = t.status === "LIVE";
+                const isFinal = i === ordered.length - 1;
+                return (
+                  <Link
+                    key={t.id}
+                    to={t.slug ? `/t/${t.slug}` : `/organizer/${t.id}`}
+                    className="group min-w-0 flex-1"
+                    title={`${isFinal ? "Final" : `Matchday ${i + 1}`} — ${t.name}`}
+                  >
+                    <span
+                      className="block h-2 rounded-full transition-[filter] group-hover:brightness-125"
+                      style={{
+                        background: live ? "var(--color-live)"
+                          : done ? "var(--color-accent-purple)"
+                          : "var(--color-surface-3)",
+                      }}
+                    />
+                    <span className="mt-1.5 block truncate text-[10px] font-semibold uppercase tracking-wide text-ink-3">
+                      {isFinal ? "Final" : `MD${i + 1}`}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
           </div>
+        )}
+
+        <div className="mt-6 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          <StatTile label="Matchdays" value={ordered.length} />
+          <StatTile label="Completed" value={completed} tone="done" />
+          <StatTile label="Players" value={participants} />
+          <StatTile label="Matches played" value={data.matches.length} />
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {[
-            { label: "Matchdays", value: ordered.length },
-            { label: "Completed", value: completed },
-            { label: "Players", value: participants },
-            { label: "Matches played", value: data.matches.length },
-          ].map((s) => (
-            <div key={s.label} className="rounded-lg border border-white/10 bg-white/5 p-3">
-              <div className="font-display text-2xl font-bold text-white">{s.value}</div>
-              <div className="text-[11px] uppercase tracking-wide text-ink-3">{s.label}</div>
-            </div>
-          ))}
-        </div>
-      </div>
+      </header>
 
       {/* Tabs — settings only exists for the owner. */}
-      <div className="mb-4 flex gap-1 overflow-x-auto border-b border-line">
-        {TABS.filter((t) => t.key !== "settings" || canManage).map((t) => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className={cx("flex flex-shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium",
-              tab === t.key ? "border-accent-teal text-accent-teal" : "border-transparent text-ink-2 hover:text-ink")}>
-            <t.icon size={14} />{t.label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        tabs={TABS.filter((t) => t.key !== "settings" || canManage)}
+        value={tab} onChange={setTab} ariaLabel="Series sections"
+        className="mb-5"
+      />
 
       {/* ── Matchdays ─────────────────────────────────────────────────── */}
       {tab === "matchdays" && (
@@ -192,7 +237,7 @@ export default function SeriesPage() {
 
           {canManage && addOpen && (
             <Card className="p-4">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">Add an existing tournament</div>
+              <div className="mb-2 md-eyebrow">Add an existing tournament</div>
               {attachable.length === 0 ? (
                 <p className="text-sm text-ink-3">
                   You have no tournaments outside a series. Create one from the organizer workspace first — a
@@ -251,7 +296,7 @@ export default function SeriesPage() {
         <div className="space-y-3">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-ink-2">Series standings</div>
+              <div className="md-eyebrow">Series standings</div>
               <p className="mt-0.5 max-w-lg text-[11px] text-ink-3">
                 Aggregated from completed matches across {standings.playedMatchdays} played{" "}
                 {standings.playedMatchdays === 1 ? "matchday" : "matchdays"}. A matchday that has not been
@@ -349,7 +394,7 @@ export default function SeriesPage() {
       {tab === "settings" && canManage && (
         <div className="max-w-lg space-y-4">
           <Card className="space-y-3 p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-ink-2">Series details</div>
+            <div className="md-eyebrow">Series details</div>
             <Field label="Name" required>
               <input className={inputCls} defaultValue={series.name}
                 onBlur={(e) => e.target.value.trim() && e.target.value !== series.name &&
@@ -363,7 +408,7 @@ export default function SeriesPage() {
           </Card>
 
           <Card className="space-y-2 p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-ink-2">Danger zone</div>
+            <div className="md-eyebrow">Danger zone</div>
             <p className="text-[11px] text-ink-3">
               Deleting the series does not delete its tournaments — they simply become standalone again, with every
               draw, schedule and result intact.

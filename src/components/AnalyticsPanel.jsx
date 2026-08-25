@@ -16,7 +16,7 @@ import { Card } from "../components/ui/primitives";
 function StatTile({ label, value, sub, tone, icon: Icon }) {
   return (
     <Card className="p-3.5">
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-ink-3">
+      <div className="flex items-center gap-1.5 md-eyebrow">
         {Icon && <Icon size={11} />}{label}
       </div>
       <div className={cx("font-display text-2xl font-bold leading-tight",
@@ -88,7 +88,7 @@ export default function AnalyticsPanel({ tournament, events, courts, entries, ma
     <div className="space-y-6">
       {/* Participation */}
       <section>
-        <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2">
+        <h3 className="mb-2 flex items-center gap-1.5 md-eyebrow">
           <Users size={13} /> Participation
         </h3>
         <div className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -99,7 +99,7 @@ export default function AnalyticsPanel({ tournament, events, courts, entries, ma
           <StatTile label="No-shows" value={p.noShows} tone={p.noShows ? "red" : undefined} />
         </div>
         <Card className="p-4">
-          <div className="mb-2 text-[11px] uppercase tracking-wide text-ink-3">Registration status breakdown</div>
+          <div className="mb-2 md-eyebrow">Registration status breakdown</div>
           <StackedBar
             total={p.total}
             segments={[
@@ -116,7 +116,7 @@ export default function AnalyticsPanel({ tournament, events, courts, entries, ma
       {/* Entries per category */}
       {events.length > 0 && (
         <section>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-2">Entries by category</h3>
+          <h3 className="mb-2 md-eyebrow">Entries by category</h3>
           <Card className="p-4">
             <BarRows
               rows={events.map((e) => ({
@@ -133,7 +133,7 @@ export default function AnalyticsPanel({ tournament, events, courts, entries, ma
 
       {/* Matches */}
       <section>
-        <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2">
+        <h3 className="mb-2 flex items-center gap-1.5 md-eyebrow">
           <Swords size={13} /> Matches
         </h3>
         <div className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -143,7 +143,7 @@ export default function AnalyticsPanel({ tournament, events, courts, entries, ma
           <StatTile label="Progress" value={`${ms.progressPct}%`} icon={BarChart3} />
         </div>
         <Card className="p-4">
-          <div className="mb-2 text-[11px] uppercase tracking-wide text-ink-3">Match pipeline</div>
+          <div className="mb-2 md-eyebrow">Match pipeline</div>
           <StackedBar
             total={ms.total}
             segments={[
@@ -158,12 +158,12 @@ export default function AnalyticsPanel({ tournament, events, courts, entries, ma
 
       {/* Timing */}
       <section>
-        <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2">
+        <h3 className="mb-2 flex items-center gap-1.5 md-eyebrow">
           <Clock size={13} /> Timing
         </h3>
         <div className="grid gap-3 sm:grid-cols-3">
           <Card className="p-3.5">
-            <div className="text-[10px] uppercase tracking-wide text-ink-3">Average match duration</div>
+            <div className="md-eyebrow">Average match duration</div>
             {ms.avgDurationMins === null ? (
               <p className="mt-1 text-xs text-ink-3">
                 Not enough data yet — needs at least 3 completed matches with recorded start and end times.
@@ -177,7 +177,7 @@ export default function AnalyticsPanel({ tournament, events, courts, entries, ma
             )}
           </Card>
           <Card className="p-3.5">
-            <div className="text-[10px] uppercase tracking-wide text-ink-3">Average start delay</div>
+            <div className="md-eyebrow">Average start delay</div>
             {ms.avgDelayMins === null ? (
               <p className="mt-1 text-xs text-ink-3">Not enough started matches to measure schedule drift yet.</p>
             ) : (
@@ -190,7 +190,7 @@ export default function AnalyticsPanel({ tournament, events, courts, entries, ma
             )}
           </Card>
           <Card className="p-3.5">
-            <div className="text-[10px] uppercase tracking-wide text-ink-3">Currently running late</div>
+            <div className="md-eyebrow">Currently running late</div>
             <div className={cx("font-display text-2xl font-bold", ms.runningLate.length ? "text-red-300" : "text-ink")}>
               {ms.runningLate.length}
             </div>
@@ -201,7 +201,7 @@ export default function AnalyticsPanel({ tournament, events, courts, entries, ma
 
       {/* Courts */}
       <section>
-        <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2">
+        <h3 className="mb-2 flex items-center gap-1.5 md-eyebrow">
           <LayoutGrid size={13} /> Court utilization
         </h3>
         {!util ? (
@@ -211,7 +211,7 @@ export default function AnalyticsPanel({ tournament, events, courts, entries, ma
           </Card>
         ) : (
           <Card className="p-4">
-            <div className="mb-3 text-[11px] uppercase tracking-wide text-ink-3">
+            <div className="mb-3 md-eyebrow">
               {util.overallPct}% of available court time is booked
             </div>
             <BarRows
@@ -233,7 +233,7 @@ export default function AnalyticsPanel({ tournament, events, courts, entries, ma
 
       {/* Revenue */}
       <section>
-        <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2">
+        <h3 className="mb-2 flex items-center gap-1.5 md-eyebrow">
           <IndianRupee size={13} /> Revenue
         </h3>
         <div className="grid gap-3 sm:grid-cols-3">

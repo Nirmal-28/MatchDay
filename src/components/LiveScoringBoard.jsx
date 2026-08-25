@@ -69,7 +69,7 @@ export default function LiveScoringBoard({ matches, events, entriesById, onStart
               <Badge tone="slate">{m.court || "Court —"}</Badge>
               {m.status === "LIVE" ? <LivePulse /> : <Badge tone="teal">Ready</Badge>}
             </div>
-            <div className="text-[11px] uppercase tracking-wide text-ink-3">{CATEGORY_META[ev.category].label} · {matchStageLabel(m, ev)}</div>
+            <div className="md-eyebrow">{CATEGORY_META[ev.category].label} · {matchStageLabel(m, ev)}</div>
             <div className="mt-1.5 space-y-1 text-sm">
               <div className="flex items-center justify-between"><span className="truncate font-medium text-ink">{entryShort(a)}</span><span className="font-mono text-ink-2">{tally.a}</span></div>
               <div className="flex items-center justify-between"><span className="truncate font-medium text-ink">{entryShort(b)}</span><span className="font-mono text-ink-2">{tally.b}</span></div>

@@ -35,11 +35,11 @@ export default function Leaderboard() {
 
   return (
     <div>
-      <div className="relative mb-6 overflow-hidden rounded-2xl bg-navy-900 px-6 py-10 text-center">
+      <div className="md-court-texture relative mb-6 overflow-hidden rounded-2xl border border-line bg-gradient-to-b from-navy-800 to-surface px-6 py-12 text-center">
         <CourtGeometry />
         <div className="relative">
-          <div className="text-[11px] font-semibold uppercase tracking-widest text-accent-teal">Matchday</div>
-          <h1 className="mt-1 text-2xl font-bold text-white sm:text-3xl">Leaderboard</h1>
+          <div className="md-eyebrow text-accent-teal">Matchday</div>
+          <h1 className="md-display md-h1 mt-1.5 text-ink">Rankings</h1>
           <p className="mx-auto mt-2 max-w-md text-sm text-ink-3">
             Badminton ranking points from every completed match on MatchDay. A player needs at least {rankingConfigFor("badminton").minMatches} completed matches to be ranked.
           </p>
@@ -54,14 +54,14 @@ export default function Leaderboard() {
         <Reveal>
           <div className="overflow-x-auto rounded-md border border-line">
             <table className="w-full text-left text-sm">
-              <thead className="bg-surface-2 text-[11px] uppercase tracking-wide text-ink-2">
+              <thead className="bg-surface-2">
                 <tr>
-                  <th className="px-3 py-2 font-medium">#</th>
-                  <th className="px-3 py-2 font-medium">Player</th>
-                  <th className="px-3 py-2 font-medium text-center">Points</th>
-                  <th className="px-3 py-2 font-medium text-center">Played</th>
-                  <th className="px-3 py-2 font-medium text-center">Won</th>
-                  <th className="px-3 py-2 font-medium text-center">Win %</th>
+                  <th className="md-eyebrow px-3 py-2.5">#</th>
+                  <th className="md-eyebrow px-3 py-2.5">Player</th>
+                  <th className="md-eyebrow px-3 py-2.5 text-center">Points</th>
+                  <th className="md-eyebrow px-3 py-2.5 text-center">Played</th>
+                  <th className="md-eyebrow px-3 py-2.5 text-center">Won</th>
+                  <th className="md-eyebrow px-3 py-2.5 text-center">Win %</th>
                 </tr>
               </thead>
               <StaggerList as="tbody" className="divide-y divide-line-soft">
@@ -71,7 +71,7 @@ export default function Leaderboard() {
                       {i < 3 ? (
                         <Trophy size={16} className={RANK_ACCENT[i]} />
                       ) : (
-                        <span className="text-ink-3">{i + 1}</span>
+                        <span className="md-score text-ink-3">{i + 1}</span>
                       )}
                     </td>
                     <td className="px-3 py-2.5">
@@ -84,10 +84,10 @@ export default function Leaderboard() {
                         </span>
                       )}
                     </td>
-                    <td className="px-3 py-2.5 text-center font-mono font-bold text-accent-teal">{p.points}</td>
-                    <td className="px-3 py-2.5 text-center font-mono text-ink-2">{p.played}</td>
-                    <td className="px-3 py-2.5 text-center font-mono font-semibold text-ink">{p.won}</td>
-                    <td className={cx("px-3 py-2.5 text-center font-mono font-semibold", i < 3 ? "text-accent-teal" : "text-ink-2")}>
+                    <td className="md-score px-3 py-2.5 text-center text-lg text-accent-teal">{p.points}</td>
+                    <td className="px-3 py-2.5 text-center tabular-nums text-ink-2">{p.played}</td>
+                    <td className="px-3 py-2.5 text-center font-semibold tabular-nums text-ink">{p.won}</td>
+                    <td className={cx("px-3 py-2.5 text-center font-semibold tabular-nums", i < 3 ? "text-accent-teal" : "text-ink-2")}>
                       {p.winPct}%
                     </td>
                   </StaggerItem>

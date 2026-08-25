@@ -57,7 +57,7 @@ export default function ExportsPanel({ tournament, events, courts, entriesByEven
   return (
     <div className="space-y-6">
       <section>
-        <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2">
+        <h3 className="mb-2 flex items-center gap-1.5 md-eyebrow">
           <FileSpreadsheet size={13} /> Spreadsheet exports
         </h3>
         <div className="space-y-2">
@@ -85,7 +85,7 @@ export default function ExportsPanel({ tournament, events, courts, entriesByEven
       </section>
 
       <section>
-        <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-2">
+        <h3 className="mb-2 flex items-center gap-1.5 md-eyebrow">
           <Printer size={13} /> Print-friendly views
         </h3>
         <div className="flex flex-wrap gap-2">
