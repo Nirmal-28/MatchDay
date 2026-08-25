@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  Trophy, ArrowRight, Search, SlidersHorizontal, X, Radio, Flame, Timer,
+  Trophy, ArrowRight, Search, SlidersHorizontal, X, Radio, Flame, Timer, ChevronDown,
 } from "lucide-react";
 import {
   cx, fmtDateRange, inr, TOURNAMENT_STATUS_META,
@@ -91,14 +91,73 @@ function toCardModel(t) {
   };
 }
 
+/* ── Ticker ───────────────────────────────────────────────────────────────
+   A scoreboard ticker running under the hero. It carries REAL content: live
+   scores when anything is on court, otherwise the sports the platform
+   actually runs and the open-entry count.
+
+   This is the one continuously moving element in the product and it is a
+   deliberate exception, not a relapse: a ticker is how a venue board and a
+   broadcast lower-third have always shown a run of results. It is content
+   in motion rather than decoration behind content — it never sits under
+   text, it pauses on hover so a score can be read, and reduced motion stops
+   it dead with the first run still legible. */
+function Ticker({ items }) {
+  if (!items.length) return null;
+  // Duration scales with content so a long run does not sprint past.
+  const duration = Math.max(28, items.length * 5);
+  const run = (
+    <>
+      {items.map((it, i) => (
+        <span key={i} className="flex items-center gap-2.5 whitespace-nowrap">
+          {it.live && <span className="md-live-dot" />}
+          <span className={cx("md-display text-2xl", it.live ? "text-ink" : "text-ink-3")}>
+            {it.label}
+          </span>
+          {it.value && <span className="md-score text-2xl text-accent-teal">{it.value}</span>}
+          <span className="text-ink-3/40" aria-hidden="true">/</span>
+        </span>
+      ))}
+    </>
+  );
+
+  return (
+    <div
+      className="md-bleed border-y border-line bg-surface/40 py-3"
+      style={{ "--marquee-duration": `${duration}s` }}
+    >
+      {/* One accessible copy; the duplicated visual runs are hidden so a
+          screen reader does not read the same scores twice. */}
+      <span className="sr-only">
+        {items.map((i) => `${i.label} ${i.value || ""}`).join(", ")}
+      </span>
+      <div className="md-marquee" aria-hidden="true">
+        <div>{run}</div>
+        {/* The second run is what makes the loop seamless — it slides in
+            behind the first as that one leaves. */}
+        <div>{run}</div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Hero ───────────────────────────────────────────────────────────────
-   Editorial, static, and mostly type. Depth comes from the court texture
-   and the app-wide background behind it, not from anything that moves. */
+   A poster, not a page header.
+
+   This is deliberately built to break the app's 72rem reading column and
+   take the whole viewport, with type at a scale that fills the measure edge
+   to edge. The previous version sat politely inside the container at
+   heading size, which is why the redesign read as "same layout, nicer
+   fonts" — the composition, not the palette, is what makes a landing feel
+   like a product worth entering.
+
+   The three lines alternate solid and outlined weight so the block reads as
+   one shape. Everything below is still. */
 function Hero({ liveCount, openCount, query, onQuery, session }) {
   return (
-    <section className="md-court-texture relative -mx-4 -mt-6 overflow-hidden border-b border-line px-4 pb-10 pt-12 sm:px-8 sm:pb-14 sm:pt-16">
-      <div className="mx-auto max-w-4xl">
-        <Rise className="md-eyebrow mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+    <section className="md-bleed md-court-texture relative -mt-6 overflow-hidden border-b border-line">
+      <div className="mx-auto flex min-h-[88vh] max-w-[110rem] flex-col justify-center px-5 pb-14 pt-24 sm:px-10">
+        <Rise className="mb-7 flex flex-wrap items-center gap-x-4 gap-y-2">
           {liveCount > 0 && (
             <span className="md-status md-status-live">
               <span className="md-live-dot" />
@@ -108,63 +167,67 @@ function Hero({ liveCount, openCount, query, onQuery, session }) {
           {openCount > 0 && (
             <span className="md-status md-status-open">{openCount} open for entry</span>
           )}
-          {liveCount === 0 && openCount === 0 && <span>Multi-sport competition platform</span>}
+          <span className="md-eyebrow">Multi-sport competition platform</span>
         </Rise>
 
-        {/* The brand statement, revealed line by line from behind its own
-            mask. This is the one place in the product that gets the full
-            treatment — it earns it by being the first thing anyone sees, and
-            it stays still forever after it lands. */}
+        {/* The statement. Line by line from behind its own mask, then still
+            forever. The middle line is outlined so the block has internal
+            rhythm rather than three identical bars of type. */}
         <MaskText
           as="h1"
-          className="md-display text-ink"
-          lineClassName="md-h1"
+          className="md-poster text-ink"
           lines={["Play.", "Compete.", "Belong."]}
-          stagger={0.085}
+          lineClassName={(i) => (i === 1 ? "md-outline" : undefined)}
+          stagger={0.09}
         />
 
-        <Rise delay={0.28}>
-          <p className="mt-6 max-w-lg text-[15px] leading-relaxed text-ink-2">
-            Anyone can enter the arena — any age, any level, any sport. Find a
-            tournament, enter it, and follow every point live.
-          </p>
-        </Rise>
+        <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:items-end">
+          <Rise delay={0.3}>
+            <p className="max-w-md text-base leading-relaxed text-ink-2 sm:text-lg">
+              Anyone can enter the arena — any age, any level, any sport. Find a
+              tournament, enter it, and follow every point live.
+            </p>
+            <div className="mt-4 text-[13px] text-ink-3">
+              Running one yourself?{" "}
+              <Link to={session ? "/organizer" : "/host"} className="md-underline font-semibold text-accent-teal">
+                Host a tournament
+              </Link>
+            </div>
+          </Rise>
 
-        {/* Search sits in the hero because "what can I play" is the first
-            question, and burying the field below three marketing sections
-            made people scroll past the thing they came for. */}
-        <Rise delay={0.36} className="mt-7 flex flex-col gap-2.5 sm:flex-row">
-          <div className="relative flex-1">
-            <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-3" />
-            <label className="sr-only" htmlFor="discover-search">Search tournaments</label>
-            <input
-              id="discover-search"
-              className="h-12 w-full rounded-lg border border-line bg-surface/80 pl-11 pr-4 text-sm text-ink placeholder-ink-3 backdrop-blur focus:border-accent-teal focus:outline-none"
-              placeholder="Search by tournament, venue or city"
-              value={query}
-              onChange={(e) => onQuery(e.target.value)}
-            />
-          </div>
-          {/* The one magnetic control in the product. It drifts toward the
-              pointer as you aim at it — a small reward for reaching for the
-              primary action, and one that stops meaning anything if every
-              button does it. */}
-          <Magnetic>
-            <a
-              href="#tournaments"
-              className="md-group inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-accent-teal px-6 text-sm font-bold uppercase tracking-wide text-navy-950 transition-[filter] hover:brightness-110 sm:w-auto"
-            >
-              Browse events <ArrowRight size={15} className="md-arrow" />
-            </a>
-          </Magnetic>
-        </Rise>
+          {/* Search sits in the hero because "what can I play" is the first
+              question, and burying the field below marketing sections made
+              people scroll past the thing they came for. */}
+          <Rise delay={0.38} className="flex flex-col gap-2.5">
+            <div className="relative">
+              <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink-3" />
+              <label className="sr-only" htmlFor="discover-search">Search tournaments</label>
+              <input
+                id="discover-search"
+                className="h-14 w-full rounded-xl border border-line bg-surface/70 pl-12 pr-4 text-[15px] text-ink placeholder-ink-3 backdrop-blur focus:border-accent-teal focus:outline-none"
+                placeholder="Search tournaments, venues, cities"
+                value={query}
+                onChange={(e) => onQuery(e.target.value)}
+              />
+            </div>
+            {/* The one magnetic control in the product — a small reward for
+                aiming at the primary action, and one that would stop meaning
+                anything if every button did it. */}
+            <Magnetic>
+              <a
+                href="#tournaments"
+                className="md-group flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-accent-teal text-sm font-bold uppercase tracking-widest text-navy-950 transition-[filter] hover:brightness-110"
+              >
+                Browse every event <ArrowRight size={16} className="md-arrow" />
+              </a>
+            </Magnetic>
+          </Rise>
+        </div>
 
-        <Rise delay={0.44} className="mt-4 text-[13px] text-ink-3">
-          Running one yourself?{" "}
-          <Link to={session ? "/organizer" : "/host"} className="md-underline font-semibold text-accent-teal">
-            Host a tournament on MatchDay
-          </Link>
-        </Rise>
+        <div className="mt-14 flex items-center gap-2 text-ink-3">
+          <ChevronDown size={16} className="md-cue" aria-hidden="true" />
+          <span className="md-eyebrow">Scroll</span>
+        </div>
       </div>
     </section>
   );
@@ -179,7 +242,7 @@ function LiveStrip({ tournament, matches, courts }) {
   const accent = sportAccent(tournament.sport);
 
   return (
-    <section className="mt-10">
+    <section className="md-section">
       <SectionHeader
         eyebrow="Happening now"
         title="Live on court"
@@ -242,7 +305,7 @@ function LiveStrip({ tournament, matches, courts }) {
 function Rail({ eyebrow, title, icon: Icon, tone, tournaments }) {
   if (!tournaments.length) return null;
   return (
-    <section className="mt-12">
+    <section className="md-section">
       <SectionHeader
         eyebrow={eyebrow}
         title={
@@ -313,13 +376,37 @@ function SportChips({ value, onChange, counts }) {
    without seven things sliding underneath it. */
 function EveryoneCanPlay() {
   return (
-    <section className="md-hatch relative mt-16 overflow-hidden rounded-2xl border border-line bg-gradient-to-b from-navy-800 to-surface px-6 py-14 text-center">
-      <img src={logo} alt="" className="mx-auto mb-6 h-14 w-14 rounded-xl" width="56" height="56" />
-      <h2 className="md-display md-h2 text-ink">Everyone can play.</h2>
-      <p className="mx-auto mt-3 max-w-lg text-[15px] leading-relaxed text-ink-2">
-        No matter your age, background or skill level, there is a place for you on the
-        court. Different people, different sports, one competition.
-      </p>
+    // The one inverted block in the product. Coming out of a long dark
+    // scroll onto a light ground is the strongest section transition
+    // available without a single frame of animation — and it is spent here,
+    // once, on the sentence the whole platform exists for. A second inverted
+    // section would turn a statement into a stripe pattern.
+    <section className="md-bleed md-invert md-section md-hatch relative mt-16 overflow-hidden">
+      <div className="mx-auto max-w-[110rem] px-5 sm:px-10">
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-end">
+          <div>
+            <div className="md-eyebrow mb-6">The whole point</div>
+            <MaskText
+              as="h2"
+              className="md-poster-sm text-ink"
+              lines={["Anyone", "can compete."]}
+              lineClassName={(i) => (i === 1 ? "md-outline" : undefined)}
+            />
+          </div>
+          <Rise delay={0.15}>
+            <p className="max-w-md text-lg leading-relaxed text-ink-2">
+              No matter your age, background or skill level, there is a place for you
+              on the court. Different people, different sports, one competition.
+            </p>
+            <div className="mt-7 flex items-center gap-3">
+              <img src={logo} alt="" className="h-11 w-11 rounded-xl" width="44" height="44" />
+              <span className="wordmark text-2xl uppercase leading-none text-ink">
+                Match<span className="wordmark-accent">day</span>
+              </span>
+            </div>
+          </Rise>
+        </div>
+      </div>
     </section>
   );
 }
@@ -331,7 +418,7 @@ function EveryoneCanPlay() {
 function SportCoverage() {
   const sports = SPORT_KEYS.map((k) => ({ key: k, ...sportMeta(k) }));
   return (
-    <section className="mt-16">
+    <section className="md-section">
       <SectionHeader eyebrow="Built for every sport" title="One platform. Every competition." />
       <p className="-mt-1 mb-5 max-w-xl text-sm text-ink-2">
         Draws, seeding, scheduling, check-in and rankings are sport-agnostic and work
@@ -403,6 +490,31 @@ export default function PublicDiscovery() {
   const all = useMemo(() => tournaments || [], [tournaments]);
   const liveCount = all.filter((t) => t.status === "LIVE").length;
   const openCount = all.filter((t) => t.status === "REGISTRATION_OPEN").length;
+
+  /* What the ticker carries. Live match scores when anything is on court —
+     the genuinely broadcast-worthy content — otherwise the sports that are
+     actually playable and the real open-entry tournaments. Never a
+     fabricated headline: if there is nothing true to say, the ticker does
+     not render at all. */
+  const tickerItems = useMemo(() => {
+    if (liveData?.matches?.length) {
+      const onCourt = liveData.matches.filter((m) => m.status === "LIVE");
+      if (onCourt.length) {
+        return onCourt.map((m) => {
+          const games = [...(m.games || [])].sort((a, b) => a.game_number - b.game_number);
+          const cur = games[games.length - 1];
+          return {
+            live: true,
+            label: m.court || "Court",
+            value: cur ? `${cur.score_a}–${cur.score_b}` : null,
+          };
+        });
+      }
+    }
+    const open = all.filter((t) => tournamentRegistrationState(t, t.events).canRegister);
+    if (open.length) return open.slice(0, 10).map((t) => ({ label: t.name, value: null }));
+    return [];
+  }, [liveData, all]);
 
   const sportCounts = useMemo(() => {
     const c = {};
@@ -500,6 +612,8 @@ export default function PublicDiscovery() {
         session={session}
       />
 
+      <Ticker items={tickerItems} />
+
       {liveData && (
         <LiveStrip tournament={liveData.tournament} matches={liveData.matches} courts={liveData.courts} />
       )}
@@ -527,7 +641,7 @@ export default function PublicDiscovery() {
       />
 
       {/* ── Full listing ─────────────────────────────────────────────── */}
-      <section id="tournaments" className="mt-16 scroll-mt-20">
+      <section id="tournaments" className="md-section scroll-mt-20">
         <SectionHeader
           eyebrow="Every event"
           title="Find a tournament"

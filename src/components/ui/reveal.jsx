@@ -160,7 +160,13 @@ export function MaskText({
           style={{ paddingBottom: "0.08em", marginBottom: "-0.08em" }}
         >
           <span
-            className={cx("block will-change-transform", lineClassName)}
+            // `lineClassName` may be a function of the line index, which is
+            // how a poster block alternates solid and outlined weight without
+            // the caller having to hand-roll three separate MaskTexts.
+            className={cx(
+              "block will-change-transform",
+              typeof lineClassName === "function" ? lineClassName(i) : lineClassName
+            )}
             style={{
               transform: reduced || inView ? "translate3d(0,0,0)" : "translate3d(0,110%,0)",
               opacity: reduced || inView ? 1 : 0,

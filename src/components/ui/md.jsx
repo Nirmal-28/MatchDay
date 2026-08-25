@@ -85,14 +85,23 @@ export function StatusPill({ status, children, className }) {
    the same timing, without a single page importing an animation primitive
    to decorate its own heading. One place to tune it, one place to turn it
    off, and no chance of two pages drifting to different easings. */
-export function SectionHeader({ title, eyebrow, action, className, id }) {
+export function SectionHeader({ title, eyebrow, action, className, id, size = "lg" }) {
   return (
-    <Rise className={cx("mb-3 flex items-end justify-between gap-4", className)}>
+    <Rise className={cx("mb-5 flex items-end justify-between gap-4", className)}>
       <div className="min-w-0">
-        {eyebrow && <div className="md-eyebrow mb-1">{eyebrow}</div>}
-        <h2 id={id} className="md-display md-h3 md-rule text-ink">{title}</h2>
+        {eyebrow && <div className="md-eyebrow mb-2">{eyebrow}</div>}
+        {/* Section titles carry real weight: at h3 scale they read as form
+            labels, and the page becomes an undifferentiated run of cards.
+            `size="sm"` exists for genuinely subordinate blocks inside a
+            panel, not as the default. */}
+        <h2
+          id={id}
+          className={cx("md-display md-rule text-ink", size === "sm" ? "md-h3" : "md-h2")}
+        >
+          {title}
+        </h2>
       </div>
-      {action && <div className="shrink-0 pb-1">{action}</div>}
+      {action && <div className="shrink-0 pb-1.5">{action}</div>}
     </Rise>
   );
 }

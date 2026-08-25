@@ -4,6 +4,7 @@ import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import { AuthProvider, useAuth } from "./lib/AuthContext";
 import { BrandLoader } from "./components/ui/motion";
 import NavOverlay from "./components/ui/NavOverlay";
+import Cursor from "./components/ui/Cursor";
 // Purely decorative. It is now static SVG rather than the GSAP timelines it
 // used to run, so the chunk is small — but it is still off the critical path
 // between a shared tournament link and the score someone opened it to see,
@@ -358,7 +359,11 @@ function AnimatedRoutes() {
 
 function Shell() {
   return (
-    <div className="relative min-h-screen text-ink">
+    // `overflow-x: clip` (NOT hidden) absorbs the few pixels a `100vw`
+    // full-bleed section overhangs by when a vertical scrollbar is present,
+    // so the page can never scroll sideways. `clip` is deliberate: `hidden`
+    // would make this a scroll container and break the sticky header.
+    <div className="relative min-h-screen [overflow-x:clip] text-ink">
       {/* Keyboard users land on the header links on every page load; without
           this they have to tab past the whole nav to reach the content. It is
           invisible until focused. */}
@@ -371,6 +376,10 @@ function Shell() {
       {/* No fallback: the background is decoration, and a placeholder for it
           would be more distracting than its brief absence. */}
       <Suspense fallback={null}><SportsBackground /></Suspense>
+      {/* Site chrome only. Scorer Mode and the Venue Display render outside
+          the Shell — a courtside phone and an unattended TV have no pointer
+          worth decorating. It also self-disables on touch and reduced motion. */}
+      <Cursor />
       <Header />
       {/* Bottom padding clears the mobile nav bar so the last card is never
           trapped underneath it. */}
