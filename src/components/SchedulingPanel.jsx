@@ -307,7 +307,7 @@ export default function SchedulingPanel({ tournament, events, entriesById, notif
               const pct = quality.utilizationByCourt[c.id] || 0;
               return (
                 <div key={c.id} className="flex items-center gap-2 text-xs">
-                  <span className="w-20 shrink-0 text-ink-2">{c.name}</span>
+                  <span className="w-24 shrink-0 truncate text-ink-2" title={c.name}>{c.name}</span>
                   <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-2">
                     <div className="h-full rounded-full bg-accent-teal" style={{ width: `${pct}%` }} />
                   </div>
@@ -606,7 +606,10 @@ function CourtTimeline({
     <div className="md-card md-scroll overflow-x-auto p-3">
       <div style={{ width: laneWidth, minWidth: "100%" }}>
         {/* ── Time ruler ─────────────────────────────────────────────── */}
-        <div className="relative mb-2 ml-20 h-5 border-b border-line">
+        {/* 7rem = the 6.5rem lane label plus the 0.5rem flex gap between it
+            and the lane. If either changes this must change with it, or the
+            hour ticks stop sitting above the lanes they label. */}
+        <div className="relative mb-2 ml-[7rem] h-5 border-b border-line">
           {hours.map((h) => (
             <span
               key={h.toISOString()}
@@ -627,7 +630,17 @@ function CourtTimeline({
 
             return (
               <div key={c.id} className="flex items-stretch gap-2">
-                <div className="md-display flex w-18 shrink-0 items-center truncate text-lg text-ink" style={{ width: "4.5rem" }} title={c.name}>
+                {/* Fixed, not min/max: the hour ruler above is positioned by
+                    a hard left offset, so every lane label must be exactly
+                    the same width or the ticks drift out of line with the
+                    lanes they label. 6.5rem is sized to the court names this
+                    product actually has — the previous 4.5rem clipped even
+                    "Court 1" to "COUR…". */}
+                <div
+                  className="md-display flex shrink-0 items-center truncate text-lg text-ink"
+                  style={{ width: "6.5rem" }}
+                  title={c.name}
+                >
                   {c.name}
                 </div>
 

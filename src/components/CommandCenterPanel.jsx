@@ -52,7 +52,16 @@ function CourtLane({ c, name }) {
       className="md-card md-edge flex items-center gap-3.5 px-3.5 py-3 pl-5"
       style={{ "--md-edge": meta.color }}
     >
-      <div className="md-display w-16 shrink-0 truncate text-2xl text-ink" title={c.court.name}>
+      {/* Sized to the content, not to a guess. A fixed 4rem clipped even
+          "Court 1" to "COUR…" in condensed display type — court names are
+          the index an organizer scans this list by, so they must never
+          truncate at a normal length. min/max keeps the lanes aligned while
+          still allowing a genuinely long name ("Show Court") to fit. */}
+      <div
+        className="md-display shrink-0 truncate text-2xl text-ink"
+        style={{ minWidth: "5.5rem", maxWidth: "11rem" }}
+        title={c.court.name}
+      >
         {c.court.name}
       </div>
       <div className="min-w-0 flex-1">
