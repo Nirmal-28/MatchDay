@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bell, Mail, MessageSquare, Smartphone, Check } from "lucide-react";
+import { Bell, Mail, MessageSquare, MessageCircle, Smartphone, Check } from "lucide-react";
 import { getMyNotificationPreferences, updateMyNotificationPreferences } from "../lib/repository";
 import { enablePush, disablePush, isPushSupported, isPushConfigured, isThisDeviceSubscribed, pushPermission } from "../lib/push";
 import { Card } from "./ui/primitives";
@@ -54,7 +54,7 @@ export default function NotificationPreferences() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    getMyNotificationPreferences().then(setPrefs).catch(() => setPrefs({ email: true, sms: false, push: false }));
+    getMyNotificationPreferences().then(setPrefs).catch(() => setPrefs({ email: true, sms: false, push: false, whatsapp: false }));
     isThisDeviceSubscribed().then(setDeviceSubscribed);
   }, []);
 
@@ -122,6 +122,16 @@ export default function NotificationPreferences() {
           checked={!!prefs.sms} onChange={(v) => save({ sms: v })}
           disabled
           status="Not connected. Indian SMS needs a DLT-registered template and a gateway account — see supabase-integration/README.md."
+        />
+        {/* Shown as disabled rather than hidden, deliberately: a player
+            wondering "can it message me on WhatsApp?" gets an answer either
+            way, and the answer today is an honest no. */}
+        <Row
+          icon={MessageCircle} title="WhatsApp"
+          description="The same alerts as an approved WhatsApp template message."
+          checked={!!prefs.whatsapp} onChange={(v) => save({ whatsapp: v })}
+          disabled
+          status="Not connected. Needs a WhatsApp Business account and pre-approved message templates — see supabase-integration/GOING-LIVE.md."
         />
       </div>
 

@@ -363,7 +363,7 @@ function Shell() {
     // full-bleed section overhangs by when a vertical scrollbar is present,
     // so the page can never scroll sideways. `clip` is deliberate: `hidden`
     // would make this a scroll container and break the sticky header.
-    <div className="relative min-h-screen [overflow-x:clip] text-ink">
+    <div className="relative flex min-h-screen flex-col [overflow-x:clip] text-ink">
       {/* Keyboard users land on the header links on every page load; without
           this they have to tab past the whole nav to reach the content. It is
           invisible until focused. */}
@@ -383,7 +383,11 @@ function Shell() {
       <Header />
       {/* Bottom padding clears the mobile nav bar so the last card is never
           trapped underneath it. */}
-      <main id="main" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-6 pb-24 sm:pb-6">
+      {/* flex-1 so a short page (an empty leaderboard, a 404) still pushes
+          the footer to the bottom of the viewport. Without it the footer
+          floated in the middle of the screen with dead space beneath, which
+          reads as a broken page rather than an empty one. */}
+      <main id="main" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 pb-24 sm:pb-6">
         <AnimatedRoutes />
       </main>
       <footer className="mx-auto max-w-6xl px-4 pb-24 pt-4 text-center text-[11px] text-ink-3 sm:pb-8">

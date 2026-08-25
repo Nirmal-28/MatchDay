@@ -110,6 +110,62 @@ async function sendSms(phone: string, n: Notification): Promise<Result> {
   return { channel: "sms", status: "sent" };
 }
 
+/* ------------------------------ WHATSAPP -------------------------------- */
+// Meta Cloud API. Same contract as every other channel: it activates only
+// when its own secrets are present and reports `skipped` otherwise, so this
+// can sit deployed and inert until an account exists.
+//
+// The hard constraint that shapes this code: outside a 24-hour window opened
+// by the user messaging you first, WhatsApp permits ONLY pre-approved
+// templates. Tournament notices are always outside that window — nobody
+// messages a tournament first — so free-form `n.message` can never be sent
+// here. That is why this posts a template name with positional parameters
+// rather than the message body.
+//
+// Register a template named by WHATSAPP_TEMPLATE_NAME with exactly two
+// body parameters, in this order:
+//   {{1}} the notification title      e.g. "Match time changed"
+//   {{2}} the notification message    e.g. "Your R16 match moved to 4:30 PM"
+// Approval takes days and the submitted text must match what you send.
+async function sendWhatsApp(phone: string, n: Notification): Promise<Result> {
+  const token = Deno.env.get("WHATSAPP_TOKEN");
+  const phoneId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
+  const template = Deno.env.get("WHATSAPP_TEMPLATE_NAME");
+  const lang = Deno.env.get("WHATSAPP_TEMPLATE_LANG") || "en";
+  if (!token || !phoneId || !template) {
+    return { channel: "whatsapp", status: "skipped", detail: "WHATSAPP_TOKEN/PHONE_NUMBER_ID/TEMPLATE_NAME not set" };
+  }
+
+  // WhatsApp wants full international format with no punctuation. The stored
+  // number is Indian and may or may not already carry the country code.
+  const digits = phone.replace(/\D/g, "");
+  const to = digits.length === 10 ? `91${digits}` : digits;
+  if (to.length < 11) return { channel: "whatsapp", status: "skipped", detail: "no valid mobile number" };
+
+  const res = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to,
+      type: "template",
+      template: {
+        name: template,
+        language: { code: lang },
+        components: [{
+          type: "body",
+          parameters: [
+            { type: "text", text: n.title.slice(0, 120) },
+            { type: "text", text: n.message.slice(0, 480) },
+          ],
+        }],
+      },
+    }),
+  });
+  if (!res.ok) return { channel: "whatsapp", status: "failed", detail: `${res.status} ${await res.text()}` };
+  return { channel: "whatsapp", status: "sent" };
+}
+
 /* -------------------------------- PUSH ---------------------------------- */
 // Web Push needs a signed VAPID JWT per endpoint origin plus encrypted
 // payloads. Rather than hand-roll the crypto, this uses the standard library.
@@ -205,6 +261,7 @@ Deno.serve(async (req) => {
 
   if (wants.email && email) results.push(await sendEmail(email, notification).catch((e) => ({ channel: "email", status: "failed" as const, detail: String(e) })));
   if (wants.sms && player?.phone) results.push(await sendSms(player.phone, notification).catch((e) => ({ channel: "sms", status: "failed" as const, detail: String(e) })));
+  if (wants.whatsapp && player?.phone) results.push(await sendWhatsApp(player.phone, notification).catch((e) => ({ channel: "whatsapp", status: "failed" as const, detail: String(e) })));
   if (wants.push) results.push(await sendPush(subs ?? [], notification, supabase).catch((e) => ({ channel: "push", status: "failed" as const, detail: String(e) })));
 
   // Record what actually happened, so "did they get told?" has an answer.
