@@ -438,7 +438,11 @@ function EveryoneCanPlay() {
    the moment a sport gains a real scoring engine it moves out of "coming
    soon" here with no edit to this file. */
 function SportCoverage() {
-  const sports = SPORT_KEYS.map((k) => ({ key: k, ...sportMeta(k) }));
+  // `key: k` LAST: sportMeta() falls back to badminton for an unknown key,
+  // and its spread carries a `key` field — spread-first means the glyph key
+  // always wins, so a registry/glyph drift can never render two cards with
+  // the same React key again.
+  const sports = SPORT_KEYS.map((k) => ({ ...sportMeta(k), key: k }));
   return (
     <section className="md-section">
       <SectionHeader eyebrow="Built for every sport" title="One platform. Every competition." />

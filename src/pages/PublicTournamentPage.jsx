@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft, MapPin, Calendar, Building2, Share2, Lock, Search, Megaphone,
-  Users, ExternalLink, Trophy, Radio,
+  Users, ExternalLink, Trophy, Radio, Navigation, CalendarPlus, CalendarDays,
 } from "lucide-react";
 import {
   cx, fmtDateRange, fmtDateTime, fmtTime, inr, entryName, entryShort, matchStageLabel,
   BadmintonScoringEngine, toAB, divisionLabel, EVENT_STATUS_META,
-  TOURNAMENT_STATUS_META, accentTheme,
+  TOURNAMENT_STATUS_META, accentTheme, todayLocal,
 } from "../lib/engines";
+import { useAuth } from "../lib/AuthContext";
 import { getTournament, getTournamentBySlug, listEvents, listEntriesPublic, listMatches, registerEntry, subscribeToEvent } from "../lib/repository";
 import { registrationState } from "../lib/lifecycle";
 import { Badge, Btn, EmptyState, inputCls } from "../components/ui/primitives";
@@ -68,6 +69,43 @@ function buildTabs({ isLive, hasStandings, hasSponsors }) {
   ];
 }
 
+// Whole days until the tournament starts. Negative once underway; null when
+// there is no start date. String math via todayLocal so a device timezone
+// west of IST cannot show "starts tomorrow" on the morning of the event.
+function daysUntilStart(t) {
+  if (!t?.start_date) return null;
+  const ms = new Date(`${t.start_date}T00:00:00`) - new Date(`${todayLocal()}T00:00:00`);
+  return Math.round(ms / 86400000);
+}
+
+// Directions straight from the hero. A maps SEARCH url, not coordinates —
+// MatchDay only has the venue as text, and pretending to a pin it does not
+// have would send people to the wrong building.
+function mapsUrl(t) {
+  const q = [t.venue, t.location].filter(Boolean).join(", ");
+  return q ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}` : null;
+}
+
+// Google Calendar template link — an all-day span, no account needed on our
+// side. End date is exclusive in the template format, hence the +1 day.
+function gcalUrl(t, href) {
+  if (!t?.start_date) return null;
+  const day = (iso) => iso.replaceAll("-", "");
+  const after = (iso) => {
+    const d = new Date(`${iso}T12:00:00`);
+    d.setDate(d.getDate() + 1);
+    return day(d.toISOString().slice(0, 10));
+  };
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: t.name,
+    dates: `${day(t.start_date)}/${after(t.end_date || t.start_date)}`,
+    details: `Live draws, schedule and scores on MatchDay: ${href}`,
+    location: [t.venue, t.location].filter(Boolean).join(", "),
+  });
+  return `https://calendar.google.com/calendar/render?${params}`;
+}
+
 // A public live/upcoming match row → the shared <MatchCard/> model. Sides
 // stay in draw order here (unlike the player dashboard, which puts "you"
 // first) because a spectator has no side.
@@ -104,6 +142,9 @@ function toCardModel(m, ev, entriesById, tournament) {
 export default function PublicTournamentPage() {
   const { slug } = useParams();
   const navigate = useNavigate();
+  // Only to place the mobile action bar: signed-in visitors have the surface
+  // switcher docked at the bottom, so the bar stacks above it.
+  const { caps } = useAuth();
   const [tournament, setTournament] = useState(null);
   useDocumentMeta({ title: tournament?.name, description: tournament ? [tournament.venue, tournament.city].filter(Boolean).join(", ") || undefined : undefined });
   const [events, setEvents] = useState([]);
@@ -184,6 +225,29 @@ export default function PublicTournamentPage() {
     .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at))
     .slice(0, 4), [allMatches]);
 
+  // The freshest finished matches, for the Live tab's quiet moments — a
+  // spectator between sessions still gets "what just happened" instead of a
+  // void. Recency by scheduled slot: matches carry no completion timestamp,
+  // and the last slots to be played are the last to finish.
+  const justFinished = useMemo(() => allMatches
+    .filter((m) => ["COMPLETED", "WALKOVER"].includes(m.status))
+    .sort((a, b) => (b.scheduled_at || "").localeCompare(a.scheduled_at || ""))
+    .slice(0, 4), [allMatches]);
+
+  // Decided finals → champions. Knockout only: a round-robin winner comes
+  // from the standings table, which has its own surface. Nothing here is
+  // predicted — a category appears the moment its final has a recorded
+  // winner, and not a second before.
+  const champions = useMemo(() => events.flatMap((ev) => {
+    if (ev.format === "ROUND_ROBIN" || !ev.total_rounds) return [];
+    const final = (matchesByEvent[ev.id] || []).find(
+      (m) => !m.group_label && m.round === ev.total_rounds && m.winner_entry_id
+    );
+    if (!final) return [];
+    const winner = entriesById[final.winner_entry_id];
+    return winner ? [{ event: ev, winner }] : [];
+  }), [events, matchesByEvent, entriesById]);
+
   // Organizer accent, clamped by accentTheme() so a bad colour can never
   // destroy contrast. Used only for accents — never as a page background.
   const theme = accentTheme(tournament?.accent_color);
@@ -244,6 +308,15 @@ export default function PublicTournamentPage() {
                 {TOURNAMENT_STATUS_META[tournament.status].label}
               </Badge>
             )}
+            {/* Real calendar distance, only while it is in the future. Amber
+                inside 48 hours — that is when a player still deciding needs
+                the nudge — quiet blue any further out. */}
+            {!isLive && tournament.status !== "COMPLETED" && (() => {
+              const d = daysUntilStart(tournament);
+              if (d == null || d < 0) return null;
+              const label = d === 0 ? "Starts today" : d === 1 ? "Starts tomorrow" : `Starts in ${d} days`;
+              return <span className={cx("md-status", d <= 1 ? "md-status-closing" : "md-status-done")}>{label}</span>;
+            })()}
           </div>
 
           <div className="flex flex-wrap items-start gap-4">
@@ -301,7 +374,26 @@ export default function PublicTournamentPage() {
               >
                 <Radio size={15} /> Watch live
               </button>
-            ) : null}
+            ) : tournament.status === "COMPLETED" ? (
+              /* The story is over; lead with how it ended. */
+              <button
+                onClick={() => setTab("results")}
+                className="inline-flex h-11 items-center gap-2 rounded-lg px-6 text-sm font-bold uppercase tracking-wide text-navy-950"
+                style={{ background: "var(--color-accent-yellow)" }}
+              >
+                <Trophy size={15} /> See results
+              </button>
+            ) : (
+              /* Live-but-idle, or closed and waiting: the next most useful
+                 thing is when play happens. A hero must never offer nothing. */
+              <button
+                onClick={() => setTab("schedule")}
+                className="inline-flex h-11 items-center gap-2 rounded-lg px-6 text-sm font-bold uppercase tracking-wide text-navy-950 transition-[filter] hover:brightness-110"
+                style={{ background: accent }}
+              >
+                <CalendarDays size={15} /> View schedule
+              </button>
+            )}
             <FollowButton subjectType="TOURNAMENT" subjectId={tournament.id} />
             <Btn
               size="lg" variant="secondary" icon={Share2}
@@ -312,6 +404,25 @@ export default function PublicTournamentPage() {
             >
               Share
             </Btn>
+            {/* Venue-day utilities. Quiet by design: they matter enormously
+                to the ~40 people attending and not at all to everyone else,
+                so they read as links rather than competing with the CTA. */}
+            {mapsUrl(tournament) && (
+              <a
+                href={mapsUrl(tournament)} target="_blank" rel="noopener noreferrer"
+                className="inline-flex h-11 items-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
+              >
+                <Navigation size={14} className="text-ink-3" /> Directions
+              </a>
+            )}
+            {tournament.status !== "COMPLETED" && gcalUrl(tournament, typeof window !== "undefined" ? window.location.href : "") && (
+              <a
+                href={gcalUrl(tournament, window.location.href)} target="_blank" rel="noopener noreferrer"
+                className="inline-flex h-11 items-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
+              >
+                <CalendarPlus size={14} className="text-ink-3" /> Add to calendar
+              </a>
+            )}
           </Rise>
 
           {/* At a glance. Four counts straight off the rows already loaded —
@@ -338,6 +449,35 @@ export default function PublicTournamentPage() {
           )}
         </div>
       </header>
+
+      {/* ── Champions ────────────────────────────────────────────────────
+          The podium moment. Appears the instant a final has a recorded
+          winner — during the event for an early-finishing category, and as
+          the page's lead once everything is done. Names link nowhere and
+          claim nothing beyond what the result rows already say. */}
+      {champions.length > 0 && (
+        <Rise className="mt-5">
+        <div
+          className="md-edge rounded-xl border border-line bg-gradient-to-r from-accent-yellow/[0.08] to-surface p-4 pl-5"
+          style={{ "--md-edge": "var(--color-accent-yellow)" }}
+        >
+          <div className="mb-2.5 flex items-center gap-2">
+            <Trophy size={15} style={{ color: "var(--color-accent-yellow)" }} aria-hidden="true" />
+            <span className="md-eyebrow" style={{ color: "var(--color-accent-yellow)" }}>
+              Champion{champions.length === 1 ? "" : "s"}
+            </span>
+          </div>
+          <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+            {champions.map(({ event: ev, winner }) => (
+              <div key={ev.id} className="min-w-0">
+                <div className="md-eyebrow">{divisionLabel(ev)}</div>
+                <div className="md-display mt-0.5 truncate text-2xl text-ink">{entryName(winner)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        </Rise>
+      )}
 
       {tournament.announcement && (
         <div
@@ -423,23 +563,70 @@ export default function PublicTournamentPage() {
       )}
 
       <div className="pt-5">
-        {activeTab === "overview" && (
-          <div className="space-y-5">
-            {/* Real counts from real rows — no attendance or popularity. */}
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-              <StatTile label="Categories" value={events.length} />
-              <StatTile
-                label="Entries"
-                value={Object.values(entriesByEvent).flat().filter((e) => !["REJECTED", "CANCELLED"].includes(e.reg_status)).length}
-              />
-              <StatTile label="Matches" value={allMatches.length} />
-              <StatTile
-                label="Completed"
-                value={allMatches.filter((m) => ["COMPLETED", "WALKOVER"].includes(m.status)).length}
-                tone="done"
-              />
-            </div>
+        {activeTab === "overview" && (() => {
+          // The hero already carries the count tiles; repeating them four
+          // hundred pixels lower said nothing new. Overview's job is the
+          // practical brief: when, where, what it costs, who to ask.
+          const fees = events.map((e) => Number(e.fee_inr) || 0);
+          const minFee = fees.length ? Math.min(...fees) : null;
+          const maxFee = fees.length ? Math.max(...fees) : null;
+          return (
             <div className="grid gap-3 sm:grid-cols-2">
+              <div className="md-card p-4">
+                <div className="md-eyebrow mb-2.5">When &amp; where</div>
+                <div className="space-y-1.5 text-sm text-ink-2">
+                  <div className="flex items-center gap-2">
+                    <Calendar size={14} className="shrink-0 text-ink-3" aria-hidden="true" />
+                    {fmtDateRange(tournament.start_date, tournament.end_date)}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <MapPin size={14} className="shrink-0 text-ink-3" aria-hidden="true" />
+                    <span>{tournament.venue}{tournament.location ? `, ${tournament.location}` : ""}</span>
+                  </div>
+                </div>
+                <div className="mt-3.5 flex flex-wrap gap-x-4 gap-y-1.5">
+                  {mapsUrl(tournament) && (
+                    <a
+                      href={mapsUrl(tournament)} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-accent-teal hover:underline"
+                    >
+                      <Navigation size={13} /> Get directions
+                    </a>
+                  )}
+                  {tournament.status !== "COMPLETED" && gcalUrl(tournament, window.location.href) && (
+                    <a
+                      href={gcalUrl(tournament, window.location.href)} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-accent-teal hover:underline"
+                    >
+                      <CalendarPlus size={13} /> Add to calendar
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              {events.length > 0 && (
+                <div className="md-card p-4">
+                  <div className="md-eyebrow mb-2.5">Entry</div>
+                  <div className="text-sm text-ink-2">
+                    {events.length} categor{events.length === 1 ? "y" : "ies"} ·{" "}
+                    {maxFee === 0 ? "free entry"
+                      : minFee === maxFee ? `${inr(minFee)} per entry`
+                      : `${inr(minFee)}–${inr(maxFee)} per entry`}
+                  </div>
+                  {tournament.registration_deadline && tournament.status !== "COMPLETED" && (
+                    <div className="mt-1.5 text-[13px] text-ink-3">
+                      Register by {fmtDateRange(tournament.registration_deadline, tournament.registration_deadline)}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setTab("categories")}
+                    className="mt-3.5 inline-flex items-center gap-1.5 text-[13px] font-semibold text-accent-teal hover:underline"
+                  >
+                    {openEvent ? "See categories & register" : "See categories"}
+                  </button>
+                </div>
+              )}
+
               {tournament.settings?.rules && (
                 <div className="md-card p-4">
                   <div className="md-eyebrow mb-2">Format &amp; rules</div>
@@ -457,8 +644,8 @@ export default function PublicTournamentPage() {
                 </div>
               )}
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {activeTab === "categories" && (
           <div className="grid gap-3 sm:grid-cols-2">
@@ -520,10 +707,7 @@ export default function PublicTournamentPage() {
         )}
 
         {activeTab === "live" && (
-          liveMatches.length === 0 ? (
-            <EmptyState icon={Radio} title="No live matches right now"
-              hint="Scores appear here the moment a scorer starts a match." />
-          ) : (
+          liveMatches.length > 0 ? (
             <div className="grid gap-2.5 sm:grid-cols-2">
               {liveMatches.map((m) => (
                 <MatchCard
@@ -534,6 +718,49 @@ export default function PublicTournamentPage() {
                 />
               ))}
             </div>
+          ) : upNext.length > 0 || justFinished.length > 0 ? (
+            /* Nothing on court is not nothing to say. A spectator between
+               sessions gets what is due next and what just happened — the
+               two questions they actually opened the tab with. */
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 text-[13px] text-ink-2">
+                <Radio size={14} className="text-ink-3" aria-hidden="true" />
+                No match on court right now — live scores appear here the moment a scorer starts one.
+              </div>
+              {upNext.length > 0 && (
+                <div>
+                  <div className="md-eyebrow mb-2">Up next</div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {upNext.map((m) => (
+                      <MatchCard
+                        key={m.id}
+                        match={toCardModel(m, events.find((e) => e.id === m.event_id), entriesById, tournament)}
+                        to={`/m/${m.id}`}
+                        size="compact"
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {justFinished.length > 0 && (
+                <div>
+                  <div className="md-eyebrow mb-2">Just finished</div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {justFinished.map((m) => (
+                      <MatchCard
+                        key={m.id}
+                        match={toCardModel(m, events.find((e) => e.id === m.event_id), entriesById, tournament)}
+                        to={`/m/${m.id}`}
+                        size="compact"
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <EmptyState icon={Radio} title="No live matches right now"
+              hint="Scores appear here the moment a scorer starts a match." />
           )
         )}
 
@@ -628,6 +855,68 @@ export default function PublicTournamentPage() {
           </div>
         </div>
       )}
+
+      {/* ── Mobile action bar ────────────────────────────────────────────
+          The hero's CTA scrolls away in one swipe on a phone, and a phone is
+          where this page lives — links land in WhatsApp. The one action the
+          page most wants taken stays under the thumb: enter while entries
+          are open, watch while play is on, results when it is over. Docked
+          above the surface switcher when a signed-in visitor has one. */}
+      <div
+        className="fixed inset-x-0 z-40 border-t border-line bg-canvas/95 px-4 py-2.5 backdrop-blur-md sm:hidden"
+        style={caps?.signedIn
+          ? { bottom: "calc(3.5rem + env(safe-area-inset-bottom))" }
+          : { bottom: 0, paddingBottom: "calc(0.625rem + env(safe-area-inset-bottom))" }}
+      >
+        <div className="flex items-center gap-2.5">
+          {openEvent ? (
+            <button
+              onClick={() => { setTab("categories"); setRegEvent(openEvent); }}
+              className="h-12 flex-1 rounded-lg text-sm font-bold uppercase tracking-wide text-navy-950"
+              style={{ background: accent }}
+            >
+              {Number(openEvent.fee_inr) > 0 ? `Enter · ${inr(openEvent.fee_inr)}` : "Enter free"}
+            </button>
+          ) : liveMatches.length > 0 ? (
+            <button
+              onClick={() => { setTab("live"); window.scrollTo({ top: 0 }); }}
+              className="flex h-12 flex-1 items-center justify-center gap-2 rounded-lg text-sm font-bold uppercase tracking-wide text-white"
+              style={{ background: "var(--color-live)" }}
+            >
+              <Radio size={15} /> Watch live
+            </button>
+          ) : tournament.status === "COMPLETED" ? (
+            <button
+              onClick={() => { setTab("results"); window.scrollTo({ top: 0 }); }}
+              className="flex h-12 flex-1 items-center justify-center gap-2 rounded-lg text-sm font-bold uppercase tracking-wide text-navy-950"
+              style={{ background: "var(--color-accent-yellow)" }}
+            >
+              <Trophy size={15} /> See results
+            </button>
+          ) : (
+            <button
+              onClick={() => { setTab("schedule"); window.scrollTo({ top: 0 }); }}
+              className="flex h-12 flex-1 items-center justify-center gap-2 rounded-lg text-sm font-bold uppercase tracking-wide text-navy-950"
+              style={{ background: accent }}
+            >
+              <CalendarDays size={15} /> View schedule
+            </button>
+          )}
+          <button
+            aria-label="Share on WhatsApp"
+            onClick={() => {
+              const text = `${tournament.name} — ${tournament.venue}, ${fmtDateRange(tournament.start_date, tournament.end_date)}. Live draws, schedule and scores on MatchDay: ${window.location.href}`;
+              window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+            }}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-ink-2"
+          >
+            <Share2 size={18} />
+          </button>
+        </div>
+      </div>
+      {/* Keeps the last content clear of the bar on a phone; the app shell's
+          own bottom padding only accounts for the surface switcher. */}
+      <div className="h-16 sm:hidden" aria-hidden="true" />
 
       <RegistrationModal
         open={!!regEvent} onClose={() => setRegEvent(null)}

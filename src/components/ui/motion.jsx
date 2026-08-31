@@ -214,14 +214,6 @@ const SPORT_GLYPHS = {
       <path d="M18.5 15v.01M17.3 17.2v.01M19.7 17.2v.01" strokeWidth="1.5" strokeLinecap="round" />
     </>
   ),
-  // Smaller head and a longer throat than the tennis racket above.
-  squash: (
-    <>
-      <ellipse cx="14.5" cy="8" rx="4.2" ry="5.4" strokeWidth="1.5" transform="rotate(35 14.5 8)" />
-      <path d="M11 12.5L4.5 20" strokeWidth="1.5" strokeLinecap="round" />
-      <circle cx="5.2" cy="8.6" r="1.7" strokeWidth="1.5" />
-    </>
-  ),
   cricket: (
     <>
       <path d="M14.5 3.5l6 6-9 9-6-6 9-9z" strokeWidth="1.5" strokeLinejoin="round" />
