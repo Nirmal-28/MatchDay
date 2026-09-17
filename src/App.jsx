@@ -174,8 +174,8 @@ function Header() {
               settles back — a single, short, physical acknowledgement rather
               than a looping logo animation. */}
           <img
-            src={logo} alt="" width="40" height="40"
-            className="h-10 w-10 rounded-md transition-transform duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:-rotate-6 group-hover:scale-110"
+            src={logo} alt="" width="48" height="48"
+            className="h-12 w-12 rounded-md transition-transform duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:-rotate-6 group-hover:scale-110"
           />
           <Wordmark className="text-xl sm:text-2xl" />
         </Link>
