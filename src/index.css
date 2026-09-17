@@ -146,7 +146,8 @@ select option {
   font-family: var(--font-display);
   font-weight: 700;
   font-style: italic;
-  letter-spacing: 0.01em;
+  /* Match the tight, athletic lettering of the supplied logo lockup. */
+  letter-spacing: -0.025em;
   color: var(--color-ink);
 }
 .wordmark-accent { color: var(--color-accent-teal); }
