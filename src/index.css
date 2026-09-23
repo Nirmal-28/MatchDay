@@ -107,8 +107,8 @@ html {
 }
 
 .md-theme-toggle {
-  width: 174px;
-  height: 54px;
+  width: 150px;
+  height: 44px;
   background: #13211f;
   border-color: #38504b;
   color: #d7e3df;
@@ -116,8 +116,8 @@ html {
 .md-theme-toggle:hover { border-color: var(--color-accent-teal); }
 .md-theme-sun { color: #91aaa3; }
 .md-theme-moon { color: #18d5c3; }
-.md-theme-track { width: 44px; height: 24px; background: #344743; }
-.md-theme-knob { top: 2px; left: 0; width: 20px; height: 20px; background: #f5faf8; }
+.md-theme-track { width: 38px; height: 20px; background: #344743; }
+.md-theme-knob { top: 2px; left: 0; width: 16px; height: 16px; background: #f5faf8; }
 :root[data-theme="light"] .md-theme-toggle { background: #ffffff; border-color: #b9c8c5; color: #50635e; }
 :root[data-theme="light"] .md-theme-sun { color: #008f82; }
 :root[data-theme="light"] .md-theme-moon { color: #607873; }
