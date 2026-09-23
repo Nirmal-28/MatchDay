@@ -11,6 +11,7 @@ import Cursor from "./components/ui/Cursor";
 // and nothing depends on it being present.
 const SportsBackground = lazy(() => import("./components/ui/SportsBackground"));
 import logo from "./assets/logo.png";
+import logoLight from "./assets/logo-light.png";
 import { signOut } from "./lib/repository";
 import PublicDiscovery from "./pages/PublicDiscovery";
 import PublicTournamentPage from "./pages/PublicTournamentPage";
@@ -63,7 +64,7 @@ function ThemeToggle() {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
     document.querySelector('meta[name="theme-color"]')?.setAttribute(
-      "content", isDark ? "#111817" : "#f6f7f4"
+      "content", isDark ? "#111817" : "#e8f0ed"
     );
     try { window.localStorage.setItem(THEME_STORAGE_KEY, theme); } catch { /* no-op */ }
   }, [theme, isDark]);
@@ -217,10 +218,10 @@ function Header() {
           {/* The mark tilts a few degrees toward the wordmark on hover and
               settles back — a single, short, physical acknowledgement rather
               than a looping logo animation. */}
-          <img
-            src={logo} alt="" width="48" height="48"
-            className="h-12 w-12 rounded-md transition-transform duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:-rotate-6 group-hover:scale-110"
-          />
+          <picture className="md-logo-wrap h-12 w-12 shrink-0">
+            <img src={logo} alt="" width="48" height="48" className="md-logo-dark h-12 w-12 object-contain transition-transform duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:-rotate-6 group-hover:scale-110" />
+            <img src={logoLight} alt="" width="48" height="48" className="md-logo-light h-12 w-12 object-contain transition-transform duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:-rotate-6 group-hover:scale-110" />
+          </picture>
           <Wordmark className="text-2xl sm:text-3xl" />
         </Link>
 

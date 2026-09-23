@@ -19,13 +19,13 @@ import { Badge, Card } from "./ui/primitives";
 
 function Metric({ label, value, sub, tone = "ink", icon: Icon }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+    <div className="rounded-lg border border-line bg-surface-2 p-3">
       <div className="flex items-center gap-1.5 md-eyebrow">
         {Icon && <Icon size={11} />} {label}
       </div>
       <div className={cx(
         "font-display text-2xl font-bold leading-tight",
-        tone === "teal" ? "text-accent-teal" : tone === "red" ? "text-red-300" : tone === "amber" ? "text-amber-300" : "text-white"
+        tone === "teal" ? "text-accent-teal" : tone === "red" ? "text-red-300" : tone === "amber" ? "text-amber-300" : "text-ink"
       )}>
         {value}
       </div>
@@ -102,9 +102,9 @@ export default function TournamentHealthPanel({
       <div>
         <div className="mb-1 flex items-center justify-between text-[11px] text-ink-3">
           <span>Progress</span>
-          <span className="font-medium text-white">{progress.completed} / {progress.total}</span>
+          <span className="font-medium text-ink">{progress.completed} / {progress.total}</span>
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-white/10">
+        <div className="h-2 overflow-hidden rounded-full bg-surface-3">
           <div
             className="h-full rounded-full bg-gradient-to-r from-accent-teal to-accent-blue transition-[width] duration-500"
             style={{ width: `${progress.pct}%` }}

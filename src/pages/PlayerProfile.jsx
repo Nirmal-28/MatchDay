@@ -153,7 +153,7 @@ export default function PlayerProfile() {
 
         {/* Ranking is withheld rather than shown as a provisional number —
             a "rank" off one match would read as a real standing. */}
-        <div className="relative mt-3 rounded-lg border border-white/10 bg-white/5 p-3.5">
+        <div className="relative mt-3 rounded-lg border border-line bg-surface-2 p-3.5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="md-eyebrow">Badminton ranking points</div>
@@ -194,8 +194,8 @@ export default function PlayerProfile() {
           <div className="relative mt-4 flex flex-wrap gap-1.5">
             {badges.map((b) => (
               <span key={b.key} className={cx(
-                "inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] font-semibold",
-                BADGE_TONES[b.tone] || "text-white"
+                "inline-flex items-center gap-1 rounded-full border border-line bg-surface-3 px-2.5 py-1 text-[11px] font-semibold",
+                BADGE_TONES[b.tone] || "text-ink"
               )}>
                 🏅 {b.label}
               </span>
