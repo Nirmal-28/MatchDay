@@ -118,7 +118,7 @@ function NowFrame({ tone = "var(--color-accent-teal)", eyebrow, children, live }
   return (
     <section
       className={cx(
-        "md-court-texture md-edge relative overflow-hidden rounded-2xl border p-5 sm:p-7",
+        "md-now-frame md-court-texture md-edge relative overflow-hidden rounded-2xl border p-5 sm:p-7",
         live ? "md-live-surface" : "border-line bg-gradient-to-b from-navy-800 to-surface"
       )}
       style={{ "--md-edge": tone }}

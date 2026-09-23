@@ -124,11 +124,6 @@ html {
 :root[data-theme="light"] .md-theme-track { background: #d9e3e0; }
 :root[data-theme="light"] .md-theme-knob { background: #17302b; }
 
-.md-logo-wrap { display: block; }
-.md-logo-light { display: none; }
-:root[data-theme="light"] .md-logo-dark { display: none; }
-:root[data-theme="light"] .md-logo-light { display: block; }
-
 /* The base colour lives on <html> only. If <body> also painted an opaque
    background it would cover the fixed -z-10 <SportsBackground/>: in CSS paint
    order a block's own background is drawn *after* negative-z-index
@@ -610,6 +605,13 @@ html { scroll-behavior: smooth; }
   --color-ink-3: #70837e;
   background: var(--color-canvas);
   color: var(--color-ink);
+}
+
+/* Player dashboard action cards stay readable when the light theme is active;
+   the dark navy treatment is reserved for the dark theme. */
+:root[data-theme="light"] .md-now-frame:not(.md-live-surface) {
+  background: linear-gradient(180deg, var(--color-surface) 0%, var(--color-surface-2) 100%);
+  border-color: var(--color-line);
 }
 
 /* ── Marquee ──────────────────────────────────────────────────────────────
