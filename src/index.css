@@ -78,6 +78,52 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+:root {
+  --md-bg-highlight: #16233d;
+  --md-bg-mid: #0c1526;
+  --md-vignette: rgba(6,9,17,0.9);
+}
+
+/* The original dark system remains the default. Light mode changes only the
+   semantic tokens, so layout, interaction, and product hierarchy stay intact. */
+:root[data-theme="light"] {
+  --color-canvas: #f1f6f4;
+  --color-surface: #ffffff;
+  --color-surface-2: #edf3f1;
+  --color-surface-3: #dfe9e6;
+  --color-line: #c0cfcb;
+  --color-line-soft: #dce7e3;
+  --color-ink: #17302b;
+  --color-ink-2: #4b625c;
+  --color-ink-3: #6c817b;
+  --color-accent-teal: #008f82;
+  --color-live: #c52b45;
+  --color-open: #19784c;
+  --color-closing: #9a5b00;
+  --color-done: #2168b1;
+  --md-bg-highlight: #e0efea;
+  --md-bg-mid: #eef5f2;
+  --md-vignette: rgba(241,246,244,0.58);
+}
+
+.md-theme-toggle {
+  width: 174px;
+  height: 54px;
+  background: #13211f;
+  border-color: #38504b;
+  color: #d7e3df;
+}
+.md-theme-toggle:hover { border-color: var(--color-accent-teal); }
+.md-theme-sun { color: #91aaa3; }
+.md-theme-moon { color: #18d5c3; }
+.md-theme-track { width: 44px; height: 24px; background: #344743; }
+.md-theme-knob { top: 2px; left: 0; width: 20px; height: 20px; background: #f5faf8; }
+:root[data-theme="light"] .md-theme-toggle { background: #ffffff; border-color: #b9c8c5; color: #50635e; }
+:root[data-theme="light"] .md-theme-sun { color: #008f82; }
+:root[data-theme="light"] .md-theme-moon { color: #607873; }
+:root[data-theme="light"] .md-theme-track { background: #d9e3e0; }
+:root[data-theme="light"] .md-theme-knob { background: #17302b; }
+
 /* The base colour lives on <html> only. If <body> also painted an opaque
    background it would cover the fixed -z-10 <SportsBackground/>: in CSS paint
    order a block's own background is drawn *after* negative-z-index

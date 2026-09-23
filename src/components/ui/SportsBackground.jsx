@@ -111,7 +111,7 @@ export default function SportsBackground() {
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(120% 90% at 50% 4%, #16233d 0%, #0c1526 42%, var(--color-canvas) 100%)",
+            "radial-gradient(120% 90% at 50% 4%, var(--md-bg-highlight) 0%, var(--md-bg-mid) 42%, var(--color-canvas) 100%)",
         }}
       />
 
@@ -177,14 +177,11 @@ export default function SportsBackground() {
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(100% 75% at 50% 45%, transparent 0%, rgba(6,9,17,0.45) 45%, rgba(6,9,17,0.9) 100%)",
+            "radial-gradient(100% 75% at 50% 45%, transparent 0%, color-mix(in srgb, var(--md-vignette) 50%, transparent) 45%, var(--md-vignette) 100%)",
         }}
       />
 
       <style>{`
-        /* One draw-on at mount: the bracket assembles, then holds forever.
-           A long dash pattern over the whole group reads as the structure
-           being filled in from nothing. */
         .md-draw path {
           stroke-dasharray: 1400;
           stroke-dashoffset: 1400;

@@ -41,7 +41,51 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { trackPageView } from "./lib/productAnalytics";
 import { paymentsAreLive } from "./lib/payments";
 import { cx } from "./lib/engines";
-import { Compass, CalendarDays, Trophy, Gavel, User } from "lucide-react";
+import { Compass, CalendarDays, Trophy, Gavel, User, Moon, Sun } from "lucide-react";
+
+const THEME_STORAGE_KEY = "matchday-theme-v2";
+
+function initialTheme() {
+  try {
+    const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (saved === "light" || saved === "dark") return saved;
+  } catch {
+    // A blocked localStorage should never prevent the app from rendering.
+  }
+  return "dark";
+}
+
+function ThemeToggle() {
+  const [theme, setTheme] = useState(initialTheme);
+  const isDark = theme === "dark";
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute(
+      "content", isDark ? "#111817" : "#f6f7f4"
+    );
+    try { window.localStorage.setItem(THEME_STORAGE_KEY, theme); } catch { /* no-op */ }
+  }, [theme, isDark]);
+
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={isDark}
+      aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+      className="md-theme-toggle flex items-center justify-between rounded-full border px-3.5 font-semibold transition-colors"
+    >
+      <Sun size={22} aria-hidden="true" className="md-theme-sun shrink-0" />
+      <span className="text-base leading-none">{isDark ? "Dark" : "Light"}</span>
+      <span className="md-theme-track relative shrink-0 rounded-full" aria-hidden="true">
+        <span className={cx("md-theme-knob absolute rounded-full transition-transform duration-200", isDark ? "translate-x-5" : "translate-x-0.5")} />
+      </span>
+      <Moon size={22} aria-hidden="true" className="md-theme-moon shrink-0" />
+    </button>
+  );
+}
 
 function RequireAuth({ children }) {
   const { session, loading } = useAuth();
@@ -214,6 +258,7 @@ function Header() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2.5">
+          <ThemeToggle />
           {session ? (
             <>
               <NotificationCenter userId={session.user.id} />
