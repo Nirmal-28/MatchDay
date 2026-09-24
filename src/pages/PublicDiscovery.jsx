@@ -340,7 +340,7 @@ function Rail({ eyebrow, title, icon: Icon, tone, tournaments }) {
           same children lay out as a grid from `sm` up. */}
       <Stagger className="md-rail -mx-4 px-4 sm:mx-0 sm:grid sm:grid-cols-[repeat(auto-fit,minmax(19rem,1fr))] sm:gap-3 sm:overflow-visible sm:px-0">
         {tournaments.map((t) => (
-          <StaggerChild key={t.id} className="w-[78vw] max-w-[320px] sm:w-auto sm:max-w-none">
+          <StaggerChild key={t.id} className="w-[calc(100vw-2rem)] max-w-[320px] overflow-hidden sm:w-auto sm:max-w-none">
             <TournamentCard t={t} variant="featured" />
           </StaggerChild>
         ))}

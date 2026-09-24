@@ -211,12 +211,12 @@ function Header() {
         scrolled ? "border-b border-line bg-canvas/85 backdrop-blur-xl" : "border-b border-transparent"
       )}
     >
-      <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4">
+      <div className="md-header-inner mx-auto flex h-14 max-w-6xl items-center gap-6 px-4">
         <Link to="/" className="md-group flex shrink-0 items-center gap-2" aria-label="MatchDay home">
           {/* The mark tilts a few degrees toward the wordmark on hover and
               settles back — a single, short, physical acknowledgement rather
               than a looping logo animation. */}
-          <Wordmark className="text-2xl sm:text-3xl" />
+          <Wordmark className="text-xl sm:text-3xl" />
         </Link>
 
         {/* Desktop switcher. Hidden below `sm`, where MobileSurfaceNav takes
@@ -256,7 +256,7 @@ function Header() {
           <ThemeToggle />
           {session ? (
             <>
-              <NotificationCenter userId={session.user.id} />
+              <span className="md-mobile-hide-notification"><NotificationCenter userId={session.user.id} /></span>
               {/* The account entry point. An avatar-shaped target rather than
                   a text link: it is the one control whose position should be
                   identical on every screen in the product. */}
@@ -307,13 +307,14 @@ function Header() {
             onClick={() => setMenuOpen(true)}
             aria-expanded={menuOpen}
             aria-haspopup="dialog"
-            className="md-group flex h-9 items-center gap-2 rounded-full border border-line px-3 text-xs font-bold uppercase tracking-wider text-ink-2 transition-colors hover:border-accent-teal hover:text-ink"
+            className="md-menu-trigger md-group flex h-9 items-center gap-2 rounded-full border border-line px-3 text-xs font-bold uppercase tracking-wider text-ink-2 transition-colors hover:border-accent-teal hover:text-ink"
           >
             <span className="flex flex-col gap-[3px]" aria-hidden="true">
               <span className="block h-px w-4 bg-current transition-transform duration-300 group-hover:translate-x-0.5" />
               <span className="block h-px w-4 bg-current" />
+              <span className="block h-px w-4 bg-current transition-transform duration-300 group-hover:-translate-x-0.5" />
             </span>
-            Menu
+            <span className="max-sm:hidden">Menu</span>
           </button>
         </div>
       </div>

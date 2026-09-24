@@ -617,6 +617,14 @@ html { scroll-behavior: smooth; }
 html, body { overflow-x: hidden; }
 
 @media (max-width: 640px) {
+  .md-header-inner { gap: .45rem; padding-inline: .65rem; }
+  .md-header-inner .md-theme-toggle { width: 108px; height: 36px; padding-inline: .55rem; font-size: .75rem; }
+  .md-header-inner .md-theme-sun, .md-header-inner .md-theme-moon { width: 16px; height: 16px; }
+  .md-header-inner .md-theme-track { width: 30px; height: 18px; }
+  .md-header-inner .md-theme-knob { width: 14px; height: 14px; top: 2px; }
+  .md-header-inner .md-theme-knob.translate-x-4 { transform: translateX(14px); }
+  .md-header-inner .md-menu-trigger { width: 36px; padding-inline: 0; justify-content: center; }
+  .md-mobile-hide-notification { display: none; }
   .md-section { padding-block: clamp(2.75rem, 10vw, 4.5rem); }
   .md-poster, .md-poster-sm { font-size: clamp(2.35rem, 12vw, 4.5rem); line-height: .94; }
   .md-card { border-radius: .85rem; }
