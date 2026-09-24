@@ -79,7 +79,7 @@ function ThemeToggle() {
       <Sun size={18} aria-hidden="true" className="md-theme-sun shrink-0" />
       <span className="text-base leading-none">{isDark ? "Dark" : "Light"}</span>
       <span className="md-theme-track relative shrink-0 rounded-full" aria-hidden="true">
-        <span className={cx("md-theme-knob absolute rounded-full transition-transform duration-200", isDark ? "translate-x-4" : "translate-x-0.5")} />
+        <span className={cx("md-theme-knob absolute rounded-full transition-transform duration-200", isDark ? "md-theme-knob-dark" : "md-theme-knob-light")} />
       </span>
       <Moon size={18} aria-hidden="true" className="md-theme-moon shrink-0" />
     </button>

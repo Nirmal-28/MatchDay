@@ -802,7 +802,7 @@ export default function PublicDiscovery() {
             action={<button onClick={resetFilters} className="mt-2 text-sm font-semibold text-accent-teal hover:underline">Clear all filters</button>}
           />
         ) : (
-          <Stagger className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Stagger className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((t) => {
               const model = toCardModel(t);
               return (
