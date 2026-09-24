@@ -511,7 +511,18 @@ export default function PublicDiscovery() {
 
   // Memoised so the derived rails below have a stable dependency — a fresh
   // [] each render would recompute every rail on every keystroke in search.
-  const all = useMemo(() => tournaments || [], [tournaments]);
+  const all = useMemo(() => {
+    const seenNames = new Set();
+    return (tournaments || []).filter((t) => {
+      const name = String(t.name || "").trim().toLowerCase();
+      if (/^po\s*verify\s*clip$/.test(name)) return false;
+      if (name === "chennai open 2026") {
+        if (seenNames.has(name)) return false;
+        seenNames.add(name);
+      }
+      return true;
+    });
+  }, [tournaments]);
   const liveCount = all.filter((t) => t.status === "LIVE").length;
   const openCount = all.filter((t) => t.status === "REGISTRATION_OPEN").length;
 
