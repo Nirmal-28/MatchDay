@@ -17,7 +17,6 @@ import {
 } from "../components/ui/md";
 import { MaskText, Rise, Magnetic, Stagger, StaggerChild, Counter } from "../components/ui/reveal";
 import { sportMeta } from "../lib/sports";
-import logo from "../assets/logo.png";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -421,7 +420,6 @@ function EveryoneCanPlay() {
               on the court. Different people, different sports, one competition.
             </p>
             <div className="mt-7 flex items-center gap-3">
-              <img src={logo} alt="" className="h-11 w-11 rounded-xl" width="44" height="44" />
               <span className="wordmark text-2xl uppercase leading-none text-ink">
                 Match<span className="wordmark-accent">day</span>
               </span>

@@ -87,23 +87,23 @@ html {
 /* The original dark system remains the default. Light mode changes only the
    semantic tokens, so layout, interaction, and product hierarchy stay intact. */
 :root[data-theme="light"] {
-  --color-canvas: #e8f0ed;
-  --color-surface: #f4f7f4;
-  --color-surface-2: #e3ece8;
-  --color-surface-3: #d4e1dc;
-  --color-line: #b7c9c2;
-  --color-line-soft: #d2dfda;
-  --color-ink: #17302b;
-  --color-ink-2: #4b625c;
-  --color-ink-3: #6c817b;
-  --color-accent-teal: #008f82;
+  --color-canvas: #dfe7e8;
+  --color-surface: #edf2f1;
+  --color-surface-2: #d4dfe0;
+  --color-surface-3: #c5d2d4;
+  --color-line: #aebfc2;
+  --color-line-soft: #c9d5d6;
+  --color-ink: #1b3035;
+  --color-ink-2: #52676c;
+  --color-ink-3: #718388;
+  --color-accent-teal: #007f83;
   --color-live: #c52b45;
   --color-open: #19784c;
   --color-closing: #9a5b00;
   --color-done: #2168b1;
-  --md-bg-highlight: #d8eae3;
-  --md-bg-mid: #e4eeea;
-  --md-vignette: rgba(232,240,237,0.68);
+  --md-bg-highlight: #cbdcdf;
+  --md-bg-mid: #dce5e6;
+  --md-vignette: rgba(223,231,232,0.72);
 }
 
 .md-theme-toggle {
@@ -118,7 +118,7 @@ html {
 .md-theme-moon { color: #18d5c3; }
 .md-theme-track { width: 38px; height: 20px; background: #344743; }
 .md-theme-knob { top: 2px; left: 0; width: 16px; height: 16px; background: #f5faf8; }
-:root[data-theme="light"] .md-theme-toggle { background: #ffffff; border-color: #b9c8c5; color: #50635e; }
+:root[data-theme="light"] .md-theme-toggle { background: #edf2f1; border-color: #aebfc2; color: #52676c; }
 :root[data-theme="light"] .md-theme-sun { color: #008f82; }
 :root[data-theme="light"] .md-theme-moon { color: #607873; }
 :root[data-theme="light"] .md-theme-track { background: #d9e3e0; }
@@ -594,15 +594,15 @@ html { scroll-behavior: smooth; }
    spend it. Tokens are overridden inside so every child component (cards,
    eyebrows, status pills) recolours itself without a single override. */
 .md-invert {
-  --color-canvas: #e8f0ed;
-  --color-surface: #f4f7f4;
-  --color-surface-2: #e3ece8;
-  --color-surface-3: #d4e1dc;
-  --color-line: #b7c9c2;
-  --color-line-soft: #d2dfda;
-  --color-ink: #17302b;
-  --color-ink-2: #526863;
-  --color-ink-3: #70837e;
+  --color-canvas: #dfe7e8;
+  --color-surface: #edf2f1;
+  --color-surface-2: #d4dfe0;
+  --color-surface-3: #c5d2d4;
+  --color-line: #aebfc2;
+  --color-line-soft: #c9d5d6;
+  --color-ink: #1b3035;
+  --color-ink-2: #52676c;
+  --color-ink-3: #718388;
   background: var(--color-canvas);
   color: var(--color-ink);
 }
@@ -612,6 +612,14 @@ html { scroll-behavior: smooth; }
 :root[data-theme="light"] .md-now-frame:not(.md-live-surface) {
   background: linear-gradient(180deg, var(--color-surface) 0%, var(--color-surface-2) 100%);
   border-color: var(--color-line);
+}
+
+html, body { overflow-x: hidden; }
+
+@media (max-width: 640px) {
+  .md-section { padding-block: clamp(2.75rem, 10vw, 4.5rem); }
+  .md-poster, .md-poster-sm { font-size: clamp(2.35rem, 12vw, 4.5rem); line-height: .94; }
+  .md-card { border-radius: .85rem; }
 }
 
 /* ── Marquee ──────────────────────────────────────────────────────────────

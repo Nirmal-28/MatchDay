@@ -92,13 +92,11 @@ export function LivePulse({ label = "LIVE", className = "" }) {
 export function BrandLoader({ label = "Loading…" }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-14">
-      <motion.img
-        src={logo}
-        alt=""
-        className="h-10 w-10 rounded-lg"
+      <motion.div
+        className="wordmark text-xl uppercase leading-none text-ink"
         animate={{ scale: [1, 1.08, 1], opacity: [0.7, 1, 0.7] }}
         transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-      />
+      >Match<span className="wordmark-accent">day</span></motion.div>
       <div className="text-sm text-ink-3">{label}</div>
     </div>
   );
