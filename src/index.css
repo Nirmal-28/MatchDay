@@ -87,23 +87,23 @@ html {
 /* The original dark system remains the default. Light mode changes only the
    semantic tokens, so layout, interaction, and product hierarchy stay intact. */
 :root[data-theme="light"] {
-  --color-canvas: #dfe7e8;
-  --color-surface: #edf2f1;
-  --color-surface-2: #d4dfe0;
-  --color-surface-3: #c5d2d4;
-  --color-line: #aebfc2;
-  --color-line-soft: #c9d5d6;
-  --color-ink: #1b3035;
-  --color-ink-2: #52676c;
-  --color-ink-3: #718388;
+  --color-canvas: #d2dcdd;
+  --color-surface: #e1e8e7;
+  --color-surface-2: #cbd6d7;
+  --color-surface-3: #bbc9cb;
+  --color-line: #9eafb2;
+  --color-line-soft: #bac8ca;
+  --color-ink: #1d3034;
+  --color-ink-2: #4f6267;
+  --color-ink-3: #6b7b80;
   --color-accent-teal: #007f83;
   --color-live: #c52b45;
   --color-open: #19784c;
   --color-closing: #9a5b00;
   --color-done: #2168b1;
-  --md-bg-highlight: #cbdcdf;
-  --md-bg-mid: #dce5e6;
-  --md-vignette: rgba(223,231,232,0.72);
+  --md-bg-highlight: #c2d0d2;
+  --md-bg-mid: #d0dadd;
+  --md-vignette: rgba(210,220,221,0.82);
 }
 
 .md-theme-toggle {
@@ -118,7 +118,7 @@ html {
 .md-theme-moon { color: #18d5c3; }
 .md-theme-track { width: 38px; height: 20px; background: #344743; }
 .md-theme-knob { top: 2px; left: 0; width: 16px; height: 16px; background: #f5faf8; }
-:root[data-theme="light"] .md-theme-toggle { background: #edf2f1; border-color: #aebfc2; color: #52676c; }
+:root[data-theme="light"] .md-theme-toggle { background: #e1e8e7; border-color: #9eafb2; color: #4f6267; }
 :root[data-theme="light"] .md-theme-sun { color: #008f82; }
 :root[data-theme="light"] .md-theme-moon { color: #607873; }
 :root[data-theme="light"] .md-theme-track { background: #d9e3e0; }
@@ -594,15 +594,15 @@ html { scroll-behavior: smooth; }
    spend it. Tokens are overridden inside so every child component (cards,
    eyebrows, status pills) recolours itself without a single override. */
 .md-invert {
-  --color-canvas: #dfe7e8;
-  --color-surface: #edf2f1;
-  --color-surface-2: #d4dfe0;
-  --color-surface-3: #c5d2d4;
-  --color-line: #aebfc2;
-  --color-line-soft: #c9d5d6;
-  --color-ink: #1b3035;
-  --color-ink-2: #52676c;
-  --color-ink-3: #718388;
+  --color-canvas: #d2dcdd;
+  --color-surface: #e1e8e7;
+  --color-surface-2: #cbd6d7;
+  --color-surface-3: #bbc9cb;
+  --color-line: #9eafb2;
+  --color-line-soft: #bac8ca;
+  --color-ink: #1d3034;
+  --color-ink-2: #4f6267;
+  --color-ink-3: #6b7b80;
   background: var(--color-canvas);
   color: var(--color-ink);
 }
