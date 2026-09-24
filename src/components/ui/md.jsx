@@ -382,7 +382,7 @@ export function TournamentCard({ t, variant = "default", className, footer }) {
   return (
     <Link
       to={t.slug ? `/t/${t.slug}` : `/t/${t.id}`}
-      className={cx("md-group group block h-full", className)}
+      className={cx("md-group group block h-full min-w-0", className)}
     >
       {/* The card behaves as a physical object: it leans toward the pointer
           and catches a highlight from it. Both are pointer-only and both
@@ -391,7 +391,7 @@ export function TournamentCard({ t, variant = "default", className, footer }) {
       <Tilt className="h-full">
         <div
           className={cx(
-            "md-card md-card-link md-edge md-sheen flex h-full flex-col p-4 pl-5",
+            "md-card md-card-link md-edge md-sheen flex h-full min-w-0 flex-col overflow-hidden p-4 pl-5",
             featured && "md-hatch sm:p-5 sm:pl-6"
           )}
           style={{ "--md-edge": accent }}
@@ -399,9 +399,9 @@ export function TournamentCard({ t, variant = "default", className, footer }) {
           {/* Sport first — it is the single most useful filter a browsing
               player applies, and the glyph reads faster than a word. */}
           <div className="mb-2.5 flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 items-center gap-2">
               <SportIcon sport={t.sport} className="h-5 w-5" style={{ color: accent }} />
-              <span className="md-eyebrow" style={{ color: accent }}>{t.sportLabel || t.sport}</span>
+              <span className="md-eyebrow truncate" style={{ color: accent }}>{t.sportLabel || t.sport}</span>
             </div>
             {t.live ? (
               <StatusPill status="live" />
@@ -419,7 +419,7 @@ export function TournamentCard({ t, variant = "default", className, footer }) {
             {t.name}
           </h3>
 
-          <div className="mt-2.5 space-y-1 text-[13px] text-ink-2">
+          <div className="mt-2.5 min-w-0 space-y-1 text-[13px] text-ink-2">
             {t.dateLabel && (
               <div className="flex items-center gap-1.5">
                 <Clock size={13} className="shrink-0 text-ink-3" aria-hidden="true" />
@@ -456,7 +456,7 @@ export function TournamentCard({ t, variant = "default", className, footer }) {
           <CapacityBar filled={t.filled} capacity={t.capacity} className="mt-3.5" />
 
             {(t.fee != null || footer) && (
-              <div className="mt-3 flex items-center justify-between gap-3 border-t border-line-soft pt-3">
+              <div className="mt-3 flex min-w-0 items-center justify-between gap-3 border-t border-line-soft pt-3">
                 {t.fee != null && (
                   <span className="text-sm font-semibold text-ink">{t.fee}</span>
                 )}
