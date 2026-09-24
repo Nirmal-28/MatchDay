@@ -622,11 +622,14 @@ html, body { overflow-x: hidden; }
   .md-header-inner { gap: .45rem; padding-inline: .65rem; }
   .md-header-inner .md-theme-toggle { width: 108px; height: 36px; padding-inline: .55rem; font-size: .75rem; }
   .md-header-inner .md-theme-sun, .md-header-inner .md-theme-moon { width: 16px; height: 16px; }
+  .md-header-inner .md-theme-moon { display: none; }
   .md-header-inner .md-theme-track { width: 30px; height: 18px; }
   .md-header-inner .md-theme-knob { width: 14px; height: 14px; top: 2px; left: 2px; }
   .md-header-inner .md-theme-knob-light { transform: translateX(0); }
   .md-header-inner .md-theme-knob-dark { transform: translateX(12px); }
   .md-bleed { left: 0; right: 0; width: 100%; margin-inline: 0; }
+  .md-card-link, .md-card-link > *, .md-rail > *, .md-rail .md-group { min-width: 0; max-width: 100%; }
+  .md-card-link { width: 100%; }
   .md-header-inner .md-menu-trigger { width: 36px; padding-inline: 0; justify-content: center; }
   .md-mobile-hide-notification { display: none; }
   .md-section { padding-block: clamp(2.75rem, 10vw, 4.5rem); }
