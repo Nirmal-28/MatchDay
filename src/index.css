@@ -632,6 +632,7 @@ html, body { overflow-x: hidden; }
   .md-card-link { width: 100%; }
   .md-header-inner .md-menu-trigger { width: 36px; padding-inline: 0; justify-content: center; }
   .md-mobile-hide-notification { display: none; }
+  .md-profile-trigger { display: none; }
   .md-section { padding-block: clamp(2.75rem, 10vw, 4.5rem); }
   .md-poster, .md-poster-sm { font-size: clamp(2.35rem, 12vw, 4.5rem); line-height: .94; }
   .md-card { border-radius: .85rem; }

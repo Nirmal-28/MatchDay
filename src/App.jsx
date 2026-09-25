@@ -40,7 +40,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { trackPageView } from "./lib/productAnalytics";
 import { paymentsAreLive } from "./lib/payments";
 import { cx } from "./lib/engines";
-import { Compass, CalendarDays, Trophy, Gavel, User, Moon, Sun } from "lucide-react";
+import { Compass, CalendarDays, Trophy, Gavel, User, Moon, Sun, HelpCircle, X } from "lucide-react";
 
 const THEME_STORAGE_KEY = "matchday-theme-v2";
 
@@ -138,6 +138,87 @@ function Wordmark({ className = "" }) {
   );
 }
 
+const GUIDE_SECTIONS = [
+  {
+    icon: User,
+    title: "Player journey",
+    intro: "Find an event, register, prepare, and follow every point.",
+    steps: [
+      "Browse tournaments from Discover, then use search, sport, status, and filters to find the right event.",
+      "Open a tournament to read its categories, fees, venue, dates, participants, draw, schedule, courts, and live matches.",
+      "Choose a category and register. Complete your details, partner details for doubles, and any organizer questions.",
+      "Use your player dashboard to see payment status, check-in instructions, upcoming matches, results, and ranking history.",
+      "Open a match to follow live scores. Your profile collects completed results and tournament history."
+    ]
+  },
+  {
+    icon: Trophy,
+    title: "Organizer journey",
+    intro: "Set up the competition, run the day, and publish the result.",
+    steps: [
+      "Create a tournament with its name, venue, dates, sport, registration rules, categories, fees, and courts.",
+      "Review entries in Participants. Approve or manage registration status, check players in, and assign seeds where needed.",
+      "Create the draw using the category format. The draw determines rounds, pairings, and progression.",
+      "Schedule matches across available courts. Resolve conflicts, move matches, and keep players informed.",
+      "Monitor Live Scoring, results, disputes, staff, and tournament health from the control center.",
+      "Publish the tournament link so players and viewers can follow the public draw, schedule, courts, results, and live matches."
+    ]
+  },
+  {
+    icon: Gavel,
+    title: "Match keeper / scorer journey",
+    intro: "Keep one court accurate, clear, and up to date.",
+    steps: [
+      "Open the assigned match or scorer link and confirm the court and two sides before starting.",
+      "Start the match when both players or pairs are ready. The scorer records each rally using the score controls.",
+      "The current game, server, game history, and match total remain visible throughout play.",
+      "Pause or correct only when necessary. If a completed score needs correction, use the organizer dispute workflow.",
+      "Finish the match only after the final game is correct. The result then flows to the draw, schedule, player history, and public page."
+    ]
+  },
+  {
+    icon: Compass,
+    title: "Viewer journey",
+    intro: "Follow a tournament without an account.",
+    steps: [
+      "Open the public tournament link shared by the organizer.",
+      "Use Participants, Draw, Schedule, Courts, Results, and Live to find the information you need.",
+      "Open a live match for the latest score and court status. Completed matches show their game-by-game result.",
+      "Share the tournament or match link with family, teammates, and supporters. No sign-in is needed for public information."
+    ]
+  }
+];
+
+function HelpGuide({ open, onClose }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[80] flex items-start justify-center bg-navy-950/75 p-3 backdrop-blur-sm sm:p-8" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <section className="max-h-[calc(100dvh-1.5rem)] w-full max-w-3xl overflow-y-auto rounded-2xl border border-line bg-surface p-5 text-ink shadow-2xl sm:max-h-[calc(100dvh-4rem)] sm:p-8" role="dialog" aria-modal="true" aria-labelledby="matchday-guide-title">
+        <div className="flex items-start justify-between gap-4 border-b border-line-soft pb-5">
+          <div>
+            <div className="md-eyebrow text-accent-teal">Getting started</div>
+            <h2 id="matchday-guide-title" className="md-display mt-1 text-3xl text-ink sm:text-4xl">How MatchDay works</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-2">A simple guide for every person who enters a tournament—from first discovery to the final result.</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close help guide" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-ink-2 hover:border-accent-teal hover:text-ink"><X size={18} /></button>
+        </div>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          {GUIDE_SECTIONS.map(({ icon: Icon, title, intro, steps }) => (
+            <article key={title} className="rounded-xl border border-line bg-surface-2 p-4 sm:p-5">
+              <div className="flex items-center gap-2 text-accent-teal"><Icon size={18} /><h3 className="font-semibold text-ink">{title}</h3></div>
+              <p className="mt-2 text-sm text-ink-2">{intro}</p>
+              <ol className="mt-3 space-y-2.5 pl-5 text-sm leading-relaxed text-ink-2">
+                {steps.map((step) => <li key={step} className="pl-1 marker:font-bold marker:text-accent-teal">{step}</li>)}
+              </ol>
+            </article>
+          ))}
+        </div>
+        <p className="mt-6 rounded-lg border border-accent-teal/25 bg-accent-teal/10 p-3 text-sm text-ink-2"><strong className="text-ink">Tip:</strong> If you are unsure where to go, start with Discover. A public tournament page is always the best place to see what is happening, while an account unlocks player and organizer actions.</p>
+      </section>
+    </div>
+  );
+}
+
 // The bottom bar a phone gets in place of the header's switcher. Sized for
 // thumbs: 56px of height plus the safe-area inset, and the whole cell is the
 // tap target rather than just the label.
@@ -187,6 +268,7 @@ function Header() {
   const surfaces = surfacesFor(caps);
   const surface = surfaceOf(location.pathname);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   // The header stays legible over whatever is behind it, but only earns its
   // border and blur once the page has actually moved — at the very top of a
@@ -254,6 +336,14 @@ function Header() {
 
         <div className="ml-auto flex items-center gap-2.5">
           <ThemeToggle />
+          <button
+            type="button"
+            onClick={() => setHelpOpen(true)}
+            aria-label="Open MatchDay guide"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line bg-surface-2 text-ink-2 transition-colors hover:border-accent-teal hover:text-ink"
+          >
+            <HelpCircle size={17} />
+          </button>
           {session ? (
             <>
               <span className="md-mobile-hide-notification"><NotificationCenter userId={session.user.id} /></span>
@@ -263,7 +353,7 @@ function Header() {
               <Link
                 to="/me/profile"
                 aria-label="Your profile and settings"
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-line bg-surface-2 text-ink-2 transition-colors hover:border-accent-teal hover:text-ink"
+                className="md-profile-trigger flex h-8 w-8 items-center justify-center rounded-full border border-line bg-surface-2 text-ink-2 transition-colors hover:border-accent-teal hover:text-ink"
               >
                 <User size={15} />
               </Link>
@@ -327,6 +417,7 @@ function Header() {
         session={session}
         onSignOut={() => signOut()}
       />
+      <HelpGuide open={helpOpen} onClose={() => setHelpOpen(false)} />
     </header>
   );
 }
