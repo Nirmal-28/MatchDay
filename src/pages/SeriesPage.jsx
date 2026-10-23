@@ -151,7 +151,7 @@ export default function SeriesPage() {
   };
 
   const completed = ordered.filter((t) => ["COMPLETED", "ARCHIVED"].includes(t.status)).length;
-  const participants = new Set(Object.values(data.entryToPlayer || {})).size;
+  const participants = new Set(Object.values(data.entryToPlayer || {}).flat()).size;
 
   return (
     <div>

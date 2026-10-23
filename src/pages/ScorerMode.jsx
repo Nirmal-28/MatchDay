@@ -57,19 +57,36 @@ export default function ScorerMode() {
     try { await fn(); } catch { /* offline: keep the last known state */ }
   }, []);
 
-  useEffect(() => {
-    getMyRole(id).then((r) => setRole(r || null));
+  // A failed role check used to leave the screen on "Checking access…" for
+  // good — no error, no retry — which a scorer at the net post reads as a
+  // frozen app. Distinguish "you are not staff" from "could not check".
+  const [roleError, setRoleError] = useState(false);
+  const checkRole = useCallback(() => {
+    setRoleError(false);
+    setRole(undefined);
+    getMyRole(id).then((r) => setRole(r || null)).catch(() => setRoleError(true));
   }, [id]);
+  useEffect(() => { checkRole(); }, [checkRole]);
 
-  useEffect(() => { if (role) loadAll(); }, [role, loadAll]);
+  useEffect(() => { if (role) refresh(loadAll); }, [role, loadAll, refresh]);
 
   useEffect(() => {
     if (events.length === 0) return;
-    const unsubs = events.map((e) => subscribeToEvent(e.id, loadAll));
+    const unsubs = events.map((e) => subscribeToEvent(e.id, () => refresh(loadAll)));
     return () => unsubs.forEach((u) => u());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events.map((e) => e.id).join(",")]);
 
+  if (roleError) {
+    return (
+      <div className="mx-auto max-w-sm py-16 text-center">
+        <Radio className="mx-auto mb-3 text-ink-3" size={28} />
+        <h1 className="text-lg font-semibold text-ink">Couldn't reach MatchDay</h1>
+        <p className="mt-1 text-sm text-ink-2">Check the connection, then try again. Nothing you have scored is lost.</p>
+        <button onClick={checkRole} className="mt-4 rounded-lg bg-accent-teal px-4 py-2 text-sm font-bold text-navy-950">Try again</button>
+      </div>
+    );
+  }
   if (role === undefined) return <BrandLoader label="Checking access…" />;
   if (role === null) {
     return (

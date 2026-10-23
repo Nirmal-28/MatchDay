@@ -82,6 +82,7 @@ export default function NavOverlay({ open, onClose, surfaces, currentSurface, se
   // the same capability logic the header applies, not a second nav model.
   const secondary = [
     { to: "/leaderboard", label: "Rankings" },
+    { to: "/pulse", label: "MatchDay Pulse" },
     ...(session
       ? [{ to: "/me/profile", label: "Profile & settings" }]
       : [{ to: "/host", label: "Host a tournament" }, { to: "/login", label: "Sign in" }]),

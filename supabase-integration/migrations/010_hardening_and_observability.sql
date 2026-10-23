@@ -287,6 +287,17 @@ begin
 
   if not found then raise exception 'no game to score'; end if;
 
+  -- A point on a game that is already won is a stale tap: a second device
+  -- that queued behind the lock above, or an offline replay. Without this,
+  -- two scorers both tapping at 20-19 produced 22-19. Return the row
+  -- unchanged so the caller re-reads the real state.
+  if p_delta > 0 and (
+       g.score_a >= 30 or g.score_b >= 30 or
+       (greatest(g.score_a, g.score_b) >= 21 and abs(g.score_a - g.score_b) >= 2)
+     ) then
+    return g;
+  end if;
+
   -- The badminton cap (30) and the "game already won" guard live in
   -- src/lib/engines.js for the UI. Repeating the hard bounds here is
   -- deliberate: this function is reachable over the API, so it must not rely

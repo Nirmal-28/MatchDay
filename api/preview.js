@@ -41,7 +41,7 @@ function describe(t) {
   const dates = formatDates(t.start_date, t.end_date);
   if (dates) bits.push(dates);
   if (t.venue) bits.push(t.venue);
-  if (t.city) bits.push(t.city);
+  if (t.location) bits.push(t.location);
   const head = bits.join(" · ");
 
   const status = {
@@ -96,7 +96,7 @@ export default async function handler(req, res) {
   const fallback = {
     title: "Matchday — run and play racket tournaments",
     description: "Create a tournament, seed the draw, schedule courts and score matches live.",
-    image: `${origin}/logo.png`,
+    image: `${origin}/og-default.jpg`,
     url: `${origin}${path}`,
   };
 
@@ -111,7 +111,7 @@ export default async function handler(req, res) {
       `${SUPABASE_URL}/rest/v1/tournaments` +
       `?slug=eq.${encodeURIComponent(slug)}` +
       `&status=neq.DRAFT` +
-      `&select=name,venue,city,start_date,end_date,status,cover_image_url,logo_url` +
+      `&select=name,venue,location,start_date,end_date,status,cover_image_url,logo_url` +
       `&limit=1`;
 
     const r = await fetch(query, {
@@ -132,7 +132,7 @@ export default async function handler(req, res) {
     return res.status(200).send(page({
       title: `${t.name} — Matchday`,
       description: describe(t),
-      image: t.cover_image_url || t.logo_url || `${origin}/logo.png`,
+      image: t.cover_image_url || t.logo_url || `${origin}/og-default.jpg`,
       url: `${origin}/t/${encodeURIComponent(slug)}`,
     }));
   } catch {

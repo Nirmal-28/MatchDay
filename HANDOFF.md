@@ -65,7 +65,20 @@ tournament pages, discovery, venue display, and tournament intelligence.
 WhatsApp, push. See the *External integrations still required* table in
 `supabase-integration/README.md` for exactly what each one needs.
 
-**Migrations 010, 011 and 012 are written but not yet applied** to the live
+**MatchDay Pulse** (the differentiator — see `/pulse` in the app) is built on
+three pure, tested engines: `rating.js` (MatchDay Rating, a verified Elo-style
+skill rating replayed from officiated matches), `winProbability.js` (exact
+Markov model of rally-point badminton) and `matchStory.js` (moments read from
+the rally log). It surfaces on the match page, venue display, player profile,
+leaderboard (Skill view) and seeding panel (Fair Draw). Its momentum features
+need **migration 015**; ratings and win probability work without it.
+
+**UPI Direct** (migration 016, `src/lib/upi.js`) lets players pay the organizer
+from any UPI app; organizers confirm in the Finance tab. **Court queue**
+(`src/lib/courtQueue.js`, `CourtEta`) shows players when their match will
+really start, from live on-court pace — no migration needed.
+
+**Migrations 010, 011, 012, 015 and 016 are written but not yet applied** to the live
 project. Until 010 is applied, concurrent-scorer protection
 (`score_point_atomic`), rate limiting and client-error logging are inactive.
 Apply them in order via the Supabase SQL editor.

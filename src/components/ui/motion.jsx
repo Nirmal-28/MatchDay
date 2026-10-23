@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from "motion/react";
-import logo from "../../assets/logo.png";
+import logo from "../../assets/logo-256.webp";
 
 /* Scroll-reveal helpers.
 

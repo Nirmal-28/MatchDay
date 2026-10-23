@@ -32,8 +32,8 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "MatchDay";
   const options = {
     body: payload.body || "",
-    icon: "/logo.png",
-    badge: "/logo.png",
+    icon: "/logo-192.png",
+    badge: "/logo-32.png",
     // Collapse repeat notifications about the same match instead of stacking
     // twelve of them on the lock screen during a close game.
     tag: payload.tag || payload.url || "matchday",

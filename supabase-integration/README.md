@@ -276,7 +276,70 @@ both that the recursion is gone and that `SECURITY DEFINER` did not widen
 access (a stranger still sees nothing; a SCORER sees only their own
 tournament; published tournaments stay publicly readable).
 
-## Applying 010, 011, 012 and 013 — exact procedure
+## Migration 015 — MatchDay Pulse: the rally log
+
+Adds `match_points`, an **append-only** log of every rally scored (and every
+correction, as `delta = -1`). `games` remains the source of truth for the
+score; this table is the source of truth for *how* the score happened, and
+powers the momentum chart, live win probability history, Match Story moments
+and the shareable match card.
+
+- Readable wherever the match's games are (published tournaments, or staff).
+- Insertable only by someone who can score the match (`can_score_match`, so
+  it needs **013**), and only as themselves (`created_by = auth.uid()`).
+- No update or delete policy at all: history cannot be rewritten.
+- Added to the `supabase_realtime` publication, so spectators' charts move live.
+
+The client detects the table's absence and silently skips logging until 015
+is applied, so applying it is what *turns Pulse's momentum features on* — the
+score itself is unaffected either way. The rally insert is deliberately
+best-effort and never throws: scorePoint runs through the offline queue, and a
+throw after the point landed would make the queue replay (double-count) it.
+
+The **MatchDay Rating** needs no table. It is a deterministic replay of
+completed matches in `src/lib/rating.js`, so it can never drift from results.
+At larger scale, materialise it nightly from an Edge Function; the engine is
+unchanged.
+
+Guarded by `scripts/verify-migration-015.mjs` (part of `npm run
+test:migrations`): 13 assertions on real Postgres — applies cleanly and
+idempotently, scorer can write, stranger/anon cannot, no impersonation, no
+UPDATE/DELETE, draft logs private, published logs public, shape checks,
+realtime publication.
+
+### Amendment to 010 (not yet applied, so amended in place)
+
+`score_point_atomic()` now ignores a `+1` on a game that is already won.
+Without this, two scorers both tapping at 20–19 produced 22–19: the row lock
+serialised the two updates but nothing checked the game was over.
+
+## Migration 016 — UPI Direct
+
+Players pay the organizer straight from any UPI app (no gateway, no MDR, no
+KYC) and submit the 12-digit UTR; the organizer confirms after seeing the
+credit in their own bank app. Built for how Indian club tournaments already
+collect fees, minus the "post your screenshot in the group" step that fake
+screenshots exploit.
+
+- `tournaments.upi_id`, `upi_payee_name` — validated (`name@bank`), public by
+  nature (shown to every registrant).
+- `payment_claims` — organizer-only (`is_entry_owner`), never anon-readable,
+  because `entries` is public and a UTR is payment information. One open
+  claim per entry; re-submitting replaces it.
+- `claim_upi_payment(entry, utr)` — SECURITY DEFINER, the only player write
+  path. Validates the UTR, the tournament's UPI ID, entry state and fee, and
+  can move an entry to **PENDING at most**. Only the organizer's review
+  (`reviewUpiClaim` → `recordOfflinePayment`) sets PAID.
+
+Independent of every other migration except schema.sql. Guarded by
+`scripts/verify-migration-016.mjs`: 16 assertions on real Postgres.
+
+## Applying 010, 011, 012, 013, 015 and 016 — exact procedure
+
+016 is independent and can be applied any time.
+
+Apply **015 after 013** (it calls `can_score_match`). It is independent of
+010–012 and safe to apply at any time after 013.
 
 All three are idempotent (`if not exists` / `drop policy if exists` / `create
 or replace` throughout) and safe to re-run. **Apply them in order**, and apply
@@ -295,6 +358,8 @@ supabase db push
 #   2. 010_hardening_and_observability.sql
 #   3. 011_notification_delivery.sql
 #   4. 012_registration_fields_and_follows.sql
+#   5. 015_match_pulse.sql                      <-- turns on Pulse momentum
+#   6. 016_upi_direct.sql                       <-- turns on UPI Direct
 ```
 
 Applying 013 out of numeric order is fine and intentional: it only redefines a

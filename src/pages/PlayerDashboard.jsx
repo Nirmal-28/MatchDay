@@ -22,6 +22,8 @@ import { SectionHeader, StatTile, StatusPill, Tabs } from "../components/ui/md";
 import { MaskText, Rise, Counter } from "../components/ui/reveal";
 import { pay } from "../lib/payments";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
+import UpiPayCard from "../components/UpiPayCard";
+import CourtEta from "../components/CourtEta";
 
 const DONE = ["COMPLETED", "WALKOVER"];
 
@@ -62,6 +64,20 @@ function PayRow({ entry, player, onDone }) {
   const [message, setMessage] = useState(null);
   const fee = Number(entry.fee_inr || 0);
   const tournament = entry.tournament_events?.tournaments;
+
+  // The organizer takes UPI directly: show the real way to pay them instead
+  // of the (simulated) gateway button.
+  if (tournament?.upi_id) {
+    return (
+      <div className="md-card space-y-2.5 px-3.5 py-3">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-ink">{tournament.name}</div>
+          <div className="truncate text-[11px] text-ink-3">{divisionLabel(entry.tournament_events)} · {inr(fee)}</div>
+        </div>
+        <UpiPayCard tournament={tournament} entry={entry} />
+      </div>
+    );
+  }
 
   const run = async () => {
     setState("paying");
@@ -192,6 +208,9 @@ function NowCard({ item, player, onRefresh }) {
         <div className="mt-1.5 text-sm text-ink-2">
           {match.scheduled_at ? `${fmtDate(match.scheduled_at)} · ` : ""}{tournament?.name}
         </div>
+
+        {/* The printed time is the plan; this is when it will really happen. */}
+        <CourtEta match={match} tournament={tournament} className="mt-4" />
 
         {/* The matchup, in the same net-divided form the shared MatchCard
             uses — so a player recognises the shape everywhere it appears. */}

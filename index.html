@@ -2,10 +2,26 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/logo.png" />
-    <link rel="apple-touch-icon" href="/logo.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0B1220" />
+    <!-- Sized icons. These used to point at the 1.5 MB, 1254px master logo,
+         which every first visit downloaded just to draw a 16px tab icon. -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/logo-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/logo-192.png" />
+    <link rel="apple-touch-icon" href="/logo-192.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#111817" />
+    <!-- Apply the saved theme before first paint. The React toggle only runs
+         after the bundle loads, so a light-mode user saw the dark theme flash
+         on every page load. -->
+    <script>
+      try {
+        var t = localStorage.getItem("matchday-theme-v2");
+        if (t === "light" || t === "dark") {
+          document.documentElement.dataset.theme = t;
+          document.documentElement.style.colorScheme = t;
+        }
+      } catch (e) {}
+    </script>
 
     <title>Matchday — run and play racket tournaments</title>
     <meta name="description" content="Create a tournament, seed the draw, schedule courts and score matches live. Players find events, register and follow their results — one account for playing, organizing and officiating." />
@@ -18,11 +34,13 @@
     <meta property="og:site_name" content="Matchday" />
     <meta property="og:title" content="Matchday — run and play racket tournaments" />
     <meta property="og:description" content="Create a tournament, seed the draw, schedule courts and score matches live. Players find events, register and follow their results." />
-    <meta property="og:image" content="/logo.png" />
+    <meta property="og:image" content="/og-default.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Matchday — run and play racket tournaments" />
     <meta name="twitter:description" content="Create a tournament, seed the draw, schedule courts and score matches live. Players find events, register and follow their results." />
-    <meta name="twitter:image" content="/logo.png" />
+    <meta name="twitter:image" content="/og-default.jpg" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

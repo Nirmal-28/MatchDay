@@ -9,6 +9,7 @@ import { BrandLoader, Reveal } from "../components/ui/motion";
 import { CourtGeometry } from "../components/ui/atmosphere";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
 import FollowButton from "../components/FollowButton";
+import PlayerRatingCard from "../components/pulse/PlayerRatingCard";
 
 const BADGE_TONES = {
   yellow: "text-accent-yellow", teal: "text-accent-teal", purple: "text-accent-purple",
@@ -150,6 +151,10 @@ export default function PlayerProfile() {
           <StatTile label="Titles" value={ranking.titles} accent="text-accent-yellow" />
           <StatTile label="Finals" value={ranking.finals} />
         </div>
+
+        {/* Skill first: the verified MatchDay Rating. Ranking points below
+            measure activity, which is a different question. */}
+        <PlayerRatingCard playerId={player.id} className="relative mt-3" />
 
         {/* Ranking is withheld rather than shown as a provisional number —
             a "rank" off one match would read as a real standing. */}

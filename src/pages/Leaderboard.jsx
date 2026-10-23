@@ -9,12 +9,16 @@ import { BrandLoader, Reveal, StaggerList, StaggerItem } from "../components/ui/
 import { CourtGeometry } from "../components/ui/atmosphere";
 import { MaskText } from "../components/ui/reveal";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
+import RatingLeaderboard from "../components/pulse/RatingLeaderboard";
 
 const RANK_ACCENT = ["text-accent-yellow", "text-ink-3", "text-accent-orange"];
 
 export default function Leaderboard() {
   const [rows, setRows] = useState(null);
-  useDocumentMeta({ title: "Leaderboard", description: "Badminton ranking points from completed tournament matches." });
+  // Skill (MatchDay Rating) or activity (ranking points): two different
+  // questions, so two tables rather than one blended number.
+  const [view, setView] = useState("skill");
+  useDocumentMeta({ title: "Leaderboard", description: "MatchDay Rating and ranking points from officiated badminton matches." });
 
   // Ranking points come from real completed matches only. getRankingData()
   // returns the raw material; computeRanking() applies the sport's points
@@ -40,14 +44,26 @@ export default function Leaderboard() {
         <CourtGeometry />
         <div className="relative">
           <div className="md-eyebrow text-accent-teal">Matchday</div>
-          <MaskText as="h1" className="md-display md-h1 mt-1.5 text-ink" lines={["Rankings"]} />
+          <MaskText as="h1" immediate className="md-display md-h1 mt-1.5 text-ink" lines={["Rankings"]} />
           <p className="mx-auto mt-2 max-w-md text-sm text-ink-3">
-            Badminton ranking points from every completed match on MatchDay. A player needs at least {rankingConfigFor("badminton").minMatches} completed matches to be ranked.
+            {view === "skill"
+              ? "MatchDay Rating — verified skill, replayed from every officiated match. Beat stronger players to climb."
+              : `Ranking points reward playing: every completed match counts. A player needs at least ${rankingConfigFor("badminton").minMatches} completed matches to be ranked.`}
           </p>
+          <div className="mt-4 inline-flex rounded-full border border-line bg-surface p-1 text-xs font-bold uppercase tracking-wide">
+            {[["skill", "Skill · MDR"], ["activity", "Activity · points"]].map(([k, label]) => (
+              <button key={k} onClick={() => setView(k)} aria-pressed={view === k}
+                className={cx("rounded-full px-4 py-2", view === k ? "bg-accent-teal text-navy-950" : "text-ink-3 hover:text-ink")}>
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {!rows ? (
+      {view === "skill" ? (
+        <RatingLeaderboard />
+      ) : !rows ? (
         <BrandLoader />
       ) : rows.length === 0 ? (
         <EmptyState icon={Trophy} title="No rankings yet" hint={`Once players complete at least ${rankingConfigFor("badminton").minMatches} matches each, the ranking table fills in.`} />

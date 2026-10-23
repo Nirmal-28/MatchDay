@@ -21,6 +21,7 @@ import { MaskText, Rise } from "../components/ui/reveal";
 import { sportMeta } from "../lib/sports";
 import RegistrationModal from "../components/RegistrationModal";
 import FollowButton from "../components/FollowButton";
+import CourtEta from "../components/CourtEta";
 import BracketView from "../components/BracketView";
 import StandingsPanel from "../components/StandingsPanel";
 import ScheduleTable from "../components/ScheduleTable";
@@ -94,7 +95,7 @@ function gcalUrl(t, href) {
   const after = (iso) => {
     const d = new Date(`${iso}T12:00:00`);
     d.setDate(d.getDate() + 1);
-    return day(d.toISOString().slice(0, 10));
+    return day(todayLocal(d));
   };
   const params = new URLSearchParams({
     action: "TEMPLATE",
@@ -146,7 +147,7 @@ export default function PublicTournamentPage() {
   // switcher docked at the bottom, so the bar stacks above it.
   const { caps } = useAuth();
   const [tournament, setTournament] = useState(null);
-  useDocumentMeta({ title: tournament?.name, description: tournament ? [tournament.venue, tournament.city].filter(Boolean).join(", ") || undefined : undefined });
+  useDocumentMeta({ title: tournament?.name, description: tournament ? [tournament.venue, tournament.location].filter(Boolean).join(", ") || undefined : undefined });
   const [events, setEvents] = useState([]);
   const [entriesByEvent, setEntriesByEvent] = useState({});
   const [matchesByEvent, setMatchesByEvent] = useState({});
@@ -196,7 +197,9 @@ export default function PublicTournamentPage() {
 
   useEffect(() => {
     if (events.length === 0) return;
-    const unsubs = events.map((e) => subscribeToEvent(e.id, refreshAll));
+    // A failed background refresh keeps the last good page rather than
+    // surfacing as an unhandled rejection; the next change retries it.
+    const unsubs = events.map((e) => subscribeToEvent(e.id, () => refreshAll().catch(() => {})));
     return () => unsubs.forEach((u) => u());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events.map((e) => e.id).join(",")]);
@@ -227,11 +230,12 @@ export default function PublicTournamentPage() {
 
   // The freshest finished matches, for the Live tab's quiet moments — a
   // spectator between sessions still gets "what just happened" instead of a
-  // void. Recency by scheduled slot: matches carry no completion timestamp,
-  // and the last slots to be played are the last to finish.
+  // void. Recency by completed_at, which scoring stamps when a match ends;
+  // the scheduled slot is only a fallback, because a delayed match finishes
+  // long after the slot it was given and would otherwise sink out of view.
   const justFinished = useMemo(() => allMatches
-    .filter((m) => ["COMPLETED", "WALKOVER"].includes(m.status))
-    .sort((a, b) => (b.scheduled_at || "").localeCompare(a.scheduled_at || ""))
+    .filter((m) => ["COMPLETED", "WALKOVER"].includes(m.status) && !m.is_bye)
+    .sort((a, b) => (b.completed_at || b.scheduled_at || "").localeCompare(a.completed_at || a.scheduled_at || ""))
     .slice(0, 4), [allMatches]);
 
   // Decided finals → champions. Knockout only: a round-robin winner comes
@@ -325,12 +329,13 @@ export default function PublicTournamentPage() {
             )}
             <div className="min-w-0 flex-1">
               <MaskText
+                immediate
                 as="h1"
                 className="md-poster-sm text-ink"
                 lines={[tournament.name]}
               />
               {tournament.description && (
-                <Rise delay={0.12}>
+                <Rise delay={0.12} immediate>
                   <p className="mt-2.5 max-w-xl text-[15px] leading-relaxed text-ink-2">{tournament.description}</p>
                 </Rise>
               )}
@@ -355,7 +360,9 @@ export default function PublicTournamentPage() {
             )}
           </div>
 
-          <Rise delay={0.2} className="mt-6 flex flex-wrap items-center gap-2.5">
+          {/* immediate: the hero is above the fold by construction; waiting on
+              an intersection could leave the entry CTA invisible on a phone. */}
+          <Rise delay={0.2} immediate className="mt-6 flex flex-wrap items-center gap-2.5">
             {/* One unmistakable primary action, chosen by real state: enter
                 if anything is open, otherwise watch if anything is live. */}
             {openEvent ? (
@@ -432,7 +439,7 @@ export default function PublicTournamentPage() {
               strip is dropped entirely before a draw exists rather than
               showing a row of zeroes. */}
           {allMatches.length > 0 && (
-            <Rise delay={0.28} className="mt-8 grid max-w-2xl grid-cols-2 gap-2.5 sm:grid-cols-4">
+            <Rise delay={0.28} immediate className="mt-8 grid max-w-2xl grid-cols-2 gap-2.5 sm:grid-cols-4">
               <StatTile label="Categories" value={events.length} />
               <StatTile
                 label="Entries"
@@ -697,7 +704,7 @@ export default function PublicTournamentPage() {
         {activeTab === "schedule" && event && (
           tournament.schedule_published ? (
             <div className="space-y-4">
-              <NextMatchFinder events={events} entriesByEvent={entriesByEvent} matchesByEvent={matchesByEvent} />
+              <NextMatchFinder events={events} entriesByEvent={entriesByEvent} matchesByEvent={matchesByEvent} tournament={tournament} />
               <ScheduleTable matches={eventMatches} entriesById={entriesById} event={event} />
             </div>
           ) : (
@@ -932,7 +939,7 @@ export default function PublicTournamentPage() {
 
    This is the single most-used control at a real venue: a player who does
    not have the app, standing in a hall, wanting to know when and where. */
-function NextMatchFinder({ events, entriesByEvent, matchesByEvent }) {
+function NextMatchFinder({ events, entriesByEvent, matchesByEvent, tournament }) {
   const [query, setQuery] = useState("");
   const [result, setResult] = useState(null);
 
@@ -993,6 +1000,14 @@ function NextMatchFinder({ events, entriesByEvent, matchesByEvent }) {
           <div className="mt-3 text-xs text-ink-3">
             {matchStageLabel(result.match, result.event)} · {divisionLabel(result.event)}
           </div>
+          {/* The printed slot above is the plan; this is live pace. */}
+          {(() => {
+            // The search result is a snapshot; the page refreshes live, so
+            // read the match's current row rather than the one found.
+            const all = Object.values(matchesByEvent).flat();
+            const fresh = all.find((m) => m.id === result.match.id) || result.match;
+            return <CourtEta match={fresh} tournament={tournament} matches={all} className="mt-3.5" />;
+          })()}
         </div>
       )}
     </div>

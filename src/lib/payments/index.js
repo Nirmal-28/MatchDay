@@ -109,7 +109,7 @@ function awaitPaymentResult(entryId, { timeoutMs = 90_000 } = {}) {
     };
 
     const channel = supabase
-      .channel(`pay-${entryId}`)
+      .channel(`pay-${entryId}-${Date.now()}`)
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "entries", filter: `id=eq.${entryId}` },

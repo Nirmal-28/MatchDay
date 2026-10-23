@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, MapPin, Clock, Radio, Swords, Gavel, ClipboardList, ArrowRight, Trophy } from "lucide-react";
 import {
@@ -9,11 +9,15 @@ import { getMatchDetail, subscribeToMatch } from "../lib/repository";
 import { Badge, Card, EmptyState } from "../components/ui/primitives";
 import { BrandLoader, LivePulse } from "../components/ui/motion";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
+import { useMatchPulse } from "../lib/useMatchPulse";
+import { RatingChip, WinProbabilityBar, MomentumChart, MatchMoments } from "../components/pulse/PulseUI";
+import ShareStoryCard from "../components/pulse/ShareStoryCard";
+import CourtEta from "../components/CourtEta";
 
 // One side of the match: name(s), live or final score, winner marker. Declared
 // at module level rather than inside the page so it keeps its identity across
 // re-renders (this page re-renders on every realtime score change).
-function Side({ entry, side, won, showLive, showFinal, liveScore, finalGames }) {
+function Side({ entry, side, won, showLive, showFinal, liveScore, finalGames, rating, delta }) {
   return (
     <div className={cx(
       "flex items-center justify-between gap-3 rounded-lg border px-4 py-3",
@@ -36,6 +40,11 @@ function Side({ entry, side, won, showLive, showFinal, liveScore, finalGames }) 
           <Link to={`/p/${entry.entry_players[0].player_id}`} className="text-[11px] text-ink-3 hover:text-accent-teal">
             View profile
           </Link>
+        )}
+        {rating && (
+          <div className="mt-1.5">
+            <RatingChip rating={rating.rating} provisional={rating.provisional} delta={delta} />
+          </div>
         )}
       </div>
       <div className="shrink-0 text-right">
@@ -63,9 +72,14 @@ export default function MatchDetail() {
   const [error, setError] = useState(null);
   useDocumentMeta({ title: data ? "Match detail" : undefined });
 
+  // Only the FIRST load can decide the match does not exist. A realtime
+  // refresh that fails mid-match is a connection blip, and swapping a live
+  // scoreboard for "Match not found" because one re-read dropped told
+  // spectators the match had vanished. Keep the last good score instead.
+  const hasData = useRef(false);
   const load = useCallback(async () => {
-    try { setData(await getMatchDetail(id)); }
-    catch (e) { setError(e.message); }
+    try { setData(await getMatchDetail(id)); hasData.current = true; }
+    catch (e) { if (!hasData.current) setError(e.message); }
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
@@ -74,7 +88,12 @@ export default function MatchDetail() {
   if (error) return <EmptyState icon={Swords} title="Match not found" hint="This link may be wrong, or the tournament isn't published yet." />;
   if (!data) return <BrandLoader />;
 
+  return <MatchDetailView data={data} navigate={navigate} />;
+}
+
+function MatchDetailView({ data, navigate }) {
   const { match, event, tournament, entriesById, officials, feeders, nextMatch } = data;
+  const pulse = useMatchPulse(match, entriesById);
   const a = entriesById[match.entry_a];
   const b = entriesById[match.entry_b];
   const games = [...(match.games || [])].sort((x, y) => x.game_number - y.game_number);
@@ -94,7 +113,27 @@ export default function MatchDetail() {
     showFinal: isDone,
     liveScore: side === "A" ? current?.score_a : current?.score_b,
     finalGames: side === "A" ? tally.a : tally.b,
+    rating: pulse?.rating?.[side] || null,
+    delta: pulse?.delta?.[side] ?? null,
   });
+  const nameA = entryShort(a) || "Side A";
+  const nameB = entryShort(b) || "Side B";
+  const winnerPre = winnerSide === "A" ? pulse?.preMatchA : winnerSide === "B" ? 1 - (pulse?.preMatchA ?? 0.5) : null;
+  const upset = isDone && pulse?.basis === "ratings" && winnerPre != null && winnerPre < 0.35;
+  const storyCard = isDone && !match.is_bye && games.length > 0 ? {
+    tournament: tournament?.name, stage: matchStageLabel(match, event), division: divisionLabel(event),
+    sides: [
+      { name: nameA, won: winnerSide === "A", delta: pulse?.delta?.A, rating: pulse?.rating?.A?.rating },
+      { name: nameB, won: winnerSide === "B", delta: pulse?.delta?.B, rating: pulse?.rating?.B?.rating },
+    ],
+    games: toAB(games),
+    series: pulse?.logComplete ? pulse.story.series : [],
+    moments: [
+      ...(upset ? [{ title: `Upset — won from a ${Math.round(winnerPre * 100)}% pre-match chance`, side: winnerSide }] : []),
+      ...(pulse?.story?.moments || []),
+    ],
+    url: typeof window !== "undefined" ? window.location.href : "",
+  } : null;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -144,12 +183,32 @@ export default function MatchDetail() {
         </div>
       </div>
 
+      {/* When it will really start, from live pace on this court. Renders
+          nothing for a match that is finished, unscheduled or days away. */}
+      {!isLive && !isDone && <CourtEta match={match} tournament={tournament} className="mb-4" />}
+
       {/* Sides + score */}
       <div className="mb-4 space-y-2">
         <Side entry={a} {...sideProps("A")} />
         <div className="text-center text-[11px] font-semibold uppercase tracking-widest text-ink-3">versus</div>
         <Side entry={b} {...sideProps("B")} />
       </div>
+
+      {/* ── MatchDay Pulse ───────────────────────────────────────────────
+          Live: who is winning, as a probability that moves every rally.
+          Before: the rating-based prediction. After: how it happened. */}
+      {isLive && pulse?.live != null && (
+        <WinProbabilityBar className="mb-4" nameA={nameA} nameB={nameB} pA={pulse.live} basis={pulse.basis} />
+      )}
+      {!isLive && !isDone && pulse?.basis === "ratings" && match.entry_a && match.entry_b && (
+        <WinProbabilityBar className="mb-4" label="Pre-match prediction" nameA={nameA} nameB={nameB} pA={pulse.preMatchA} basis="ratings" />
+      )}
+      {upset && (
+        <div className="md-edge mb-4 rounded-lg border border-accent-yellow/40 bg-accent-yellow/[0.07] px-4 py-3 pl-5 text-sm" style={{ "--md-edge": "var(--color-accent-yellow)" }}>
+          <span className="font-semibold text-accent-yellow">Upset.</span>{" "}
+          <span className="text-ink-2">{winnerSide === "A" ? nameA : nameB} went in with a {Math.round(winnerPre * 100)}% chance on MatchDay Ratings — and won.</span>
+        </div>
+      )}
 
       {/* Game-by-game */}
       {games.length > 0 && (
@@ -189,6 +248,27 @@ export default function MatchDetail() {
             <div className="mt-2 text-[11px] text-ink-3">Match duration {fmtDuration(durationMins)}</div>
           )}
         </Card>
+      )}
+
+      {(isLive || isDone) && pulse && (pulse.logComplete || pulse.story.moments.length > 0 || storyCard) && (
+        <section className="mb-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="md-display text-xl text-ink">Match pulse</h2>
+            {storyCard && <ShareStoryCard card={storyCard} fileName={`matchday-${match.id.slice(0, 8)}.png`} />}
+          </div>
+          {pulse.logComplete && pulse.story.series.length > 2 && (
+            <MomentumChart series={pulse.story.series} nameA={nameA} nameB={nameB} />
+          )}
+          {pulse.logPartial && (
+            <p className="text-[11px] text-ink-3">Part of this match's rally log is missing, so the momentum chart is hidden rather than drawn from incomplete data. The score above is official.</p>
+          )}
+          <MatchMoments moments={pulse.story.moments} nameA={nameA} nameB={nameB} />
+          {pulse.story.stats && pulse.logComplete && (
+            <div className="text-[11px] text-ink-3">
+              {pulse.story.stats.rallies} rallies · {nameA} won {pulse.story.stats.pointsWon.A}, {nameB} won {pulse.story.stats.pointsWon.B}
+            </div>
+          )}
+        </section>
       )}
 
       {/* Officials + progression */}

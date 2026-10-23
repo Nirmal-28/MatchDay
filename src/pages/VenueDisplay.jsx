@@ -5,11 +5,13 @@ import {
   cx, entryShort, matchStageLabel, fmtTime, divisionLabel, accentTheme,
   BadmintonScoringEngine, toAB, displayTitle, displaySentence,
 } from "../lib/engines";
-import { getTournamentBySlug, listEvents, listEntriesPublic, listMatches, listCourts, subscribeToEvent } from "../lib/repository";
+import { getTournamentBySlug, listEvents, listEntriesPublic, listMatches, listCourts, subscribeToEvent, getRatingData } from "../lib/repository";
+import { expectedScore, sideRating } from "../lib/rating";
+import { matchWinProbability, rallyProbabilityFor, stateFromGames } from "../lib/winProbability";
 import { courtBoard } from "../lib/analytics";
 import { BrandLoader } from "../components/ui/motion";
 import { EmptyState } from "../components/ui/primitives";
-import logo from "../assets/logo.png";
+import logo from "../assets/logo-256.webp";
 
 /* Public, no-login TV/projector view. Optimised for being read across a hall:
    very large type, high contrast, no interaction, no chrome. It rotates
@@ -46,7 +48,20 @@ function Clock() {
    weight carries further than any badge. Game pips below give the match
    shape (21-18, 19-21) without a second row of numerals competing with
    the running score. */
-function LiveCard({ m, event, entriesById, accent }) {
+// Live win chance for one court, from MatchDay Ratings when both sides have
+// one and from the score alone otherwise (the board says which).
+function liveChance(m, entriesById, ratings) {
+  const ids = (eid) => (entriesById[eid]?.entry_players || []).map((p) => p.player_id).filter(Boolean);
+  const idsA = ids(m.entry_a), idsB = ids(m.entry_b);
+  const pool = ratings?.players?.[Math.max(idsA.length, idsB.length) > 1 ? "doubles" : "singles"] || {};
+  const ra = sideRating(pool, idsA), rb = sideRating(pool, idsB);
+  const rated = !!(ra && rb);
+  const p = rated ? rallyProbabilityFor(expectedScore(ra.rating, rb.rating)) : 0.5;
+  return { pA: matchWinProbability(stateFromGames(toAB(m.games)), p), rated };
+}
+
+function LiveCard({ m, event, entriesById, accent, ratings }) {
+  const chance = liveChance(m, entriesById, ratings);
   const games = [...(m.games || [])].sort((x, y) => x.game_number - y.game_number);
   const current = games[games.length - 1];
   const tally = BadmintonScoringEngine.gameTally(toAB(games));
@@ -110,6 +125,21 @@ function LiveCard({ m, event, entriesById, accent }) {
           </span>
         </div>
       )}
+
+      {/* MatchDay Pulse: the live win chance, the one number a hall argues
+          about between rallies. Teal is the top side, orange the bottom —
+          the same colours as every phone in the room. */}
+      <div className="mt-[1.1vw]">
+        <div className="mb-[0.35vw] flex justify-between text-[0.95vw] font-semibold uppercase tracking-widest">
+          <span style={{ color: "#16c5b0" }}>{Math.round(chance.pA * 100)}%</span>
+          <span className="text-white/35">Win chance{chance.rated ? " · MDR" : ""}</span>
+          <span style={{ color: "#f97316" }}>{Math.round((1 - chance.pA) * 100)}%</span>
+        </div>
+        <div className="flex h-[0.45vw] overflow-hidden rounded-full bg-white/10">
+          <div className="h-full transition-[width] duration-700 ease-out" style={{ width: `${Math.min(99, Math.max(1, chance.pA * 100))}%`, background: "#16c5b0" }} />
+          <div className="h-full flex-1" style={{ background: "#f97316" }} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -128,6 +158,15 @@ export default function VenueDisplay() {
   // actually arrived so the board can say so when it goes quiet.
   const [lastSync, setLastSync] = useState(null);
   const [stale, setStale] = useState(false);
+  // Ratings move only when a match finishes, so a slow refresh is enough;
+  // a failure leaves win chances on the score alone, which the board labels.
+  const [ratings, setRatings] = useState(null);
+  useEffect(() => {
+    const load = () => getRatingData({ fresh: true }).then(setRatings).catch(() => {});
+    load();
+    const t = setInterval(load, 10 * 60_000);
+    return () => clearInterval(t);
+  }, []);
 
   const loadAll = useCallback(async (t) => {
     const evs = await listEvents(t.id);
@@ -157,7 +196,7 @@ export default function VenueDisplay() {
 
   useEffect(() => {
     if (events.length === 0 || !tournament) return;
-    const unsubs = events.map((e) => subscribeToEvent(e.id, () => loadAll(tournament)));
+    const unsubs = events.map((e) => subscribeToEvent(e.id, () => loadAll(tournament).catch(() => setStale(true))));
     return () => unsubs.forEach((u) => u());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events.map((e) => e.id).join(","), tournament]);
@@ -301,7 +340,7 @@ export default function VenueDisplay() {
             // nobody is touching, motion must mean "something changed", and
             // a board that re-animated on every point would be unwatchable.
             <div key={m.id} className="vd-enter">
-              <LiveCard m={m} event={eventById[m.event_id]} entriesById={entriesById} accent={accent} />
+              <LiveCard m={m} event={eventById[m.event_id]} entriesById={entriesById} accent={accent} ratings={ratings} />
             </div>
           ))}
         </div>

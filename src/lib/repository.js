@@ -3,6 +3,7 @@ import {
   nextPow2, bracketSeedOrder, roundRobinRounds, snakeIntoGroups, groupLetter, computeStandings,
 } from "./engines";
 import * as SchedulingEngine from "./schedulingEngine";
+import { computeRatings } from "./rating";
 
 /* ==========================================================================
    Courtside — Supabase repository layer.
@@ -176,32 +177,42 @@ export async function publishTournament(tournamentId, slugBase) {
   if (eErr) throw eErr;
 }
 
+// supabase-js RESOLVES with `{ error }` rather than rejecting — on an RLS
+// refusal and on a dropped connection alike. Every write whose caller shows
+// "done", or that runs through the offline queue (which treats a resolved call
+// as delivered and deletes it), must turn that into a throw. Without this a
+// scorer's "start match" tapped on dead venue wifi was silently discarded.
+function must(result) {
+  if (result?.error) throw result.error;
+  return result?.data;
+}
+
 export async function closeRegistration(tournamentId) {
-  await supabase.from("tournaments").update({ status: "REGISTRATION_CLOSED" }).eq("id", tournamentId);
-  await supabase.from("tournament_events").update({ status: "REGISTRATION_CLOSED" })
-    .eq("tournament_id", tournamentId).eq("status", "REGISTRATION_OPEN");
+  must(await supabase.from("tournaments").update({ status: "REGISTRATION_CLOSED" }).eq("id", tournamentId));
+  must(await supabase.from("tournament_events").update({ status: "REGISTRATION_CLOSED" })
+    .eq("tournament_id", tournamentId).eq("status", "REGISTRATION_OPEN"));
 }
 
 export async function startTournament(tournamentId) {
-  await supabase.from("tournaments").update({ status: "LIVE" }).eq("id", tournamentId);
-  await supabase.from("tournament_events").update({ status: "LIVE" })
-    .eq("tournament_id", tournamentId).eq("status", "SCHEDULED");
-  const { data: events } = await supabase.from("tournament_events")
-    .select("id").eq("tournament_id", tournamentId).eq("status", "LIVE");
+  must(await supabase.from("tournaments").update({ status: "LIVE" }).eq("id", tournamentId));
+  must(await supabase.from("tournament_events").update({ status: "LIVE" })
+    .eq("tournament_id", tournamentId).eq("status", "SCHEDULED"));
+  const events = must(await supabase.from("tournament_events")
+    .select("id").eq("tournament_id", tournamentId).eq("status", "LIVE"));
   const eventIds = (events || []).map((e) => e.id);
   if (eventIds.length) {
-    await supabase.from("matches").update({ status: "READY" })
+    must(await supabase.from("matches").update({ status: "READY" })
       .in("event_id", eventIds).eq("is_bye", false)
       .not("entry_a", "is", null).not("entry_b", "is", null)
-      .in("status", ["PENDING", "SCHEDULED"]);
+      .in("status", ["PENDING", "SCHEDULED"]));
   }
 }
 
 export async function completeTournament(tournamentId) {
-  await supabase.from("tournaments").update({ status: "COMPLETED" }).eq("id", tournamentId);
+  must(await supabase.from("tournaments").update({ status: "COMPLETED" }).eq("id", tournamentId));
 }
 export async function cancelTournament(tournamentId) {
-  await supabase.from("tournaments").update({ status: "CANCELLED" }).eq("id", tournamentId);
+  must(await supabase.from("tournaments").update({ status: "CANCELLED" }).eq("id", tournamentId));
 }
 export async function updateTournament(tournamentId, patch) {
   const { error } = await supabase.from("tournaments").update(patch).eq("id", tournamentId);
@@ -485,6 +496,51 @@ export async function recordOfflinePayment(entryId, { received = true, amountINR
   }
 }
 
+/* ---------------------------- UPI DIRECT ----------------------------------- */
+/* Players pay the organizer from any UPI app and submit the UTR; the organizer
+   verifies against their own bank app. See migration 016 for why nothing here
+   can mark an entry PAID on the player's word. */
+
+// Player side. Works for anonymous registrants (SECURITY DEFINER RPC).
+export async function claimUpiPayment(entryId, utr) {
+  const { data, error } = await supabase.rpc("claim_upi_payment", { p_entry_id: entryId, p_utr: utr });
+  if (error) {
+    if (error.code === "PGRST202" || /claim_upi_payment/.test(error.message || "")) {
+      throw new Error("UPI payments aren't switched on for this tournament yet. Pay the organizer and they'll record it.");
+    }
+    throw error;
+  }
+  return data;
+}
+
+// Organizer side: every claim on this tournament's entries. An empty list,
+// not an error, before migration 016 is applied.
+export async function listUpiClaims(tournamentId) {
+  const { data, error } = await supabase
+    .from("payment_claims")
+    .select("*, entries!inner(id, event_id, fee_inr, payment_status, tournament_events!inner(tournament_id))")
+    .eq("entries.tournament_events.tournament_id", tournamentId)
+    .order("created_at", { ascending: false });
+  if (error) return [];
+  return data || [];
+}
+
+// Verify = the money is in the organizer's account; reject = it is not.
+export async function reviewUpiClaim(claim, accept) {
+  const session = await getSession();
+  must(await supabase.from("payment_claims")
+    .update({ status: accept ? "VERIFIED" : "REJECTED", reviewed_at: new Date().toISOString(), reviewed_by: session?.user?.id ?? null })
+    .eq("id", claim.id));
+  if (accept) {
+    await recordOfflinePayment(claim.entry_id, { received: true, amountINR: Number(claim.amount_inr) });
+  } else {
+    // Back to unpaid, so the player can pay again; never to FAILED, which
+    // would read as the bank declining a payment that may never have existed.
+    must(await supabase.from("entries").update({ payment_status: "UNPAID" })
+      .eq("id", claim.entry_id).eq("payment_status", "PENDING"));
+  }
+}
+
 /* ----------------------------- DRAW ---------------------------------------- */
 
 // Manually set seeds before generating a draw. seedMap: { entryId: seedNumber }
@@ -527,8 +583,16 @@ function blankMatch(eventId, round, matchNumber) {
 // whoever happened to register first.
 function buildKnockout(eventId, ordered, startRound = 1, startMatchNumber = 1) {
   const size = nextPow2(ordered.length);
-  const totalRounds = Math.log2(size);
   const slots = bracketSeedOrder(size).map((seedNo) => ordered[seedNo - 1] ?? null);
+  return buildKnockoutFromSlots(eventId, slots, startRound, startMatchNumber);
+}
+
+// The bracket itself, from round-1 slots taken as given: slots[0] v slots[1]
+// is match 1, its winner meets the winner of slots[2] v slots[3], and so on.
+// null = bye. slots.length must be a power of two.
+function buildKnockoutFromSlots(eventId, slots, startRound = 1, startMatchNumber = 1) {
+  const size = slots.length;
+  const totalRounds = Math.log2(size);
 
   let matchNumber = startMatchNumber;
   const round1 = [];
@@ -571,7 +635,18 @@ function buildKnockout(eventId, ordered, startRound = 1, startMatchNumber = 1) {
   return { matches: all, totalRounds };
 }
 
+// The Draw tab hides "Generate" once matches exist, but only after a reload —
+// a double-click, or two organizers on the same event, inserted a SECOND full
+// bracket alongside the first. Checked here so every generator refuses.
+async function assertNoDraw(eventId) {
+  const { count, error } = await supabase
+    .from("matches").select("id", { count: "exact", head: true }).eq("event_id", eventId);
+  if (error) throw error;
+  if (count > 0) throw new Error("A draw already exists for this category.");
+}
+
 export async function generateDraw(eventId) {
+  await assertNoDraw(eventId);
   const entries = await confirmedEntries(eventId);
   if (entries.length < 2) throw new Error("At least 2 confirmed entries are required to generate a draw.");
 
@@ -584,9 +659,60 @@ export async function generateDraw(eventId) {
   if (updErr) throw updErr;
 }
 
+// The organizer's own matchups (made by hand or in ChatGPT) as the draw,
+// instead of a generated one. `plan` comes from planCustomDraw() in
+// lib/matchups.js, already validated. Names not yet in the category are added
+// as walk-in entries first; a pending entry that appears in a match is
+// confirmed, since putting it in the draw is the organizer's approval.
+export async function createCustomDraw(eventId, feeINR, format, plan) {
+  await assertNoDraw(eventId);
+
+  const ids = { ...plan.entryIdByKey };
+  for (const side of plan.newSides) {
+    const res = await addWalkInEntries(eventId, feeINR, [{ players: side.players }]);
+    const entry = res.added[0];
+    const name = side.players.map((p) => p.name).join(" / ");
+    if (!entry) {
+      if (res.waitlisted[0]) await supabase.from("entries").delete().eq("id", res.waitlisted[0].id);
+      throw new Error(`Couldn't add ${name}: ${res.failed[0]?.error || "the category is full. Raise its entry limit and try again."}`);
+    }
+    ids[side.key] = entry.id;
+  }
+  const idOf = (side) => (side ? ids[side.key] : null);
+
+  const used = [...new Set(plan.matches.flatMap((m) => m.sides.map(idOf)).filter(Boolean))];
+  const { error: cErr } = await supabase.from("entries")
+    .update({ reg_status: "CONFIRMED" }).in("id", used).eq("reg_status", "PENDING");
+  if (cErr) throw cErr;
+
+  let rows, patch;
+  if (format === "SINGLE_ELIM") {
+    const built = buildKnockoutFromSlots(eventId, plan.matches.flatMap((m) => m.sides.map(idOf)));
+    rows = built.matches;
+    patch = { total_rounds: built.totalRounds };
+  } else {
+    let matchNumber = 1;
+    rows = plan.matches.map((m) => ({
+      id: crypto.randomUUID(), event_id: eventId, round: m.round, match_number: matchNumber++,
+      entry_a: idOf(m.sides[0]), entry_b: idOf(m.sides[1]), is_bye: false, status: "PENDING",
+      group_label: format === "ROUND_ROBIN" ? "RR" : m.group,
+    }));
+    patch = format === "ROUND_ROBIN"
+      ? { total_rounds: Math.max(...rows.map((r) => r.round)) }
+      : { group_count: new Set(rows.map((r) => r.group_label)).size, total_rounds: null };
+  }
+
+  const { error: insErr } = await supabase.from("matches").insert(rows);
+  if (insErr) throw insErr;
+  const { error: updErr } = await supabase.from("tournament_events")
+    .update({ status: "DRAW_READY", ...patch }).eq("id", eventId);
+  if (updErr) throw updErr;
+}
+
 // Round robin: everyone plays everyone once. Best for small divisions, where a
 // knockout would send half the paying entrants home after a single match.
 export async function generateRoundRobin(eventId) {
+  await assertNoDraw(eventId);
   const entries = await confirmedEntries(eventId);
   if (entries.length < 3) throw new Error("At least 3 confirmed entries are required for a round robin.");
 
@@ -610,6 +736,7 @@ export async function generateRoundRobin(eventId) {
 // built later by generateKnockoutFromGroups(), once results are in and we
 // actually know who advanced.
 export async function generateGroupStage(eventId, groupCount, advancePerGroup = 2) {
+  await assertNoDraw(eventId);
   const entries = await confirmedEntries(eventId);
   if (entries.length < groupCount * 2) {
     throw new Error(`At least ${groupCount * 2} confirmed entries are required for ${groupCount} groups.`);
@@ -929,6 +1056,18 @@ export async function generateSchedule(eventId) {
 /* ----------------------------- MATCHES (read) ---------------------------------- */
 
 // Matches for an event, each with its games nested (needed for bracket/scorer/results UI).
+// Every match in a tournament, without scores — just what a court queue
+// needs. Courts are shared across categories, so a singles match's place in
+// line depends on the doubles matches ahead of it on the same court.
+export async function listTournamentQueue(tournamentId) {
+  const { data, error } = await supabase
+    .from("matches")
+    .select("id, event_id, match_number, court, court_id, status, scheduled_at, started_at, completed_at, entry_a, entry_b, is_bye, tournament_events!inner(tournament_id)")
+    .eq("tournament_events.tournament_id", tournamentId);
+  if (error) throw error;
+  return data || [];
+}
+
 export async function listMatches(eventId) {
   const { data, error } = await supabase
     .from("matches").select("*, games(*)").eq("event_id", eventId).order("match_number");
@@ -1068,9 +1207,74 @@ function matchWinnerSide(games) {
   if (wa === 2) return "A"; if (wb === 2) return "B"; return null;
 }
 
+// 23505 = unique_violation. games is unique on (match_id, game_number), so this
+// is "that game already exists" — which is what a retried insert whose first
+// response was lost looks like. It means the work is done, not failed.
+const isDuplicate = (error) => error?.code === "23505";
+
+// Idempotent, because the offline queue may replay it: a second start of a
+// match that is already live must not reset started_at or try to open game 1
+// again, and a start replayed after the match finished must not revive it.
 export async function startMatch(matchId) {
-  await supabase.from("matches").update({ status: "LIVE", started_at: new Date().toISOString() }).eq("id", matchId);
-  await supabase.from("games").insert({ match_id: matchId, game_number: 1, score_a: 0, score_b: 0 });
+  const match = must(await supabase.from("matches").select("id, status, games(id)").eq("id", matchId).single());
+  if (match.status === "COMPLETED" || match.status === "WALKOVER") return;
+  if (match.status !== "LIVE") {
+    must(await supabase.from("matches").update({ status: "LIVE", started_at: new Date().toISOString() }).eq("id", matchId));
+  }
+  if (!match.games?.length) {
+    const { error } = await supabase.from("games").insert({ match_id: matchId, game_number: 1, score_a: 0, score_b: 0 });
+    if (error && !isDuplicate(error)) throw error;
+  }
+}
+
+// What happens once a match has a winner, whichever way it got one — the
+// last rally, or a retirement. One path, so the two can never disagree about
+// who advances or when a division is complete.
+async function decideMatch(match, winnerEntryId, extra = {}) {
+  must(await supabase.from("matches")
+    .update({ status: "COMPLETED", winner_entry_id: winnerEntryId, completed_at: new Date().toISOString(), ...extra })
+    .eq("id", match.id));
+
+  if (match.next_match_id) {
+    const patch = match.next_slot === "A" ? { entry_a: winnerEntryId } : { entry_b: winnerEntryId };
+    const next = must(await supabase.from("matches").update(patch).eq("id", match.next_match_id).select().single());
+    if (next?.entry_a && next?.entry_b && next?.scheduled_at && ["PENDING", "SCHEDULED"].includes(next.status)) {
+      must(await supabase.from("matches").update({ status: "READY" }).eq("id", next.id));
+    }
+  } else if (!match.group_label) {
+    // Only a true knockout final has no next_match_id. Round-robin and group
+    // matches never have one either (nothing to advance into), so without this
+    // guard the FIRST round-robin match to finish would falsely crown its
+    // winner "champion" and mark the whole division complete.
+    must(await supabase.from("tournament_events")
+      .update({ status: "COMPLETED", champion_entry_id: winnerEntryId }).eq("id", match.event_id));
+  } else if (match.group_label === "RR") {
+    // Pure round robin (not groups->knockout) has no final match to hang a
+    // champion declaration off, so declare one here once every RR match in
+    // the division is done: the top of the standings table.
+    const rrMatches = must(await supabase
+      .from("matches").select("*, games(*)").eq("event_id", match.event_id).eq("group_label", "RR"));
+    const allDone = rrMatches.every((m) => m.status === "COMPLETED" || m.status === "WALKOVER");
+    if (allDone) {
+      const ids = [...new Set(rrMatches.flatMap((m) => [m.entry_a, m.entry_b]).filter(Boolean))];
+      const standings = computeStandings(ids, rrMatches);
+      if (standings[0]) {
+        must(await supabase.from("tournament_events")
+          .update({ status: "COMPLETED", champion_entry_id: standings[0].entryId }).eq("id", match.event_id));
+      }
+    }
+  }
+}
+
+// After a game ends: open the next one, or decide the match.
+async function settleAfterGame(match, games) {
+  const winSide = matchWinnerSide(games);
+  if (!winSide) {
+    const { error } = await supabase.from("games").insert({ match_id: match.id, game_number: games.length + 1, score_a: 0, score_b: 0 });
+    if (error && !isDuplicate(error)) throw error;
+    return;
+  }
+  await decideMatch(match, winSide === "A" ? match.entry_a : match.entry_b);
 }
 
 // Apply a single point atomically, falling back to the old client-side
@@ -1105,88 +1309,95 @@ async function applyPoint(last, matchId, side, key, delta) {
   return { ...last, [key]: value };
 }
 
-export async function scorePoint(matchId, side, delta) {
+// The rally log behind MatchDay Pulse (migration 015). Strictly best-effort:
+// it must NEVER throw, because scorePoint runs through the offline queue and a
+// throw here — after the point already landed — would make the queue replay
+// the point and score it twice. A missing rally costs one line of the match
+// story; a double-counted point costs a match. Until 015 is applied the table
+// does not exist, and logging switches itself off after the first refusal.
+let rallyLogAvailable = true;
+async function logRally(matchId, game, side, delta) {
+  if (!rallyLogAvailable) return;
+  try {
+    const { error } = await supabase.from("match_points").insert({
+      match_id: matchId, game_number: game.game_number, side, delta,
+      score_a: game.score_a, score_b: game.score_b,
+    });
+    // 42P01 = undefined table; PGRST205 = not in PostgREST's schema cache.
+    if (error && (error.code === "42P01" || error.code === "PGRST205" || /match_points/.test(error.message || ""))) {
+      rallyLogAvailable = false;
+    }
+  } catch { /* offline: the score is safe in games; only the story loses a line */ }
+}
+
+// A match's rallies in order, for the momentum chart and Match Story. An
+// empty list (no log yet, or 015 not applied) is a normal answer, not an
+// error — the story falls back to the game scores.
+export async function listMatchPoints(matchId) {
+  const { data, error } = await supabase
+    .from("match_points").select("id, game_number, side, delta, score_a, score_b, created_at")
+    .eq("match_id", matchId).order("id");
+  if (error) return [];
+  return data || [];
+}
+
+export async function scorePoint(matchId, side, delta, healed = false) {
   const { data: match, error } = await supabase.from("matches").select("*, games(*)").eq("id", matchId).single();
   if (error) throw error;
   if (match.status !== "LIVE") return;
 
   const games = [...match.games].sort((a, b) => a.game_number - b.game_number);
   const last = games[games.length - 1];
+  // Live with no game row: the start's game-1 insert never landed. startMatch
+  // is idempotent and opens it; the tap itself is then applied normally.
+  if (!last) {
+    if (healed) throw new Error("This match has no game to score.");
+    await startMatch(matchId);
+    return scorePoint(matchId, side, delta, true);
+  }
   const key = side === "A" ? "score_a" : "score_b";
-  if (delta > 0 && (isGameOver(last.score_a, last.score_b) || last[key] >= 30)) return;
+
+  if (delta > 0 && isGameOver(last.score_a, last.score_b)) {
+    // The last game is already won but the match is still LIVE: an earlier
+    // tap closed the game and the follow-up write (next game / result) never
+    // landed. Previously this returned early on every tap, leaving the match
+    // stuck between games for good. Finish that work now instead.
+    await settleAfterGame(match, games);
+    return;
+  }
+  if (delta > 0 && last[key] >= 30) return;
 
   // The increment itself goes through score_point_atomic() so two devices
   // scoring the same match cannot interleave a read-modify-write and lose a
   // point (migration 010). The cascade below — closing the game, opening the
   // next, advancing the winner — stays here; it is not where the race was.
   const updatedLast = await applyPoint(last, matchId, side, key, delta);
+  // Only log a rally that actually moved the score (a -1 at 0 is clamped).
+  if (updatedLast[key] !== last[key]) await logRally(matchId, updatedLast, side, delta);
   const allGames = [...games.slice(0, -1), updatedLast];
 
   if (!isGameOver(updatedLast.score_a, updatedLast.score_b)) return;
-
-  const winSide = matchWinnerSide(allGames);
-  if (!winSide) {
-    await supabase.from("games").insert({ match_id: matchId, game_number: allGames.length + 1, score_a: 0, score_b: 0 });
-    return;
-  }
-
-  const winnerEntryId = winSide === "A" ? match.entry_a : match.entry_b;
-  await supabase.from("matches")
-    .update({ status: "COMPLETED", winner_entry_id: winnerEntryId, completed_at: new Date().toISOString() })
-    .eq("id", matchId);
-
-  if (match.next_match_id) {
-    const patch = match.next_slot === "A" ? { entry_a: winnerEntryId } : { entry_b: winnerEntryId };
-    const { data: next } = await supabase.from("matches").update(patch).eq("id", match.next_match_id).select().single();
-    if (next?.entry_a && next?.entry_b && next?.scheduled_at) {
-      await supabase.from("matches").update({ status: "READY" }).eq("id", next.id);
-    }
-  } else if (!match.group_label) {
-    // Only a true knockout final has no next_match_id. Round-robin and group
-    // matches never have one either (nothing to advance into), so without this
-    // guard the FIRST round-robin match to finish would falsely crown its
-    // winner "champion" and mark the whole division complete.
-    await supabase.from("tournament_events")
-      .update({ status: "COMPLETED", champion_entry_id: winnerEntryId }).eq("id", match.event_id);
-  } else if (match.group_label === "RR") {
-    // Pure round robin (not groups->knockout) has no final match to hang a
-    // champion declaration off, so declare one here once every RR match in
-    // the division is done: the top of the standings table.
-    const { data: rrMatches } = await supabase
-      .from("matches").select("*, games(*)").eq("event_id", match.event_id).eq("group_label", "RR");
-    const allDone = rrMatches.every((m) => m.status === "COMPLETED" || m.status === "WALKOVER");
-    if (allDone) {
-      const ids = [...new Set(rrMatches.flatMap((m) => [m.entry_a, m.entry_b]).filter(Boolean))];
-      const standings = computeStandings(ids, rrMatches);
-      if (standings[0]) {
-        await supabase.from("tournament_events")
-          .update({ status: "COMPLETED", champion_entry_id: standings[0].entryId }).eq("id", match.event_id);
-      }
-    }
-  }
+  await settleAfterGame(match, allGames);
 }
 
 export async function undoLastGame(matchId) {
-  const { data: match } = await supabase.from("matches").select("*, games(*)").eq("id", matchId).single();
+  const match = must(await supabase.from("matches").select("*, games(*)").eq("id", matchId).single());
   const games = [...match.games].sort((a, b) => a.game_number - b.game_number);
   const last = games[games.length - 1];
   if (games.length < 2 || last.score_a !== 0 || last.score_b !== 0) return;
-  await supabase.from("games").delete().eq("id", last.id);
+  must(await supabase.from("games").delete().eq("id", last.id));
 }
 
 export async function retireMatch(matchId, retiredSide) {
-  const { data: match } = await supabase.from("matches").select("*").eq("id", matchId).single();
+  const match = must(await supabase.from("matches").select("*").eq("id", matchId).single());
+  // Already decided: a replayed retirement must not re-advance anyone.
+  if (match.status === "COMPLETED" || match.status === "WALKOVER") return;
   const winnerEntryId = retiredSide === "A" ? match.entry_b : match.entry_a;
-  await supabase.from("matches")
-    .update({ status: "COMPLETED", winner_entry_id: winnerEntryId, retired: true, completed_at: new Date().toISOString() })
-    .eq("id", matchId);
-  if (match.next_match_id) {
-    const patch = match.next_slot === "A" ? { entry_a: winnerEntryId } : { entry_b: winnerEntryId };
-    await supabase.from("matches").update(patch).eq("id", match.next_match_id);
-  } else {
-    await supabase.from("tournament_events")
-      .update({ status: "COMPLETED", champion_entry_id: winnerEntryId }).eq("id", match.event_id);
-  }
+  // Through the same path as a match won on the court. The old copy crowned
+  // a "champion" and closed the whole division whenever ANY match without a
+  // next_match_id ended in retirement — which is every round-robin and group
+  // match — and never marked the next knockout match ready to play.
+  await decideMatch(match, winnerEntryId, { retired: true });
 }
 
 /* ------------------------------- RBAC / STAFF ---------------------------------- */
@@ -1376,20 +1587,109 @@ export async function importEntries(eventId, feeINR, rows) {
   return results;
 }
 
+/* --------------------------- WALK-IN ENTRIES --------------------------------- */
+
+// The organizer typing in (or pasting) players who signed up over WhatsApp
+// or at the desk. Unlike registerEntry(), these are CONFIRMED on insert — the
+// organizer IS the approval, and the draw only takes CONFIRMED entries — and
+// phone is optional. Migration 017 is what lets an owner insert
+// entry_players outside the registration window, and what stops the public
+// path from setting CONFIRMED/PAID itself. The capacity trigger still
+// applies, so a full category waitlists instead of over-filling.
+//
+// items: [{ players: [{ name, phone? }], paid?: boolean }]
+export async function addWalkInEntries(eventId, feeINR, items) {
+  const results = { added: [], waitlisted: [], failed: [] };
+  for (const item of items) {
+    const players = item.players.map((p) => ({ name: p.name.trim(), phone: p.phone || null, email: null }));
+    try {
+      const { data: entry, error: eErr } = await supabase
+        .from("entries")
+        .insert({
+          event_id: eventId,
+          type: players.length > 1 ? "DOUBLES" : "SINGLES",
+          fee_inr: feeINR ?? 0,
+          reg_status: "CONFIRMED",
+          payment_status: item.paid ? "PAID" : "UNPAID",
+        })
+        .select()
+        .single();
+      if (eErr) throw eErr;
+
+      const linked = await Promise.all(players.map((p) => upsertPlayer(p)));
+      const { error: pErr } = await supabase.from("entry_players").insert(
+        players.map((p, i) => ({ entry_id: entry.id, name: p.name, phone: p.phone, player_id: linked[i]?.id ?? null }))
+      );
+      if (pErr) {
+        // An entry with no players shows up as a nameless slot in the draw.
+        await supabase.from("entries").delete().eq("id", entry.id);
+        throw pErr;
+      }
+      (entry.reg_status === "WAITLISTED" ? results.waitlisted : results.added).push(entry);
+    } catch (e) {
+      const message = /row-level security/i.test(e.message || "")
+        ? "Not allowed by the database. Has migration 017 been run?"
+        : e.message;
+      results.failed.push({ item, error: message });
+    }
+  }
+  return results;
+}
+
 /* --------------------------- REALTIME ---------------------------------------- */
 
 // Subscribes to live changes for one event (matches + entries). `games`
 // rows don't carry event_id directly, so filter those client-side against
 // the match ids you already have loaded, or denormalize event_id onto
 // `games` later if you want a server-side filter instead.
+//
+// Channel names carry a per-subscription sequence number. supabase.channel()
+// RETURNS THE EXISTING CHANNEL when the name is already in use, and
+// removeChannel() is async — so re-subscribing to the same event (React
+// StrictMode's double mount, or an effect re-running) called .on() on a
+// channel that was still joined, which throws "cannot add postgres_changes
+// callbacks after subscribe()" and took the page down with it.
+let channelSeq = 0;
+const uniqueChannel = (base) => supabase.channel(`${base}-${++channelSeq}`);
+
+// One rally writes a games row, and the point that ends a game also writes
+// the next game and possibly two matches rows — several events within a few
+// milliseconds, each of which a listener answers with a full reload. Collapse
+// a burst into one call.
+function coalesce(fn, ms = 150) {
+  let timer = null;
+  const wrapped = (payload) => { clearTimeout(timer); timer = setTimeout(() => fn(payload), ms); };
+  wrapped.cancel = () => clearTimeout(timer);
+  return wrapped;
+}
+
 export function subscribeToEvent(eventId, onChange) {
-  const channel = supabase
-    .channel(`event-${eventId}`)
-    .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `event_id=eq.${eventId}` }, onChange)
-    .on("postgres_changes", { event: "*", schema: "public", table: "entries", filter: `event_id=eq.${eventId}` }, onChange)
-    .on("postgres_changes", { event: "*", schema: "public", table: "games" }, onChange)
+  let active = true;
+  const fire = coalesce((payload) => { if (active) onChange(payload); });
+
+  // `games` has no event_id to filter on server-side, and listening to the
+  // whole table made every open tournament page, scorer phone and venue TV
+  // reload on every point scored ANYWHERE on the platform. Track this event's
+  // match ids and drop everything else.
+  const matchIds = new Set();
+  supabase.from("matches").select("id").eq("event_id", eventId)
+    .then(({ data }) => (data || []).forEach((m) => matchIds.add(m.id)));
+
+  const channel = uniqueChannel(`event-${eventId}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `event_id=eq.${eventId}` }, (payload) => {
+      const id = payload.new?.id || payload.old?.id;
+      if (id) matchIds.add(id);
+      fire(payload);
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "entries", filter: `event_id=eq.${eventId}` }, fire)
+    .on("postgres_changes", { event: "*", schema: "public", table: "games" }, (payload) => {
+      const matchId = payload.new?.match_id || payload.old?.match_id;
+      // A DELETE carries only the primary key unless the table has replica
+      // identity full, so an unattributable delete (undoLastGame) still fires.
+      if (matchId ? matchIds.has(matchId) : payload.eventType === "DELETE") fire(payload);
+    })
     .subscribe();
-  return () => supabase.removeChannel(channel);
+  return () => { active = false; fire.cancel(); supabase.removeChannel(channel); };
 }
 
 /* ══════════════════════════ PLAYER ACCOUNTS ══════════════════════════════
@@ -1629,9 +1929,18 @@ export async function getMatchDetail(matchId) {
 
 export function subscribeToMatch(matchId, onChange) {
   const channel = supabase
-    .channel(`match-${matchId}`)
+    .channel(`match-${matchId}-${++channelSeq}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `id=eq.${matchId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "games", filter: `match_id=eq.${matchId}` }, onChange)
+    .subscribe();
+  return () => supabase.removeChannel(channel);
+}
+
+// Rally-log inserts for one match, on a channel of its own: if migration 015
+// is not applied, a failure to join must not take the score channel with it.
+export function subscribeToMatchPoints(matchId, onChange) {
+  const channel = uniqueChannel(`match-points-${matchId}`)
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "match_points", filter: `match_id=eq.${matchId}` }, onChange)
     .subscribe();
   return () => supabase.removeChannel(channel);
 }
@@ -1769,6 +2078,60 @@ export async function listMyAssignedMatches() {
 
 /* ══════════════ RANKING TABLE ═══════════════════════════════════════════ */
 
+function entryPlayersFromLinks(links) {
+  const out = {};
+  (links || []).forEach((l) => {
+    if (!l.player_id) return;
+    const list = (out[l.entry_id] = out[l.entry_id] || []);
+    if (!list.includes(l.player_id)) list.push(l.player_id);
+  });
+  return out;
+}
+
+// `.in()` over thousands of ids overflows the request URL; chunk it.
+async function selectIn(table, columns, column, ids, size = 300) {
+  const out = [];
+  for (let i = 0; i < ids.length; i += size) {
+    const { data, error } = await supabase.from(table).select(columns).in(column, ids.slice(i, i + size));
+    if (error) throw error;
+    out.push(...(data || []));
+  }
+  return out;
+}
+
+/* ══════════════ MATCHDAY RATING ══════════════════════════════════════════
+
+   Everything the rating replay needs: every completed match with its game
+   scores, and which players were on each entry. RLS limits `matches` to
+   published events, so a draft never moves anyone's rating.
+
+   The replay itself runs in rating.js and is deterministic, so this is
+   cached briefly per page load — the profile, leaderboard, match page and
+   seeding panel all read the same table, and a fresh replay per screen would
+   repeat the same work. At larger scale this becomes a nightly materialized
+   table written by an Edge Function; the engine does not change.          */
+
+let ratingCache = null; // { at, promise }
+const RATING_TTL_MS = 2 * 60 * 1000;
+
+export function getRatingData({ fresh = false } = {}) {
+  if (!fresh && ratingCache && Date.now() - ratingCache.at < RATING_TTL_MS) return ratingCache.promise;
+  const promise = (async () => {
+    const { data: matches, error } = await supabase
+      .from("matches")
+      .select("id, status, is_bye, retired, entry_a, entry_b, winner_entry_id, completed_at, games(game_number, score_a, score_b)")
+      .eq("status", "COMPLETED");
+    if (error) throw error;
+    const entryIds = [...new Set((matches || []).flatMap((m) => [m.entry_a, m.entry_b]).filter(Boolean))];
+    const links = entryIds.length ? await selectIn("public_entry_names", "entry_id, player_id", "entry_id", entryIds) : [];
+    const entryPlayers = entryPlayersFromLinks(links);
+    return { ...computeRatings(matches || [], entryPlayers), entryPlayers };
+  })();
+  ratingCache = { at: Date.now(), promise };
+  promise.catch(() => { ratingCache = null; });
+  return promise;
+}
+
 // Site-wide ranking, computed from real completed matches. Pulls the match
 // rows plus the event context the points model needs (round depth, champion),
 // then aggregates per player. RLS already limits `matches` to published
@@ -1791,18 +2154,20 @@ export async function getRankingData() {
   const entryIds = [...new Set(matches.flatMap((m) => [m.entry_a, m.entry_b]).filter(Boolean))];
   const { data: links } = await supabase
     .from("public_entry_names").select("entry_id, player_id").in("entry_id", entryIds);
-  const entryToPlayer = {};
-  (links || []).forEach((l) => { if (l.player_id) entryToPlayer[l.entry_id] = l.player_id; });
+  // entry -> EVERY player on it. This used to be entry -> one player, and
+  // each doubles link overwrote the last, so only one partner of every
+  // doubles pair was ever credited with the pair's results.
+  const entryToPlayers = entryPlayersFromLinks(links);
 
   // player_id -> { entryIds, matches }
   const byPlayer = {};
   for (const m of matches) {
     for (const entryId of [m.entry_a, m.entry_b]) {
-      const pid = entryToPlayer[entryId];
-      if (!pid) continue;
-      const rec = (byPlayer[pid] = byPlayer[pid] || { entryIds: new Set(), matches: [] });
-      rec.entryIds.add(entryId);
-      if (!rec.matches.some((x) => x.id === m.id)) rec.matches.push(m);
+      for (const pid of entryToPlayers[entryId] || []) {
+        const rec = (byPlayer[pid] = byPlayer[pid] || { entryIds: new Set(), matches: [] });
+        rec.entryIds.add(entryId);
+        if (!rec.matches.some((x) => x.id === m.id)) rec.matches.push(m);
+      }
     }
   }
 
@@ -1973,7 +2338,7 @@ export function subscribeToMyMatches(entryIds, onChange) {
   // `matches` has no player column to filter on server-side, so this listens
   // to the tournaments the player is actually in via their events instead.
   const channel = supabase
-    .channel(`my-matches-${entryIds[0]}`)
+    .channel(`my-matches-${entryIds[0]}-${++channelSeq}`)
     .on("postgres_changes", { event: "UPDATE", schema: "public", table: "matches" }, (payload) => {
       const m = payload.new;
       if (entryIds.includes(m.entry_a) || entryIds.includes(m.entry_b)) onChange(m);
@@ -2074,13 +2439,17 @@ export async function getSeriesData(seriesId) {
   if (allEntryIds.length) {
     const { data: links } = await supabase
       .from("public_entry_names").select("entry_id, name, player_id").in("entry_id", allEntryIds);
+    // Every partner of a doubles entry, not just the last one read.
     (links || []).forEach((l) => {
-      if (l.player_id) entryToPlayer[l.entry_id] = l.player_id;
+      if (l.player_id) {
+        const list = (entryToPlayer[l.entry_id] = entryToPlayer[l.entry_id] || []);
+        if (!list.includes(l.player_id)) list.push(l.player_id);
+      }
       (entryNames[l.entry_id] = entryNames[l.entry_id] || []).push(l.name);
     });
   }
 
-  const playerIds = [...new Set(Object.values(entryToPlayer))];
+  const playerIds = [...new Set(Object.values(entryToPlayer).flat())];
   let players = [];
   if (playerIds.length) {
     const { data } = await supabase.from("public_players").select("*").in("id", playerIds);

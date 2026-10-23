@@ -9,9 +9,9 @@ import {
   getTournament, listEvents, listCourts, listEntries, listMatches, listNotifications, markNotificationsRead,
   publishTournament, closeRegistration, startTournament, completeTournament, cancelTournament, updateTournament,
   addCourt, updateCourt, removeCourt, updateCourtAvailability,
-  updateEntryStatus, removeEntry, recordOfflinePayment, markRefunded, registerEntry,
+  updateEntryStatus, removeEntry, recordOfflinePayment, markRefunded, addWalkInEntries,
   importEntries, promoteNextWaitlisted, updateEvent,
-  generateDraw, generateRoundRobin, generateGroupStage, generateKnockoutFromGroups, setSeeds,
+  generateDraw, generateRoundRobin, generateGroupStage, generateKnockoutFromGroups, setSeeds, createCustomDraw,
   startMatch, scorePoint, undoLastGame, retireMatch,
   subscribeToEvent,
   setCheckInStatus, checkInByCode,
@@ -21,6 +21,7 @@ import { Btn, Badge, Card, Field, inputCls, useToasts, Toasts } from "../compone
 import { BrandLoader, LivePulse } from "../components/ui/motion";
 import ParticipantsPanel from "../components/ParticipantsPanel";
 import SeedingPanel from "../components/SeedingPanel";
+import CustomDrawPanel from "../components/CustomDrawPanel";
 import StandingsPanel from "../components/StandingsPanel";
 import BracketView from "../components/BracketView";
 import SchedulingPanel from "../components/SchedulingPanel";
@@ -36,6 +37,7 @@ import RegistrationFieldsPanel from "../components/RegistrationFieldsPanel";
 import ScrollFade from "../components/ui/ScrollFade";
 import StaffPanel from "../components/StaffPanel";
 import FinancePanel from "../components/FinancePanel";
+import UpiDirectPanel from "../components/UpiDirectPanel";
 import AnalyticsPanel from "../components/AnalyticsPanel";
 import ExportsPanel from "../components/ExportsPanel";
 import BrandingPanel from "../components/BrandingPanel";
@@ -361,7 +363,10 @@ export default function TournamentControlCenter() {
           )}
 
           {activeTab === "finance" && (
-            <FinancePanel tournament={tournament} events={events} entries={allEntries} notify={notify} />
+            <div className="space-y-5">
+              <UpiDirectPanel tournament={tournament} entries={allEntries} notify={notify} onChanged={loadAll} />
+              <FinancePanel tournament={tournament} events={events} entries={allEntries} notify={notify} />
+            </div>
           )}
 
           {activeTab === "analytics" && (
@@ -411,7 +416,11 @@ export default function TournamentControlCenter() {
                 await loadEventData(events);
               }, "Payment recorded.")}
               onRefund={(eid) => guarded(async () => { await markRefunded(eid); await loadEventData(events); })}
-              onAddManual={(eid, players) => guarded(async () => { await registerEntry(eid, players, event.fee_inr); await loadEventData(events); })}
+              onAddWalkIns={async (eid, items) => {
+                const res = await addWalkInEntries(eid, event.fee_inr, items);
+                await loadEventData(events);
+                return res;
+              }}
               onImport={async (eid, rows) => {
                 const res = await importEntries(eid, event.fee_inr, rows);
                 await loadEventData(events);
@@ -467,6 +476,16 @@ export default function TournamentControlCenter() {
                       Generate draw
                     </Btn>
                   </div>
+                  {isOwner && (
+                    <CustomDrawPanel
+                      event={event} entries={eventEntries}
+                      disabled={!regLocked} disabledReason="Close registration first."
+                      onCreate={(plan) => guarded(async () => {
+                        await createCustomDraw(eventId, event.fee_inr, format, plan);
+                        await loadAll();
+                      }, "Draw created from your matchups.")}
+                    />
+                  )}
                 </div>
               );
             }

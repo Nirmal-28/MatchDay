@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Search, UserPlus, Check, X, CreditCard, Trash2, Users, Upload, ArrowUpCircle } from "lucide-react";
 import { cx, fmtDate, entryName, REG_STATUS_META, PAY_STATUS_META, CHECK_IN_META } from "../lib/engines";
 import { normaliseFields } from "../lib/registrationFields";
 import { Badge, Btn, EmptyState, inputCls } from "./ui/primitives";
-import RegistrationModal from "./RegistrationModal";
+import QuickAddModal from "./QuickAddModal";
 import CsvImportModal from "./CsvImportModal";
 
 /* Answers to the organizer's configured registration questions, shown to
@@ -31,7 +31,7 @@ function EntryAnswers({ fields, answers }) {
   );
 }
 
-export default function ParticipantsPanel({ event, entries, registrationFields = [], entryDetails = {}, isOwner = true, onApprove, onReject, onRemove, onRecordPayment, onRefund, onAddManual, onImport, onPromoteWaitlist, onToggleAutoPromote }) {
+export default function ParticipantsPanel({ event, entries, registrationFields = [], entryDetails = {}, isOwner = true, onApprove, onReject, onRemove, onRecordPayment, onRefund, onAddWalkIns, onImport, onPromoteWaitlist, onToggleAutoPromote }) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("ALL");
   const [addOpen, setAddOpen] = useState(false);
@@ -46,6 +46,10 @@ export default function ParticipantsPanel({ event, entries, registrationFields =
   });
 
   const canEdit = event.status === "REGISTRATION_OPEN" || event.status === "REGISTRATION_CLOSED";
+  const existingNames = useMemo(
+    () => entries.filter((e) => !["REJECTED", "CANCELLED"].includes(e.reg_status)).map(entryName),
+    [entries]
+  );
 
   return (
     <div>
@@ -66,7 +70,7 @@ export default function ParticipantsPanel({ event, entries, registrationFields =
             a control that fails after they've filled in a form (same
             reasoning as audit finding F4). */}
         {isOwner && onImport && <Btn size="sm" variant="secondary" icon={Upload} onClick={() => setImportOpen(true)}>Import CSV</Btn>}
-        {isOwner && <Btn size="sm" variant="secondary" icon={UserPlus} onClick={() => setAddOpen(true)}>Add participant</Btn>}
+        {isOwner && onAddWalkIns && <Btn size="sm" icon={UserPlus} onClick={() => setAddOpen(true)}>Add players</Btn>}
       </div>
 
       {waitlisted.length > 0 && (
@@ -100,7 +104,7 @@ export default function ParticipantsPanel({ event, entries, registrationFields =
       )}
 
       {filtered.length === 0 ? (
-        <EmptyState icon={Users} title="Your tournament is waiting for its first competitor" hint="Registrations for this category will appear here." />
+        <EmptyState icon={Users} title="Your tournament is waiting for its first competitor" hint={isOwner ? "Registrations appear here. Taking entries on WhatsApp? Use Add players to paste the list." : "Registrations for this category will appear here."} />
       ) : (
         <>
         {/* Mobile: one card per entry. An organizer works the registration
@@ -213,7 +217,10 @@ export default function ParticipantsPanel({ event, entries, registrationFields =
         </div>
         </>
       )}
-      <RegistrationModal open={addOpen} onClose={() => setAddOpen(false)} event={event} onSubmit={async (eid, players) => { await onAddManual(eid, players); setAddOpen(false); }} />
+      {onAddWalkIns && addOpen && (
+        <QuickAddModal key={event.id} open onClose={() => setAddOpen(false)} event={event}
+          existingNames={existingNames} onAdd={(items) => onAddWalkIns(event.id, items)} />
+      )}
       {onImport && (
         <CsvImportModal open={importOpen} onClose={() => setImportOpen(false)} event={event}
           onImport={(rows) => onImport(event.id, rows)} />

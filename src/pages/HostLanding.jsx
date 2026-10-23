@@ -7,6 +7,7 @@ import {
 import { listDiscoverableTournaments } from "../lib/repository";
 import { useAuth } from "../lib/AuthContext";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
+import PulsePromo from "../components/pulse/PulsePromo";
 import { Btn, Card, Eyebrow, Badge } from "../components/ui/primitives";
 import { Reveal, StaggerList, StaggerItem } from "../components/ui/motion";
 import { cx } from "../lib/engines";
@@ -268,6 +269,8 @@ export default function HostLanding() {
           <ScoreboardPreview />
         </div>
       </Reveal>
+
+      <PulsePromo audience="organizers" className="mb-10" />
 
       {/* ── The lifecycle, as an interactive rail ─────────────────────── */}
       <Reveal className="border-t border-line py-10">

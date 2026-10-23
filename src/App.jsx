@@ -31,6 +31,7 @@ const TournamentControlCenter = lazy(() => import("./pages/TournamentControlCent
 const ScorerMode = lazy(() => import("./pages/ScorerMode"));
 const VenueDisplay = lazy(() => import("./pages/VenueDisplay"));
 const PlayerSettings = lazy(() => import("./pages/PlayerSettings"));
+const PulseShowcase = lazy(() => import("./pages/PulseShowcase"));
 import SignIn from "./pages/auth/SignIn";
 import SignUp from "./pages/auth/SignUp";
 import ForgotPassword from "./pages/auth/ForgotPassword";
@@ -127,6 +128,7 @@ function surfaceOf(pathname) {
   if (pathname.startsWith("/officiate")) return "officiate";
   if (pathname.startsWith("/me")) return "player";
   if (pathname.startsWith("/leaderboard")) return "rankings";
+  if (pathname.startsWith("/pulse")) return "pulse";
   return "public";
 }
 
@@ -332,6 +334,18 @@ function Header() {
             Rankings
             {surface === "rankings" && <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-accent-teal" />}
           </Link>
+          <Link
+            to="/pulse"
+            aria-current={surface === "pulse" ? "page" : undefined}
+            className={cx(
+              "relative flex items-center gap-1.5 py-4 text-[13px] font-semibold uppercase tracking-wider transition-colors",
+              surface === "pulse" ? "text-ink" : "text-ink-3 hover:text-ink-2"
+            )}
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-accent-teal" aria-hidden="true" />
+            Pulse
+            {surface === "pulse" && <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-accent-teal" />}
+          </Link>
         </nav>
 
         <div className="ml-auto flex items-center gap-2.5">
@@ -460,6 +474,8 @@ function AnimatedRoutes() {
               page, minus the officials RLS keeps private. */}
           <Route path="/m/:id" element={<MatchDetail />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
+          {/* MatchDay Pulse: what sets MatchDay apart, with a live demo. */}
+          <Route path="/pulse" element={<PulseShowcase />} />
           {/* Organizer acquisition. Deliberately a real route, not a modal or a
               marketing site on another domain, so it can be linked, shared and
               indexed like any other page. */}

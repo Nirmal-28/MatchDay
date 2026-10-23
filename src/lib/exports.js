@@ -6,7 +6,7 @@
 
 import {
   entryName, divisionLabel, fmtDateTime, matchStageLabel, roundLabel,
-  BadmintonScoringEngine, toAB, computeStandings, REG_STATUS_META, PAY_STATUS_META,
+  BadmintonScoringEngine, toAB, computeStandings, REG_STATUS_META, PAY_STATUS_META, todayLocal,
 } from "./engines";
 
 /* ------------------------------- CSV core -------------------------------- */
@@ -40,7 +40,7 @@ export function downloadCsv(filename, headers, rows) {
 
 const slug = (s) => (s || "matchday").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 export const exportFilename = (tournament, kind) =>
-  `${slug(tournament?.name)}-${kind}-${new Date().toISOString().slice(0, 10)}.csv`;
+  `${slug(tournament?.name)}-${kind}-${todayLocal()}.csv`;
 
 /* ------------------------------ Builders --------------------------------- */
 

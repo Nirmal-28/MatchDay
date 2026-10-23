@@ -11,6 +11,7 @@ import {
 } from "../lib/registrationFields";
 import { useAuth } from "../lib/AuthContext";
 import { Modal, Field, Btn, Badge, inputCls } from "./ui/primitives";
+import UpiPayCard from "./UpiPayCard";
 
 /* The registration flow, as steps rather than one long form.
    Singles:  CATEGORY -> DETAILS -> REVIEW -> CONFIRMATION
@@ -219,6 +220,7 @@ export default function RegistrationModal({ open, onClose, event, tournament, on
   /* ---------------------------- CONFIRMATION ---------------------------- */
   if (result) {
     const waitlisted = result.reg_status === "WAITLISTED";
+    const upiReady = !waitlisted && !!tournament?.upi_id && !!result.id && Number(event.fee_inr) > 0;
     return (
       <Modal open={open} onClose={onClose} title="Registration received">
         <div className="space-y-4">
@@ -241,7 +243,7 @@ export default function RegistrationModal({ open, onClose, event, tournament, on
               {Number(event.fee_inr) > 0 && (
                 <li>
                   <span className="font-medium text-ink">2.</span> Pay the {inr(event.fee_inr)} entry fee directly to the
-                  organizer. They record it, and your payment status updates here.
+                  organizer{upiReady ? " by UPI, below" : ""}. They confirm it, and your payment status updates here.
                 </li>
               )}
               <li><span className="font-medium text-ink">{Number(event.fee_inr) > 0 ? 3 : 2}.</span> Once registration closes, the draw and schedule are published.</li>
@@ -249,8 +251,12 @@ export default function RegistrationModal({ open, onClose, event, tournament, on
             </ol>
           </div>
 
+          {/* UPI Direct when the organizer has a UPI ID set. Waitlisted
+              entries do not hold a place, so they are not asked to pay yet. */}
+          {upiReady && <UpiPayCard tournament={tournament} entry={{ ...result, fee_inr: result.fee_inr ?? event.fee_inr }} />}
+
           {/* Never claim money moved. */}
-          {Number(event.fee_inr) > 0 && (
+          {Number(event.fee_inr) > 0 && !upiReady && (
             <div className="flex gap-2 rounded-md border border-amber-400/30 bg-amber-400/[0.07] px-3 py-2.5 text-[11px] leading-relaxed text-amber-200">
               <Info size={13} className="mt-px shrink-0" />
               <span>

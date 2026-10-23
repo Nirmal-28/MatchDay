@@ -18,6 +18,7 @@ import {
 import { MaskText, Rise, Magnetic, Stagger, StaggerChild, Counter } from "../components/ui/reveal";
 import { sportMeta } from "../lib/sports";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
+import PulsePromo from "../components/pulse/PulsePromo";
 
 /* ═══════════════════════════════════════════════════════════════════════
    DISCOVERY
@@ -652,6 +653,8 @@ export default function PublicDiscovery() {
       {liveData && (
         <LiveStrip tournament={liveData.tournament} matches={liveData.matches} courts={liveData.courts} />
       )}
+
+      <PulsePromo className="mt-8" />
 
       <Rail
         eyebrow="Enter before it closes"

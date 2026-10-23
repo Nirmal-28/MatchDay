@@ -85,17 +85,22 @@ export function computeSeriesStandings(data, { scoring = "standard", sport = "ba
     titles: 0, finals: 0, perMatchday: {},
   });
 
+  // An entry maps to every player on it. A single id is still accepted, but a
+  // doubles entry must credit BOTH partners — it used to credit only one.
+  const pidsOf = (entryId) => [].concat(entryToPlayer[entryId] || []);
+
   // 1. Participation — an entry in a matchday that has been played.
   for (const e of entries) {
     if (["REJECTED", "CANCELLED"].includes(e.reg_status)) continue;
-    const pid = entryToPlayer[e.id];
     const tId = tournamentByEvent[e.event_id];
-    if (!pid || !tId || !playedTournamentIds.has(tId)) continue;
-    const r = row(pid);
-    if (!r.matchdays.has(tId)) {
-      r.matchdays.add(tId);
-      r.points += cfg.perMatchday;
-      r.perMatchday[tId] = r.perMatchday[tId] || { points: cfg.perMatchday, won: 0, lost: 0 };
+    if (!tId || !playedTournamentIds.has(tId)) continue;
+    for (const pid of pidsOf(e.id)) {
+      const r = row(pid);
+      if (!r.matchdays.has(tId)) {
+        r.matchdays.add(tId);
+        r.points += cfg.perMatchday;
+        r.perMatchday[tId] = r.perMatchday[tId] || { points: cfg.perMatchday, won: 0, lost: 0 };
+      }
     }
   }
 
@@ -106,9 +111,7 @@ export function computeSeriesStandings(data, { scoring = "standard", sport = "ba
     const event = eventById[m.event_id];
     const tId = tournamentByEvent[m.event_id];
 
-    for (const entryId of [m.entry_a, m.entry_b]) {
-      const pid = entryToPlayer[entryId];
-      if (!pid) continue;
+    for (const entryId of [m.entry_a, m.entry_b]) for (const pid of pidsOf(entryId)) {
       const r = row(pid);
       const won = m.winner_entry_id === entryId;
 
