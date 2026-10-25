@@ -47,15 +47,35 @@ function parsePlayer(part) {
   return { name, phone };
 }
 
+const PAIR_WORD = /^(pair|couple|team|jodi)$/i;
+const capitalise = (w) => w.charAt(0).toUpperCase() + w.slice(1);
+
+/* WhatsApp doubles lists often name a pair with a bare space — "Rathi ajith",
+   "Arjun pair". Only for a pasted list (where every line is known to be one
+   pair): two words become two partners, "X pair" becomes X and a placeholder
+   partner to rename later, and three or more words are left for the
+   organizer to split, because "Suchitra Dinesh Karthick" could go either way. */
+function splitBarePair(part) {
+  if (/\d/.test(part)) return { parts: [part] };
+  const words = part.trim().split(/\s+/);
+  if (words.length === 2 && PAIR_WORD.test(words[1])) return { parts: [capitalise(words[0]), `${capitalise(words[0])}'s partner`] };
+  if (words.length === 2) return { parts: words.map(capitalise) };
+  if (words.length > 2) return { parts: [part], ambiguous: true };
+  return { parts: [part] };
+}
+
 /* One entry's text (a player, or a doubles pair) -> { players, paid, errors, key }.
    `key` is the normalised entry name, comparable with entryName() of an
-   existing entry passed through normaliseName(). */
-export function parseEntryText(text, isDoubles) {
+   existing entry passed through normaliseName(). `bareNames` turns on
+   splitBarePair() for pasted lists. */
+export function parseEntryText(text, isDoubles, { bareNames = false } = {}) {
   let line = text;
   const paid = PAID_MARK.test(line);
   if (paid) line = line.replace(PAID_MARK, " ").trim();
 
   let parts = isDoubles ? line.split(PAIR_SPLIT).filter((p) => p.trim()) : [line];
+  let ambiguous = false;
+  if (isDoubles && bareNames && parts.length === 1) ({ parts, ambiguous = false } = splitBarePair(parts[0]));
   // "Rahul, 98765 43210 / Arjun" — a bare number belongs to the name before it.
   parts = parts.reduce((acc, p) => {
     if (!/\p{L}/u.test(p) && acc.length) acc[acc.length - 1] += ` ${p}`;
@@ -67,7 +87,8 @@ export function parseEntryText(text, isDoubles) {
   const errors = [];
   if (players.length === 0 || players.some((p) => !p.name)) errors.push("Missing a name");
   if (players.some((p) => p.name.length > NAME_MAX)) errors.push(`Name longer than ${NAME_MAX} characters`);
-  if (isDoubles && players.length !== 2) errors.push("Needs two names, e.g. Rahul / Arjun");
+  if (ambiguous) errors.push("Can't tell where one name ends — put / between the partners, e.g. Suchitra / Dinesh Karthick");
+  else if (isDoubles && players.length !== 2) errors.push("Needs two names, e.g. Rahul / Arjun");
 
   const key = players.map((p) => normaliseName(p.name)).join(" / ");
   return { players, paid, errors, key };
@@ -86,7 +107,7 @@ export function parseWalkInList(text, { isDoubles = false, existingNames = [] } 
     if (!line) continue;
     if (/:\s*$/.test(line)) continue; // a heading such as "Men's singles:"
 
-    const { players, paid, errors, key } = parseEntryText(line, isDoubles);
+    const { players, paid, errors, key } = parseEntryText(line, isDoubles, { bareNames: true });
     const duplicate = errors.length === 0 && seen.has(key);
     if (errors.length === 0) seen.add(key);
 

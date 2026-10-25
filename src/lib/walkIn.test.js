@@ -58,3 +58,32 @@ describe("parseWalkInList — duplicates", () => {
     expect(rows.map((r) => r.duplicate)).toEqual([true, false, true]);
   });
 });
+
+describe("parseWalkInList — doubles pairs written with a space", () => {
+  // The organizer's WhatsApp list for Sunday mixed doubles, as sent.
+  const LIST = `Who are all in for Sunday mixed doubles
+
+1. Rathi ajith
+2. Appurva Rajesh
+8. Arjun pair
+13. Suchitra Dinesh Karthick
+19. Sowmiya Magesh`;
+
+  it("splits two words into partners and names the partner of an 'X pair'", () => {
+    const rows = parseWalkInList(LIST, { isDoubles: true });
+    const ok = rows.filter((r) => r.errors.length === 0).map((r) => r.players.map((p) => p.name).join(" / "));
+    expect(ok).toEqual(["Rathi / Ajith", "Appurva / Rajesh", "Arjun / Arjun's partner", "Sowmiya / Magesh"]);
+  });
+
+  it("asks for a / when three words could split either way", () => {
+    const rows = parseWalkInList(LIST, { isDoubles: true });
+    const bad = rows.find((r) => r.line.includes("Suchitra"));
+    expect(bad.errors[0]).toMatch(/put \/ between the partners/);
+    const fixed = parseWalkInList("Suchitra / Dinesh Karthick", { isDoubles: true })[0];
+    expect(fixed.players.map((p) => p.name)).toEqual(["Suchitra", "Dinesh Karthick"]);
+  });
+
+  it("still keeps a single name as an error", () => {
+    expect(parseWalkInList("Rahul", { isDoubles: true })[0].errors.length).toBe(1);
+  });
+});
