@@ -258,7 +258,17 @@ export async function listEntries(eventId) {
   const { data, error } = await supabase
     .from("entries").select("*, entry_players(*)").eq("event_id", eventId).order("created_at");
   if (error) throw error;
-  return data;
+  // entry_players is owner-only (it holds phone/email), so for a scorer or
+  // referee every entry comes back with no players and Scorer Mode showed
+  // blank names. Fill those from the name-only public_entry_names view.
+  const blank = (data || []).filter((e) => !e.entry_players?.length);
+  if (blank.length === 0) return data;
+  const { data: names, error: nErr } = await supabase
+    .from("public_entry_names").select("id, entry_id, name, player_id").in("entry_id", blank.map((e) => e.id));
+  if (nErr) return data;
+  const byEntry = {};
+  (names || []).forEach((n) => { (byEntry[n.entry_id] = byEntry[n.entry_id] || []).push(n); });
+  return data.map((e) => (e.entry_players?.length ? e : { ...e, entry_players: byEntry[e.id] || [] }));
 }
 
 // Same shape as listEntries(), but for anonymous public pages. entry_players
