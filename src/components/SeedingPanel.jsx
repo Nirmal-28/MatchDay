@@ -109,12 +109,17 @@ export default function SeedingPanel({ entries, onSave, disabled }) {
               )}
             </span>
             {ratingOf(e) && <RatingChip rating={ratingOf(e).rating} provisional={ratingOf(e).provisional} />}
-            <input
-              type="number" min={1} max={confirmed.length} placeholder="—"
-              className={`${inputCls} w-20 text-center`}
-              value={seeds[e.id] ?? ""}
-              onChange={(ev) => setSeeds((s) => ({ ...s, [e.id]: ev.target.value }))}
-            />
+            {/* inputCls carries w-full, which beat w-20 and squeezed the
+                name out of the row; a fixed-width box holds the input. */}
+            <div className="w-20 shrink-0">
+              <input
+                type="number" min={1} max={confirmed.length} placeholder="—"
+                aria-label={`Seed for ${entryName(e)}`}
+                className={`${inputCls} text-center`}
+                value={seeds[e.id] ?? ""}
+                onChange={(ev) => setSeeds((s) => ({ ...s, [e.id]: ev.target.value }))}
+              />
+            </div>
           </div>
         ))}
       </div>
