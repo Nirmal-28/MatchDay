@@ -1,6 +1,7 @@
 import { supabase } from "./supabaseClient";
 import {
   nextPow2, bracketSeedOrder, roundRobinRounds, snakeIntoGroups, groupLetter, computeStandings,
+  latestGroupStage, stageFinishingOrder, reshuffleGroups, stageGroupLabel,
 } from "./engines";
 import * as SchedulingEngine from "./schedulingEngine";
 import { computeRatings } from "./rating";
@@ -645,6 +646,24 @@ async function assertNoDraw(eventId) {
   if (count > 0) throw new Error("A draw already exists for this category.");
 }
 
+// Throws the draw away so it can be made again — wrong seeds, a late
+// withdrawal. Only while nothing has been played: the enforce_draw_immutable
+// trigger (migration 009) refuses the delete once any match is LIVE,
+// COMPLETED or WALKOVER, so this checks the same thing first to say why.
+export async function resetDraw(eventId) {
+  const { data: matches, error } = await supabase
+    .from("matches").select("id, status").eq("event_id", eventId);
+  if (error) throw error;
+  if (matches.some((m) => ["LIVE", "COMPLETED", "WALKOVER"].includes(m.status))) {
+    throw new Error("Matches have already been played (or a bye was given) — the draw is locked.");
+  }
+  // A delete RLS refuses matches zero rows and still "succeeds", so count.
+  const deleted = must(await supabase.from("matches").delete().eq("event_id", eventId).select("id"));
+  if ((deleted || []).length !== matches.length) throw new Error("Only the tournament owner can reset the draw.");
+  must(await supabase.from("tournament_events")
+    .update({ status: "REGISTRATION_CLOSED", total_rounds: null, champion_entry_id: null }).eq("id", eventId));
+}
+
 export async function generateDraw(eventId) {
   await assertNoDraw(eventId);
   const entries = await confirmedEntries(eventId);
@@ -761,6 +780,46 @@ export async function generateGroupStage(eventId, groupCount, advancePerGroup = 
   if (updErr) throw updErr;
 }
 
+// After every match of the current group stage is done, start a new stage
+// with the groups reshuffled from its results (see reshuffleGroups in
+// engines.js). The old stage's matches stay as they were, so its standings
+// remain on record; the knockout, if one follows, is seeded from the newest
+// stage only.
+export async function reshuffleGroupStage(eventId) {
+  const { data: event, error: evErr } = await supabase
+    .from("tournament_events").select("status").eq("id", eventId).single();
+  if (evErr) throw evErr;
+  const { data: matches, error: mErr } = await supabase
+    .from("matches").select("*, games(*)").eq("event_id", eventId);
+  if (mErr) throw mErr;
+
+  if (matches.some((m) => !m.group_label)) throw new Error("The knockout has already been generated, so the groups can't be reshuffled.");
+  const { stage, matches: stageMatches, labels } = latestGroupStage(matches);
+  if (stage === 0) throw new Error("No group stage found for this event.");
+  if (labels.length < 2) throw new Error("Reshuffling needs at least 2 groups.");
+  const unfinished = stageMatches.filter((m) => m.status !== "COMPLETED" && m.status !== "WALKOVER");
+  if (unfinished.length > 0) throw new Error(`${unfinished.length} group match(es) still to be played.`);
+
+  const newGroups = reshuffleGroups(stageFinishingOrder(stageMatches, labels));
+  // Mid-tournament the new matches go straight to Ready, as startTournament
+  // does, so scorers see them at once; scheduling can still place them.
+  const status = event.status === "LIVE" ? "READY" : "PENDING";
+  let matchNumber = Math.max(...matches.map((m) => m.match_number)) + 1;
+  const rows = newGroups.flatMap((group, gi) =>
+    roundRobinRounds(group.map((g) => g.entryId)).flatMap((pairs, ri) =>
+      pairs.map(([a, b]) => ({
+        id: crypto.randomUUID(), event_id: eventId, round: ri + 1, match_number: matchNumber++,
+        entry_a: a, entry_b: b, is_bye: false, status,
+        group_label: stageGroupLabel(stage + 1, groupLetter(gi)),
+      }))
+    )
+  );
+
+  const { error: insErr } = await supabase.from("matches").insert(rows);
+  if (insErr) throw insErr;
+  return { stage: stage + 1, matchCount: rows.length };
+}
+
 // After all group matches are done, seed the knockout from group standings.
 export async function generateKnockoutFromGroups(eventId) {
   const { data: event, error: evErr } = await supabase
@@ -771,19 +830,16 @@ export async function generateKnockoutFromGroups(eventId) {
     .from("matches").select("*, games(*)").eq("event_id", eventId);
   if (mErr) throw mErr;
 
-  const groupMatches = matches.filter((m) => m.group_label && m.group_label !== "RR");
-  if (groupMatches.length === 0) throw new Error("No group stage found for this event.");
+  const allGroupMatches = matches.filter((m) => m.group_label && m.group_label !== "RR");
+  if (allGroupMatches.length === 0) throw new Error("No group stage found for this event.");
   if (matches.some((m) => !m.group_label)) throw new Error("The knockout stage has already been generated.");
+  // After a reshuffle, only the latest stage's groups decide who advances.
+  const { matches: groupMatches, labels } = latestGroupStage(allGroupMatches);
   const unfinished = groupMatches.filter((m) => m.status !== "COMPLETED" && m.status !== "WALKOVER");
   if (unfinished.length > 0) throw new Error(`${unfinished.length} group match(es) still to be played.`);
 
   const advance = event.advance_per_group || 2;
-  const labels = [...new Set(groupMatches.map((m) => m.group_label))].sort();
-  const qualifiersByGroup = labels.map((label) => {
-    const gm = groupMatches.filter((m) => m.group_label === label);
-    const ids = [...new Set(gm.flatMap((m) => [m.entry_a, m.entry_b]).filter(Boolean))];
-    return computeStandings(ids, gm).slice(0, advance).map((r) => r.entryId);
-  });
+  const qualifiersByGroup = stageFinishingOrder(groupMatches, labels).map((order) => order.slice(0, advance));
 
   // Interleave by finishing position (all group winners, then all runners-up,
   // reversed) so same-group qualifiers stay apart in the early knockout rounds.
@@ -795,7 +851,7 @@ export async function generateKnockoutFromGroups(eventId) {
   }
   if (ordered.length < 2) throw new Error("Not enough qualifiers to build a knockout.");
 
-  const startRound = Math.max(...groupMatches.map((m) => m.round)) + 1;
+  const startRound = Math.max(...allGroupMatches.map((m) => m.round)) + 1;
   const startNumber = Math.max(...matches.map((m) => m.match_number)) + 1;
   const { matches: koMatches, totalRounds } = buildKnockout(eventId, ordered, startRound, startNumber);
 

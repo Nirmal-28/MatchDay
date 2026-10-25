@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { Download, Printer, FileSpreadsheet } from "lucide-react";
 import {
-  divisionLabel, entryName, entryShort, matchStageLabel, fmtDateTime, fmtDate, roundLabel,
+  divisionLabel, entryName, entryShort, matchStageLabel, groupDisplayName, fmtDateTime, fmtDate, roundLabel,
   BadmintonScoringEngine, toAB, computeStandings,
 } from "../lib/engines";
 import {
@@ -161,7 +161,7 @@ export default function ExportsPanel({ tournament, events, courts, entriesByEven
                   const ids = [...new Set(gm.flatMap((m) => [m.entry_a, m.entry_b]).filter(Boolean))];
                   return (
                     <div key={g}>
-                      <h3>{g === "RR" ? "Round robin" : `Group ${g}`}</h3>
+                      <h3>{g === "RR" ? "Round robin" : groupDisplayName(g)}</h3>
                       <table>
                         <thead><tr><th>Pos</th><th>Team</th><th>P</th><th>W</th><th>L</th><th>Games</th></tr></thead>
                         <tbody>

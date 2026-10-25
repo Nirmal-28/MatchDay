@@ -148,7 +148,7 @@ export function roundLabel(round, totalRounds) {
 export function matchStageLabel(match, event) {
   if (!match.group_label) return roundLabel(match.round, event?.total_rounds);
   if (match.group_label === "RR") return `Round ${match.round}`;
-  return `Group ${match.group_label} · Round ${match.round}`;
+  return `${groupDisplayName(match.group_label)} · Round ${match.round}`;
 }
 
 export function entryName(entry) {
@@ -236,10 +236,72 @@ export function snakeIntoGroups(seededIds, groupCount) {
 
 export const groupLetter = (i) => String.fromCharCode(65 + i);
 
+/* ===================== RESHUFFLED GROUP STAGES =========================== */
+
+// A group stage can be followed by another one, with the groups reshuffled
+// from the first stage's results. Stage 1 keeps the plain letters ("A") so
+// every existing draw reads exactly as before; later stages are "S2-A",
+// "S3-A"... — no schema change, and anything that only asks "is this a group
+// match?" (group_label is set) keeps working.
+export function parseGroupLabel(label) {
+  const m = /^S(\d+)-(.+)$/.exec(label || "");
+  return m ? { stage: Number(m[1]), group: m[2] } : { stage: 1, group: label };
+}
+
+export const stageGroupLabel = (stage, group) => (stage > 1 ? `S${stage}-${group}` : group);
+
+export function groupDisplayName(label) {
+  const { stage, group } = parseGroupLabel(label);
+  return stage > 1 ? `Stage ${stage} · Group ${group}` : `Group ${group}`;
+}
+
+// The group matches of the most recent stage, plus its number and its group
+// labels in letter order. Round-robin ("RR") matches are not a group stage.
+export function latestGroupStage(matches) {
+  const grouped = (matches || []).filter((m) => m.group_label && m.group_label !== "RR");
+  if (grouped.length === 0) return { stage: 0, matches: [], labels: [] };
+  const stage = Math.max(...grouped.map((m) => parseGroupLabel(m.group_label).stage));
+  const inStage = grouped.filter((m) => parseGroupLabel(m.group_label).stage === stage);
+  const labels = [...new Set(inStage.map((m) => m.group_label))]
+    .sort((a, b) => parseGroupLabel(a).group.localeCompare(parseGroupLabel(b).group));
+  return { stage, matches: inStage, labels };
+}
+
+// Finishing order of each group in a stage: [[1st, 2nd, ...] per group].
+export function stageFinishingOrder(stageMatches, labels) {
+  return labels.map((label) => {
+    const gm = stageMatches.filter((m) => m.group_label === label);
+    const ids = [...new Set(gm.flatMap((m) => [m.entry_a, m.entry_b]).filter(Boolean))];
+    return computeStandings(ids, gm).map((r) => r.entryId);
+  });
+}
+
+// The rotation organizers draw on paper: new group k takes the 1st-placed
+// entry of old group k, the 2nd of old group k+1, the 3rd of k+2, and so on,
+// wrapping around. Every new group gets one entry from each finishing
+// position, so no group is stacked, and players meet new opponents.
+// With 4 groups of 5, new group A = 1st of A, 2nd of B, 3rd of C, 4th of D,
+// 5th of A. A group shorter than the rest just has nothing at that position.
+export function reshuffleGroups(finishingOrder) {
+  const g = finishingOrder.length;
+  const groups = Array.from({ length: g }, () => []);
+  const depth = Math.max(0, ...finishingOrder.map((o) => o.length));
+  for (let pos = 0; pos < depth; pos++) {
+    for (let k = 0; k < g; k++) {
+      const id = finishingOrder[(k + pos) % g][pos];
+      if (id) groups[k].push({ entryId: id, fromGroup: (k + pos) % g, position: pos + 1 });
+    }
+  }
+  return groups;
+}
+
 /* ========================= STANDINGS ===================================== */
 
 // Round-robin / group standings computed from completed matches.
-// Ranking: wins -> game difference -> point difference -> head-to-head.
+// Ranking: wins -> point difference -> game difference -> head-to-head.
+// Point difference comes before game difference because that is how club
+// organizers break a tie on paper: level on wins, the bigger winning margin
+// in points goes higher.
 export function computeStandings(entryIds, matches) {
   const rows = {};
   entryIds.forEach((id) => {
@@ -274,8 +336,8 @@ export function computeStandings(entryIds, matches) {
 
   return Object.values(rows).sort((x, y) =>
     y.won - x.won ||
-    (y.gamesFor - y.gamesAgainst) - (x.gamesFor - x.gamesAgainst) ||
     (y.pointsFor - y.pointsAgainst) - (x.pointsFor - x.pointsAgainst) ||
+    (y.gamesFor - y.gamesAgainst) - (x.gamesFor - x.gamesAgainst) ||
     headToHead(x, y)
   );
 }

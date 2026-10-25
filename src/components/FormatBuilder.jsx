@@ -44,6 +44,7 @@ function Preview({ event, confirmedCount }) {
       <span>
         {n} entries · {groups} groups of about {per} · ~{groupMatches} group matches ·
         top {advance} from each group go into a {nextPow2(koField)}-slot knockout.
+        {" "}Once the groups finish you can also reshuffle them from the results and play a second group stage first.
       </span>
     );
   }

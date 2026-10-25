@@ -1,5 +1,5 @@
 import { ListOrdered } from "lucide-react";
-import { cx, entryShort, computeStandings } from "../lib/engines";
+import { cx, entryShort, computeStandings, parseGroupLabel, groupDisplayName } from "../lib/engines";
 import { EmptyState, Badge } from "./ui/primitives";
 
 // Standings for a round robin ("RR") or for each group of a group stage.
@@ -9,8 +9,14 @@ export default function StandingsPanel({ event, matches, entriesById, advancePer
     return <EmptyState icon={ListOrdered} title="No standings yet" hint="Standings appear once a round robin or group stage is generated." />;
   }
 
-  const labels = [...new Set(grouped.map((m) => m.group_label))].sort();
-  const advance = event?.format === "GROUP_KO" ? (advancePerGroup ?? event?.advance_per_group ?? 2) : 0;
+  // Newest stage first: after a reshuffle, the groups being played now are the
+  // ones people look for; earlier stages stay below as the record.
+  const labels = [...new Set(grouped.map((m) => m.group_label))].sort((a, b) => {
+    const x = parseGroupLabel(a), y = parseGroupLabel(b);
+    return y.stage - x.stage || x.group.localeCompare(y.group);
+  });
+  const latestStage = Math.max(...labels.map((l) => parseGroupLabel(l).stage));
+  const advanceCount = event?.format === "GROUP_KO" ? (advancePerGroup ?? event?.advance_per_group ?? 2) : 0;
 
   return (
     <div className="space-y-5">
@@ -19,12 +25,14 @@ export default function StandingsPanel({ event, matches, entriesById, advancePer
         const ids = [...new Set(gm.flatMap((m) => [m.entry_a, m.entry_b]).filter(Boolean))];
         const rows = computeStandings(ids, gm);
         const remaining = gm.filter((m) => m.status !== "COMPLETED" && m.status !== "WALKOVER").length;
+        // Only the newest stage feeds the knockout; an earlier stage fed the reshuffle.
+        const advance = parseGroupLabel(label).stage === latestStage ? advanceCount : 0;
 
         return (
           <div key={label}>
             <div className="mb-2 flex items-center gap-2">
               <div className="md-eyebrow">
-                {label === "RR" ? "Standings" : `Group ${label}`}
+                {label === "RR" ? "Standings" : groupDisplayName(label)}
               </div>
               {remaining > 0
                 ? <Badge tone="amber">{remaining} to play</Badge>

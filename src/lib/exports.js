@@ -5,7 +5,7 @@
 // The parsing counterpart (CSV import) lives in ./csv.js.
 
 import {
-  entryName, divisionLabel, fmtDateTime, matchStageLabel, roundLabel,
+  entryName, divisionLabel, fmtDateTime, matchStageLabel, groupDisplayName, roundLabel,
   BadmintonScoringEngine, toAB, computeStandings, REG_STATUS_META, PAY_STATUS_META, todayLocal,
 } from "./engines";
 
@@ -145,7 +145,7 @@ export function standingsCsv(events, matchesByEvent, entriesById) {
       const ids = [...new Set(groupMatches.flatMap((m) => [m.entry_a, m.entry_b]).filter(Boolean))];
       computeStandings(ids, groupMatches).forEach((r, i) => {
         rows.push([
-          divisionLabel(ev), g === "RR" ? "Round robin" : `Group ${g}`, i + 1,
+          divisionLabel(ev), g === "RR" ? "Round robin" : groupDisplayName(g), i + 1,
           entryName(entriesById[r.entryId]), r.played, r.won, r.lost,
           r.gamesFor, r.gamesAgainst, r.pointsFor, r.pointsAgainst,
         ]);

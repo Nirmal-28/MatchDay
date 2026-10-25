@@ -4,14 +4,14 @@ import {
   ChevronLeft, MapPin, Calendar, Home, Users, Swords, LayoutGrid, Radio, Trophy, Settings, Play, ArrowRight,
   UserCheck, ClipboardList, ShieldAlert, Shield, IndianRupee, BarChart3, Download, Palette,
 } from "lucide-react";
-import { cx, fmtDateRange, inr, EVENT_STATUS_META, FORMAT_META, divisionLabel } from "../lib/engines";
+import { cx, fmtDateRange, inr, EVENT_STATUS_META, FORMAT_META, divisionLabel, latestGroupStage } from "../lib/engines";
 import {
   getTournament, listEvents, listCourts, listEntries, listMatches, listNotifications, markNotificationsRead,
   publishTournament, closeRegistration, startTournament, completeTournament, cancelTournament, updateTournament,
   addCourt, updateCourt, removeCourt, updateCourtAvailability,
   updateEntryStatus, removeEntry, recordOfflinePayment, markRefunded, addWalkInEntries,
   importEntries, promoteNextWaitlisted, updateEvent,
-  generateDraw, generateRoundRobin, generateGroupStage, generateKnockoutFromGroups, setSeeds, createCustomDraw,
+  generateDraw, generateRoundRobin, generateGroupStage, generateKnockoutFromGroups, reshuffleGroupStage, resetDraw, setSeeds, createCustomDraw,
   startMatch, scorePoint, undoLastGame, retireMatch,
   subscribeToEvent,
   setCheckInStatus, checkInByCode,
@@ -22,6 +22,7 @@ import { BrandLoader, LivePulse } from "../components/ui/motion";
 import ParticipantsPanel from "../components/ParticipantsPanel";
 import SeedingPanel from "../components/SeedingPanel";
 import CustomDrawPanel from "../components/CustomDrawPanel";
+import ReshufflePanel from "../components/ReshufflePanel";
 import StandingsPanel from "../components/StandingsPanel";
 import BracketView from "../components/BracketView";
 import SchedulingPanel from "../components/SchedulingPanel";
@@ -439,10 +440,12 @@ export default function TournamentControlCenter() {
             const format = event.format || "SINGLE_ELIM";
             const hasDraw = eventMatches.length > 0;
             const regLocked = tournament.status !== "REGISTRATION_OPEN" && tournament.status !== "DRAFT";
-            const groupMatches = eventMatches.filter((m) => m.group_label && m.group_label !== "RR");
+            // After a reshuffle, only the current stage has to finish before the knockout.
+            const groupMatches = latestGroupStage(eventMatches).matches;
             const groupsDone = groupMatches.length > 0 &&
               groupMatches.every((m) => m.status === "COMPLETED" || m.status === "WALKOVER");
             const koExists = eventMatches.some((m) => !m.group_label);
+            const anyPlayed = eventMatches.some((m) => ["LIVE", "COMPLETED", "WALKOVER"].includes(m.status));
 
             const generate = () => guarded(async () => {
               if (format === "ROUND_ROBIN") await generateRoundRobin(eventId);
@@ -493,6 +496,25 @@ export default function TournamentControlCenter() {
             return (
               <div className="space-y-5">
                 <FormatBuilder event={event} confirmedCount={confirmedCount} locked notify={notify} onChanged={loadAll} />
+                {isOwner && !anyPlayed && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-line bg-surface-2 px-3 py-2.5">
+                    <span className="text-xs text-ink-2">Groups or seeds wrong? Nothing has been played yet, so the draw can still be thrown away and made again.</span>
+                    <Btn size="sm" variant="secondary"
+                      onClick={() => { if (confirm("Delete this draw and its schedule so you can generate it again?")) guarded(async () => { await resetDraw(eventId); await loadAll(); }, "Draw reset. Fix the seeds and generate again."); }}>
+                      Reset draw
+                    </Btn>
+                  </div>
+                )}
+                {format === "GROUP_KO" && !koExists && isOwner && (
+                  <ReshufflePanel
+                    matches={eventMatches} entriesById={entriesById}
+                    onReshuffle={() => guarded(async () => {
+                      const { stage, matchCount } = await reshuffleGroupStage(eventId);
+                      await loadAll();
+                      return notify(`Stage ${stage} groups created: ${matchCount} matches. Schedule them to put them on court.`);
+                    })}
+                  />
+                )}
                 {format === "GROUP_KO" && !koExists && (
                   <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-line bg-surface-2 px-3 py-2.5">
                     <span className="text-xs text-ink-2">
