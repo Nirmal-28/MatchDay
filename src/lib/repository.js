@@ -1517,6 +1517,22 @@ export async function retireMatch(matchId, retiredSide) {
   await decideMatch(match, winnerEntryId, { retired: true });
 }
 
+// A group match that will not be played — a pair didn't turn up or left.
+// Stored as a WALKOVER with no winner (isVoidMatch in engines.js): it stops
+// holding up the group, and counts for nobody in the table. Knockout matches
+// are refused: someone has to go through, so use Retire there.
+export async function markNotPlayed(matchId) {
+  const match = must(await supabase.from("matches").select("*").eq("id", matchId).single());
+  if (match.status === "COMPLETED" || match.status === "WALKOVER") throw new Error("This match already has a result.");
+  if (!match.group_label) throw new Error("A knockout match needs a winner — use Retire for the pair that can't play.");
+  // Clear any points a scorer tapped first: the completed-score trigger
+  // (migration 009) refuses game edits once the match is finished.
+  must(await supabase.from("games").delete().eq("match_id", matchId));
+  must(await supabase.from("matches")
+    .update({ status: "WALKOVER", winner_entry_id: null, completed_at: new Date().toISOString() })
+    .eq("id", matchId));
+}
+
 // A finished match's whole score, typed in from the paper slip — for an
 // organizer running every court alone, where tapping each rally is
 // impossible. games = [{ a, b }, ...], a = entry_a's score. Games are written

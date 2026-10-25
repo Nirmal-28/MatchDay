@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ClipboardCheck, Search } from "lucide-react";
-import { cx, entryShort, matchStageLabel, parseGroupLabel, parseResult, divisionLabel } from "../lib/engines";
+import { cx, entryShort, matchStageLabel, parseGroupLabel, parseResult, divisionLabel, isVoidMatch } from "../lib/engines";
 import { Btn, Badge, inputCls } from "./ui/primitives";
 
 /* For the organizer running every court alone: players keep score on paper,
@@ -23,7 +23,7 @@ const byKey = (a, b) => {
   return 0;
 };
 
-function ResultRow({ match, event, entriesById, onSave }) {
+function ResultRow({ match, event, entriesById, onSave, onVoid }) {
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
   const a = entryShort(entriesById[match.entry_a]);
@@ -57,12 +57,24 @@ function ResultRow({ match, event, entriesById, onSave }) {
           {text.trim() ? (error || preview) : ""}
         </div>
       </div>
-      <Btn size="sm" disabled={!ok || saving} onClick={save}>{saving ? "Saving…" : "Save"}</Btn>
+      <div className="flex gap-1.5">
+        <Btn size="sm" disabled={!ok || saving} onClick={save}>{saving ? "Saving…" : "Save"}</Btn>
+        {match.group_label && onVoid && (
+          <Btn size="sm" variant="ghost" disabled={saving} title="A pair didn't turn up: the match counts for nobody"
+            onClick={async () => {
+              if (!window.confirm(`Mark ${a} vs ${b} as not played? It won't count for either pair.`)) return;
+              setSaving(true);
+              try { await onVoid(match.id); } finally { setSaving(false); }
+            }}>
+            Not played
+          </Btn>
+        )}
+      </div>
     </div>
   );
 }
 
-export default function QuickResultsPanel({ matches, events, entriesById, live, onSave }) {
+export default function QuickResultsPanel({ matches, events, entriesById, live, onSave, onVoid }) {
   const [q, setQ] = useState("");
   const eventById = useMemo(() => Object.fromEntries(events.map((e) => [e.id, e])), [events]);
 
@@ -104,7 +116,7 @@ export default function QuickResultsPanel({ matches, events, entriesById, live, 
           </div>
           <div className="max-h-[32rem] overflow-y-auto">
             {shown.map((m) => (
-              <ResultRow key={m.id} match={m} event={eventById[m.event_id]} entriesById={entriesById} onSave={onSave} />
+              <ResultRow key={m.id} match={m} event={eventById[m.event_id]} entriesById={entriesById} onSave={onSave} onVoid={onVoid} />
             ))}
             {shown.length === 0 && (
               <p className="px-3 py-4 text-sm text-ink-2">{open.length ? "No match matches that search." : "Every match with known players has a result."}</p>
@@ -120,7 +132,7 @@ export default function QuickResultsPanel({ matches, events, entriesById, live, 
                     {" vs "}
                     <span className={cx(m.winner_entry_id === m.entry_b && "font-semibold text-ink")}>{entryShort(entriesById[m.entry_b])}</span>
                   </span>
-                  <span className="font-mono">{[...(m.games || [])].sort((x, y) => x.game_number - y.game_number).map((g) => `${g.score_a}-${g.score_b}`).join("  ")}</span>
+                  <span className="font-mono">{isVoidMatch(m) ? "not played" : [...(m.games || [])].sort((x, y) => x.game_number - y.game_number).map((g) => `${g.score_a}-${g.score_b}`).join("  ")}</span>
                 </div>
               ))}
             </div>

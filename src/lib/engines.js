@@ -319,7 +319,9 @@ export function stageFinishingOrder(stageMatches, labels) {
   return labels.map((label) => {
     const gm = stageMatches.filter((m) => m.group_label === label);
     const ids = [...new Set(gm.flatMap((m) => [m.entry_a, m.entry_b]).filter(Boolean))];
-    return computeStandings(ids, gm).map((r) => r.entryId);
+    // A pair with no match played in a finished stage withdrew: it is not
+    // carried into the next stage or the knockout.
+    return computeStandings(ids, gm).filter((r) => r.played > 0).map((r) => r.entryId);
   });
 }
 
@@ -344,6 +346,12 @@ export function reshuffleGroups(finishingOrder) {
 
 /* ========================= STANDINGS ===================================== */
 
+// A group match the organizer marked "not played" (a pair didn't turn up).
+// The matches table only allows its fixed statuses, so it is stored as a
+// WALKOVER with no winner: finished, so it never holds up the group, but it
+// counts for nobody. A bye is a walkover too, but always has a winner.
+export const isVoidMatch = (m) => m.status === "WALKOVER" && !m.winner_entry_id && !m.is_bye;
+
 // Round-robin / group standings computed from completed matches.
 // Ranking: wins -> point difference -> game difference -> head-to-head.
 // Point difference comes before game difference because that is how club
@@ -355,7 +363,7 @@ export function computeStandings(entryIds, matches) {
     rows[id] = { entryId: id, played: 0, won: 0, lost: 0, gamesFor: 0, gamesAgainst: 0, pointsFor: 0, pointsAgainst: 0 };
   });
 
-  const done = matches.filter((m) => m.status === "COMPLETED" || m.status === "WALKOVER");
+  const done = matches.filter((m) => (m.status === "COMPLETED" || m.status === "WALKOVER") && !isVoidMatch(m));
   for (const m of done) {
     const a = rows[m.entry_a], b = rows[m.entry_b];
     if (!a || !b) continue;
@@ -387,6 +395,9 @@ export function computeStandings(entryIds, matches) {
   };
 
   return Object.values(rows).sort((x, y) =>
+    // A pair that played nothing (every match not played) goes to the foot,
+    // not above pairs who played and lost.
+    (x.played === 0) - (y.played === 0) ||
     y.won - x.won ||
     (y.pointsFor - y.pointsAgainst) - (x.pointsFor - x.pointsAgainst) ||
     (y.gamesFor - y.gamesAgainst) - (x.gamesFor - x.gamesAgainst) ||

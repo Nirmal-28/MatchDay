@@ -12,7 +12,7 @@ import {
   updateEntryStatus, removeEntry, recordOfflinePayment, markRefunded, addWalkInEntries,
   importEntries, promoteNextWaitlisted, updateEvent,
   generateDraw, generateRoundRobin, generateGroupStage, generateKnockoutFromGroups, reshuffleGroupStage, resetDraw, setSeeds, createCustomDraw,
-  startMatch, scorePoint, undoLastGame, retireMatch, recordResult, forgetMatchFormat,
+  startMatch, scorePoint, undoLastGame, retireMatch, recordResult, forgetMatchFormat, markNotPlayed,
   subscribeToEvent,
   setCheckInStatus, checkInByCode,
   getMyRole, listPayments, listMembers, listEntryDetails,
@@ -572,6 +572,10 @@ export default function TournamentControlCenter() {
                 onSave={async (mid, games) => {
                   try { await recordResult(mid, games); await loadEventData(events); notify("Result saved."); return true; }
                   catch (e) { notify(e.message, "error"); return false; }
+                }}
+                onVoid={async (mid) => {
+                  try { await markNotPlayed(mid); await loadEventData(events); notify("Marked as not played."); }
+                  catch (e) { notify(e.message, "error"); }
                 }}
               />
             </div>

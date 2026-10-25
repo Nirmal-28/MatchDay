@@ -96,3 +96,17 @@ describe("computeStandings tie-break", () => {
     expect(order).toEqual(["X", "Y", "Z"]);
   });
 });
+
+describe("matches marked not played", () => {
+  const won = (a, b, sa, sb) => ({ entry_a: a, entry_b: b, status: "COMPLETED", winner_entry_id: sa > sb ? a : b, group_label: "A", games: [{ game_number: 1, score_a: sa, score_b: sb }] });
+  const notPlayed = (a, b) => ({ entry_a: a, entry_b: b, status: "WALKOVER", winner_entry_id: null, is_bye: false, group_label: "A", games: [] });
+
+  it("count for nobody, and a pair that played nothing drops to the foot and out of the next stage", () => {
+    const ms = [won("P", "Q", 15, 10), won("Q", "R", 15, 3), notPlayed("P", "X"), notPlayed("Q", "X"), notPlayed("R", "X"), won("P", "R", 15, 12)];
+    const st = computeStandings(["P", "Q", "R", "X"], ms);
+    expect(st.map((r) => r.entryId)).toEqual(["P", "Q", "R", "X"]);
+    expect(st.find((r) => r.entryId === "P")).toMatchObject({ played: 2, won: 2 });
+    expect(st.find((r) => r.entryId === "X")).toMatchObject({ played: 0, won: 0 });
+    expect(stageFinishingOrder(ms, ["A"])).toEqual([["P", "Q", "R"]]);
+  });
+});
