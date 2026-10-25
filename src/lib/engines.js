@@ -97,6 +97,13 @@ export const TONE_CLASSES = {
 // play one game per match.
 export const gamesToWin = (settings) => (Number(settings?.gamesPerMatch) === 1 ? 1 : 2);
 
+// The whole match format from tournaments.settings. Games to 21 cap at 30
+// (BWF); games to 15 cap at 21 — win by 2, and at 20-all the next point wins.
+export function scoringFormat(settings) {
+  const points = Number(settings?.pointsPerGame) === 15 ? 15 : 21;
+  return { toWin: gamesToWin(settings), points, cap: points === 15 ? 21 : 30 };
+}
+
 export const BadmintonScoringEngine = {
   POINTS_TO_WIN: 21,
   CAP: 30,
@@ -356,7 +363,12 @@ export function computeStandings(entryIds, matches) {
     if (m.winner_entry_id === m.entry_a) { a.won++; b.lost++; }
     else if (m.winner_entry_id === m.entry_b) { b.won++; a.lost++; }
 
-    const tally = BadmintonScoringEngine.gameTally(toAB(m.games));
+    // Every game of a finished match was played out, whatever the format
+    // (a 15-11 game never satisfies the 21-point rules). Only a retirement
+    // can leave an unfinished game, so only then use the strict rules.
+    const tally = m.retired
+      ? BadmintonScoringEngine.gameTally(toAB(m.games))
+      : (m.games || []).reduce((t, g) => (g.score_a > g.score_b ? { ...t, a: t.a + 1 } : g.score_b > g.score_a ? { ...t, b: t.b + 1 } : t), { a: 0, b: 0 });
     a.gamesFor += tally.a; a.gamesAgainst += tally.b;
     b.gamesFor += tally.b; b.gamesAgainst += tally.a;
     for (const g of (m.games || [])) {

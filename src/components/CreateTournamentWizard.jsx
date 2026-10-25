@@ -90,7 +90,7 @@ export default function CreateTournamentWizard({ open, onClose, onSubmit }) {
   });
   const [selectedCats, setSelectedCats] = useState({ MS: true });
   const [catConfig, setCatConfig] = useState({ MS: { maxEntries: 16, feeINR: 300 } });
-  const [settings, setSettings] = useState({ courtsCount: 2, matchDurationMins: 40, startTime: "09:00", gamesPerMatch: 3, rules: "BWF rally-point scoring, best of 3 games to 21." });
+  const [settings, setSettings] = useState({ courtsCount: 2, matchDurationMins: 40, startTime: "09:00", gamesPerMatch: 3, pointsPerGame: 21, rules: "BWF rally-point scoring, best of 3 games to 21." });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -266,7 +266,13 @@ export default function CreateTournamentWizard({ open, onClose, onSubmit }) {
             <input type="number" min={1} className={inputCls} value={settings.courtsCount} onChange={(e) => setSettings((s) => ({ ...s, courtsCount: Number(e.target.value) }))} />
           </Field>
           <Field label="Match duration (minutes)"><input type="number" min={15} className={inputCls} value={settings.matchDurationMins} onChange={(e) => setSettings((s) => ({ ...s, matchDurationMins: Number(e.target.value) }))} /></Field>
-          <Field label="Games per match" hint="Each game is to 21, win by 2, capped at 30.">
+          <Field label="Points per game" hint="Win by 2. A game to 21 caps at 30, a game to 15 at 21.">
+            <select className={inputCls} value={settings.pointsPerGame} onChange={(e) => setSettings((s) => ({ ...s, pointsPerGame: Number(e.target.value) }))}>
+              <option value={21}>21 points</option>
+              <option value={15}>15 points</option>
+            </select>
+          </Field>
+          <Field label="Games per match">
             <select className={inputCls} value={settings.gamesPerMatch} onChange={(e) => setSettings((s) => ({ ...s, gamesPerMatch: Number(e.target.value) }))}>
               <option value={3}>Best of 3 games</option>
               <option value={1}>One game</option>

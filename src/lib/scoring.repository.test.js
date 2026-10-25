@@ -72,7 +72,7 @@ vi.mock("./supabaseClient", () => ({
   },
 }));
 
-const { startMatch, scorePoint, retireMatch, undoLastGame, generateKnockoutFromGroups } = await import("./repository");
+const { startMatch, scorePoint, retireMatch, undoLastGame, generateKnockoutFromGroups, forgetMatchFormat } = await import("./repository");
 
 function seedMatch(patch = {}) {
   const m = {
@@ -88,6 +88,7 @@ beforeEach(() => {
   db.matches = []; db.games = [];
   db.tournament_events = [{ id: "ev1", tournament_id: "t1", status: "LIVE", champion_entry_id: null }];
   db.tournaments = [{ id: "t1", settings: {} }];
+  forgetMatchFormat();
   failNext = null;
 });
 
@@ -233,5 +234,28 @@ describe("knockout from four group winners", () => {
     expect(ko.slice(0, 2).map((m) => [m.entry_a, m.entry_b])).toEqual([["winA", "winC"], ["winB", "winD"]]);
     expect(ko.slice(0, 2).every((m) => m.status === "READY")).toBe(true);
     expect(ko[2]).toMatchObject({ entry_a: null, entry_b: null });
+  });
+});
+
+describe("games to 15", () => {
+  it("ends a one-game match at 15 with a 2-point lead", async () => {
+    db.tournaments[0].settings = { gamesPerMatch: 1, pointsPerGame: 15 };
+    const m = seedMatch({ group_label: "A" });
+    await startMatch(m.id);
+    for (let i = 0; i < 14; i++) { await scorePoint(m.id, "A", 1); await scorePoint(m.id, "B", 1); } // 14-14
+    await scorePoint(m.id, "A", 1); // 15-14: not over
+    expect(db.matches[0].status).toBe("LIVE");
+    await scorePoint(m.id, "A", 1); // 16-14
+    expect(db.matches[0]).toMatchObject({ status: "COMPLETED", winner_entry_id: "A" });
+  });
+
+  it("caps a game to 15 at 21", async () => {
+    db.tournaments[0].settings = { gamesPerMatch: 1, pointsPerGame: 15 };
+    const m = seedMatch({ group_label: "B" });
+    await startMatch(m.id);
+    for (let i = 0; i < 20; i++) { await scorePoint(m.id, "A", 1); await scorePoint(m.id, "B", 1); } // 20-20
+    expect(db.matches[0].status).toBe("LIVE");
+    await scorePoint(m.id, "B", 1); // 20-21
+    expect(db.matches[0]).toMatchObject({ status: "COMPLETED", winner_entry_id: "B" });
   });
 });

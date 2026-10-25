@@ -1,7 +1,7 @@
 import { supabase } from "./supabaseClient";
 import {
   nextPow2, bracketSeedOrder, roundRobinRounds, snakeIntoGroups, groupLetter, computeStandings,
-  latestGroupStage, stageFinishingOrder, reshuffleGroups, stageGroupLabel, validateResult, gamesToWin,
+  latestGroupStage, stageFinishingOrder, reshuffleGroups, stageGroupLabel, validateResult, scoringFormat,
 } from "./engines";
 import * as SchedulingEngine from "./schedulingEngine";
 import { computeRatings } from "./rating";
@@ -1270,21 +1270,29 @@ export function subscribeToMyNotifications(userId, onChange) {
 
 /* ---------------------------- SCORING ---------------------------------------- */
 
-function isGameOver(a, b) { return a >= 30 || b >= 30 || (Math.max(a, b) >= 21 && Math.abs(a - b) >= 2); }
-function gameWinnerSide(a, b) { if (!isGameOver(a, b)) return null; return a > b ? "A" : "B"; }
-function matchWinnerSide(games, toWin = 2) {
+const DEFAULT_FORMAT = { toWin: 2, points: 21, cap: 30 };
+function isGameOver(a, b, f = DEFAULT_FORMAT) { return a >= f.cap || b >= f.cap || (Math.max(a, b) >= f.points && Math.abs(a - b) >= 2); }
+function gameWinnerSide(a, b, f = DEFAULT_FORMAT) { if (!isGameOver(a, b, f)) return null; return a > b ? "A" : "B"; }
+function matchWinnerSide(games, f = DEFAULT_FORMAT) {
   let wa = 0, wb = 0;
-  games.forEach((g) => { const w = gameWinnerSide(g.score_a, g.score_b); if (w === "A") wa++; else if (w === "B") wb++; });
-  if (wa >= toWin) return "A"; if (wb >= toWin) return "B"; return null;
+  games.forEach((g) => { const w = gameWinnerSide(g.score_a, g.score_b, f); if (w === "A") wa++; else if (w === "B") wb++; });
+  if (wa >= f.toWin) return "A"; if (wb >= f.toWin) return "B"; return null;
 }
 
-// Games needed to win a match in this event's tournament: best of 3 unless
-// the organizer chose single-game matches (tournaments.settings.gamesPerMatch).
-// Read fresh at each game end — rare, and a mid-day change must take effect.
-async function gamesToWinForEvent(eventId) {
+// This event's match format (tournaments.settings: gamesPerMatch,
+// pointsPerGame). Every tap needs it, so it is cached briefly per event; a
+// change in Settings reaches scorers within half a minute.
+const formatCache = new Map();
+// After the organizer saves a new format on this device, use it at once.
+export function forgetMatchFormat() { formatCache.clear(); }
+async function formatForEvent(eventId) {
+  const hit = formatCache.get(eventId);
+  if (hit && Date.now() - hit.at < 30000) return hit.format;
   const ev = must(await supabase.from("tournament_events").select("tournament_id").eq("id", eventId).single());
   const t = must(await supabase.from("tournaments").select("settings").eq("id", ev.tournament_id).single());
-  return gamesToWin(t?.settings);
+  const format = scoringFormat(t?.settings);
+  formatCache.set(eventId, { format, at: Date.now() });
+  return format;
 }
 
 // 23505 = unique_violation. games is unique on (match_id, game_number), so this
@@ -1349,8 +1357,8 @@ async function decideMatch(match, winnerEntryId, extra = {}) {
 }
 
 // After a game ends: open the next one, or decide the match.
-async function settleAfterGame(match, games) {
-  const winSide = matchWinnerSide(games, await gamesToWinForEvent(match.event_id));
+async function settleAfterGame(match, games, format) {
+  const winSide = matchWinnerSide(games, format || await formatForEvent(match.event_id));
   if (!winSide) {
     const { error } = await supabase.from("games").insert({ match_id: match.id, game_number: games.length + 1, score_a: 0, score_b: 0 });
     if (error && !isDuplicate(error)) throw error;
@@ -1438,16 +1446,17 @@ export async function scorePoint(matchId, side, delta, healed = false) {
     return scorePoint(matchId, side, delta, true);
   }
   const key = side === "A" ? "score_a" : "score_b";
+  const format = await formatForEvent(match.event_id);
 
-  if (delta > 0 && isGameOver(last.score_a, last.score_b)) {
+  if (delta > 0 && isGameOver(last.score_a, last.score_b, format)) {
     // The last game is already won but the match is still LIVE: an earlier
     // tap closed the game and the follow-up write (next game / result) never
     // landed. Previously this returned early on every tap, leaving the match
     // stuck between games for good. Finish that work now instead.
-    await settleAfterGame(match, games);
+    await settleAfterGame(match, games, format);
     return;
   }
-  if (delta > 0 && last[key] >= 30) return;
+  if (delta > 0 && last[key] >= format.cap) return;
 
   // The increment itself goes through score_point_atomic() so two devices
   // scoring the same match cannot interleave a read-modify-write and lose a
@@ -1458,8 +1467,8 @@ export async function scorePoint(matchId, side, delta, healed = false) {
   if (updatedLast[key] !== last[key]) await logRally(matchId, updatedLast, side, delta);
   const allGames = [...games.slice(0, -1), updatedLast];
 
-  if (!isGameOver(updatedLast.score_a, updatedLast.score_b)) return;
-  await settleAfterGame(match, allGames);
+  if (!isGameOver(updatedLast.score_a, updatedLast.score_b, format)) return;
+  await settleAfterGame(match, allGames, format);
 }
 
 export async function undoLastGame(matchId) {

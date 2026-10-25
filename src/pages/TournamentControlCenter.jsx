@@ -12,7 +12,7 @@ import {
   updateEntryStatus, removeEntry, recordOfflinePayment, markRefunded, addWalkInEntries,
   importEntries, promoteNextWaitlisted, updateEvent,
   generateDraw, generateRoundRobin, generateGroupStage, generateKnockoutFromGroups, reshuffleGroupStage, resetDraw, setSeeds, createCustomDraw,
-  startMatch, scorePoint, undoLastGame, retireMatch, recordResult,
+  startMatch, scorePoint, undoLastGame, retireMatch, recordResult, forgetMatchFormat,
   subscribeToEvent,
   setCheckInStatus, checkInByCode,
   getMyRole, listPayments, listMembers, listEntryDetails,
@@ -604,10 +604,22 @@ export default function TournamentControlCenter() {
                   change here applies to the next game that finishes. */}
               <Card className="space-y-3 p-4">
                 <div className="md-eyebrow">Match format</div>
-                <Field label="Games per match" hint="Each game is to 21, win by 2, capped at 30. Applies from the next game that finishes.">
+                <Field label="Points per game" hint="Win by 2. A game to 21 caps at 30, a game to 15 at 21. Scorers pick up a change within 30 seconds.">
+                  <select className={inputCls} value={Number(tournament.settings?.pointsPerGame) === 15 ? 15 : 21}
+                    onChange={(e) => guarded(async () => {
+                      await updateTournament(tournament.id, { settings: { ...(tournament.settings || {}), pointsPerGame: Number(e.target.value) } });
+                      forgetMatchFormat();
+                      await loadAll();
+                    }, "Match format saved.")}>
+                    <option value={21}>21 points</option>
+                    <option value={15}>15 points</option>
+                  </select>
+                </Field>
+                <Field label="Games per match">
                   <select className={inputCls} value={Number(tournament.settings?.gamesPerMatch) === 1 ? 1 : 3}
                     onChange={(e) => guarded(async () => {
                       await updateTournament(tournament.id, { settings: { ...(tournament.settings || {}), gamesPerMatch: Number(e.target.value) } });
+                      forgetMatchFormat();
                       await loadAll();
                     }, "Match format saved.")}>
                     <option value={3}>Best of 3 games</option>
