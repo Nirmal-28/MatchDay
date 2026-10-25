@@ -666,6 +666,18 @@ export async function resetDraw(eventId) {
     .update({ status: "REGISTRATION_CLOSED", total_rounds: null, champion_entry_id: null }).eq("id", eventId));
 }
 
+// A draw made (or remade) after the tournament has started must reach the
+// scorers: startTournament readies matches only once, so do the same here.
+async function readyIfLive(eventId) {
+  const ev = must(await supabase.from("tournament_events").select("tournament_id").eq("id", eventId).single());
+  const t = must(await supabase.from("tournaments").select("status").eq("id", ev.tournament_id).single());
+  if (t?.status !== "LIVE") return;
+  must(await supabase.from("tournament_events").update({ status: "LIVE" }).eq("id", eventId));
+  must(await supabase.from("matches").update({ status: "READY" })
+    .eq("event_id", eventId).eq("is_bye", false).eq("status", "PENDING")
+    .not("entry_a", "is", null).not("entry_b", "is", null));
+}
+
 export async function generateDraw(eventId) {
   await assertNoDraw(eventId);
   const entries = await confirmedEntries(eventId);
@@ -678,6 +690,7 @@ export async function generateDraw(eventId) {
   const { error: updErr } = await supabase.from("tournament_events")
     .update({ status: "DRAW_READY", total_rounds: totalRounds }).eq("id", eventId);
   if (updErr) throw updErr;
+  await readyIfLive(eventId);
 }
 
 // The organizer's own matchups (made by hand or in ChatGPT) as the draw,
@@ -728,6 +741,7 @@ export async function createCustomDraw(eventId, feeINR, format, plan) {
   const { error: updErr } = await supabase.from("tournament_events")
     .update({ status: "DRAW_READY", ...patch }).eq("id", eventId);
   if (updErr) throw updErr;
+  await readyIfLive(eventId);
 }
 
 // Round robin: everyone plays everyone once. Best for small divisions, where a
@@ -751,6 +765,7 @@ export async function generateRoundRobin(eventId) {
   const { error: updErr } = await supabase.from("tournament_events")
     .update({ status: "DRAW_READY", total_rounds: rounds.length }).eq("id", eventId);
   if (updErr) throw updErr;
+  await readyIfLive(eventId);
 }
 
 // Groups -> knockout. Group matches are created now; the knockout bracket is
@@ -780,6 +795,7 @@ export async function generateGroupStage(eventId, groupCount, advancePerGroup = 
     .update({ status: "DRAW_READY", group_count: groupCount, advance_per_group: advancePerGroup, total_rounds: null })
     .eq("id", eventId);
   if (updErr) throw updErr;
+  await readyIfLive(eventId);
 }
 
 // After every match of the current group stage is done, start a new stage
