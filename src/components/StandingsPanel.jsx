@@ -1,5 +1,28 @@
 import { ListOrdered } from "lucide-react";
-import { cx, entryShort, computeStandings, parseGroupLabel, groupDisplayName } from "../lib/engines";
+import { cx, entryShort, computeStandings, parseGroupLabel, groupDisplayName, isVoidMatch } from "../lib/engines";
+
+// One fixture line under a group table: who plays whom, in playing order,
+// with the score once it is in. Organizers asked "who should they play?" —
+// the table alone never said.
+function Fixture({ m, i, entriesById }) {
+  const done = m.status === "COMPLETED" || m.status === "WALKOVER";
+  const score = isVoidMatch(m) ? "not played"
+    : [...(m.games || [])].sort((x, y) => x.game_number - y.game_number).map((g) => `${g.score_a}–${g.score_b}`).join("  ");
+  const won = (id) => done && m.winner_entry_id === id;
+  return (
+    <li className="flex items-baseline gap-2 px-3 py-1.5 text-sm">
+      <span className="w-5 shrink-0 text-right font-mono text-[11px] text-ink-3">{i + 1}</span>
+      <span className="min-w-0 flex-1">
+        <span className={cx(won(m.entry_a) ? "font-semibold text-ink" : "text-ink-2")}>{entryShort(entriesById[m.entry_a])}</span>
+        <span className="px-1.5 text-ink-3">vs</span>
+        <span className={cx(won(m.entry_b) ? "font-semibold text-ink" : "text-ink-2")}>{entryShort(entriesById[m.entry_b])}</span>
+      </span>
+      <span className={cx("shrink-0 font-mono text-xs", done ? "text-ink-2" : m.status === "LIVE" ? "text-red-300" : "text-ink-3")}>
+        {done ? score : m.status === "LIVE" ? "live" : "to play"}
+      </span>
+    </li>
+  );
+}
 import { EmptyState, Badge } from "./ui/primitives";
 
 // Standings for a round robin ("RR") or for each group of a group stage.
@@ -79,6 +102,14 @@ export default function StandingsPanel({ event, matches, entriesById, advancePer
             {advance > 0 && (
               <p className="mt-1.5 text-[11px] text-ink-3">Top {advance} advance to the knockout.</p>
             )}
+            <details className="mt-2 rounded-md border border-line" open={remaining > 0}>
+              <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-ink-2">Matches — who plays whom, in order</summary>
+              <ol className="divide-y divide-line-soft border-t border-line-soft">
+                {[...gm].sort((x, y) => (x.match_number ?? 0) - (y.match_number ?? 0)).map((m, i) => (
+                  <Fixture key={m.id} m={m} i={i} entriesById={entriesById} />
+                ))}
+              </ol>
+            </details>
           </div>
         );
       })}
