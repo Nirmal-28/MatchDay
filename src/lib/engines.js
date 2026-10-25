@@ -127,6 +127,42 @@ export const BadmintonScoringEngine = {
   },
 };
 
+/* A whole result typed in after the match, from a paper score slip. Club
+   formats vary (one game to 15, best of 3 to 21...), so this checks only
+   what is true of every format rather than the rally-by-rally rules above:
+   no level games, nothing past the 30 cap, someone won more games, and no
+   game was played after the match was already won. */
+export function validateResult(games) {
+  if (!games || games.length === 0) return "Type the game scores, like 21-15 21-18.";
+  if (games.length > 5) return "At most 5 games.";
+  for (const g of games) {
+    if (g.a === g.b) return `A game can't end level (${g.a}-${g.b}).`;
+    if (g.a > 30 || g.b > 30) return `${Math.max(g.a, g.b)} isn't possible — badminton caps a game at 30.`;
+  }
+  const wonA = games.filter((g) => g.a > g.b).length;
+  const wonB = games.length - wonA;
+  if (wonA === wonB) return "Games are level — one player has to win more games.";
+  const last = games.at(-1);
+  if ((last.a > last.b) !== (wonA > wonB)) return "The last game must be won by the match winner.";
+  const need = Math.max(wonA, wonB);
+  const earlier = games.slice(0, -1);
+  if (earlier.filter((g) => g.a > g.b).length >= need || earlier.filter((g) => g.b > g.a).length >= need) {
+    return "A game is listed after the match was already won.";
+  }
+  return "";
+}
+
+// "21-15 21-18", "21-15, 18-21, 21-19", "21 15 21 18" -> [{a, b}, ...]
+// a = the first-named player's score.
+export function parseResult(text) {
+  const nums = (String(text || "").match(/\d+/g) || []).map(Number);
+  if (nums.length === 0) return { games: [], error: "" };
+  if (nums.length % 2) return { games: [], error: "Each game needs two scores, like 21-15." };
+  const games = [];
+  for (let i = 0; i < nums.length; i += 2) games.push({ a: nums[i], b: nums[i + 1] });
+  return { games, error: validateResult(games) };
+}
+
 // DB `games` rows use score_a/score_b and are ordered by game_number;
 // the scoring engine works on the shorter {a,b} shape.
 export function toAB(games) {

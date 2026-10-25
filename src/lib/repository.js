@@ -1,7 +1,7 @@
 import { supabase } from "./supabaseClient";
 import {
   nextPow2, bracketSeedOrder, roundRobinRounds, snakeIntoGroups, groupLetter, computeStandings,
-  latestGroupStage, stageFinishingOrder, reshuffleGroups, stageGroupLabel,
+  latestGroupStage, stageFinishingOrder, reshuffleGroups, stageGroupLabel, validateResult,
 } from "./engines";
 import * as SchedulingEngine from "./schedulingEngine";
 import { computeRatings } from "./rating";
@@ -1454,6 +1454,30 @@ export async function retireMatch(matchId, retiredSide) {
   // next_match_id ended in retirement — which is every round-robin and group
   // match — and never marked the next knockout match ready to play.
   await decideMatch(match, winnerEntryId, { retired: true });
+}
+
+// A finished match's whole score, typed in from the paper slip — for an
+// organizer running every court alone, where tapping each rally is
+// impossible. games = [{ a, b }, ...], a = entry_a's score. Games are written
+// before the match is completed, because the completed-score trigger
+// (migration 009) refuses game edits on a finished match.
+export async function recordResult(matchId, games) {
+  const problem = validateResult(games);
+  if (problem) throw new Error(problem);
+  const match = must(await supabase.from("matches").select("*").eq("id", matchId).single());
+  if (match.status === "COMPLETED" || match.status === "WALKOVER") {
+    throw new Error("This match already has a result. Raise a dispute to correct it.");
+  }
+  if (!match.entry_a || !match.entry_b) throw new Error("Both players must be known before entering a result.");
+
+  const rows = games.map((g, i) => ({ match_id: matchId, game_number: i + 1, score_a: g.a, score_b: g.b }));
+  must(await supabase.from("games").upsert(rows, { onConflict: "match_id,game_number" }));
+  // A match that was started on a scorer's phone may have an extra game row.
+  must(await supabase.from("games").delete().eq("match_id", matchId).gt("game_number", games.length));
+  if (!match.started_at) must(await supabase.from("matches").update({ started_at: new Date().toISOString() }).eq("id", matchId));
+
+  const wonA = games.filter((g) => g.a > g.b).length;
+  await decideMatch(match, wonA * 2 > games.length ? match.entry_a : match.entry_b);
 }
 
 /* ------------------------------- RBAC / STAFF ---------------------------------- */

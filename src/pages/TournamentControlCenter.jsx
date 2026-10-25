@@ -12,7 +12,7 @@ import {
   updateEntryStatus, removeEntry, recordOfflinePayment, markRefunded, addWalkInEntries,
   importEntries, promoteNextWaitlisted, updateEvent,
   generateDraw, generateRoundRobin, generateGroupStage, generateKnockoutFromGroups, reshuffleGroupStage, resetDraw, setSeeds, createCustomDraw,
-  startMatch, scorePoint, undoLastGame, retireMatch,
+  startMatch, scorePoint, undoLastGame, retireMatch, recordResult,
   subscribeToEvent,
   setCheckInStatus, checkInByCode,
   getMyRole, listPayments, listMembers, listEntryDetails,
@@ -23,6 +23,7 @@ import ParticipantsPanel from "../components/ParticipantsPanel";
 import SeedingPanel from "../components/SeedingPanel";
 import CustomDrawPanel from "../components/CustomDrawPanel";
 import ReshufflePanel from "../components/ReshufflePanel";
+import QuickResultsPanel from "../components/QuickResultsPanel";
 import StandingsPanel from "../components/StandingsPanel";
 import BracketView from "../components/BracketView";
 import SchedulingPanel from "../components/SchedulingPanel";
@@ -563,6 +564,18 @@ export default function TournamentControlCenter() {
             />
           )}
 
+          {activeTab === "live" && ["OWNER", "ORGANIZER", "ADMIN"].includes(role) && (
+            <div className="mb-5">
+              <QuickResultsPanel
+                matches={allMatches} events={events} entriesById={entriesById}
+                live={tournament.status === "LIVE"}
+                onSave={async (mid, games) => {
+                  try { await recordResult(mid, games); await loadEventData(events); notify("Result saved."); return true; }
+                  catch (e) { notify(e.message, "error"); return false; }
+                }}
+              />
+            </div>
+          )}
           {activeTab === "live" && (
             <LiveScoringBoard matches={allMatches} events={events} entriesById={entriesById}
               onStart={(mid) => guarded(async () => { await startMatch(mid); await loadEventData(events); })}
