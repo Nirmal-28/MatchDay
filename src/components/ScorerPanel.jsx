@@ -145,6 +145,17 @@ export default function ScorerPanel({ match, event, entriesById, onScore, onUndo
                   >
                     <Plus size={24} /> Point
                   </button>
+                  {/* Organizers asked for the fix-a-mis-tap control next to
+                      the point it corrects, not behind Corrections. Kept
+                      small and outlined so it is never hit instead of +1. */}
+                  <button
+                    className="mx-2 mb-2 flex h-11 items-center justify-center gap-1.5 rounded-lg border border-white/20 text-sm font-semibold text-ink-2 hover:bg-white/10 hover:text-white active:scale-[0.97] disabled:opacity-25"
+                    disabled={!current || value === 0}
+                    onClick={() => onScore(match.id, side, -1)}
+                    aria-label={`Take a point off ${entryShort(e)}`}
+                  >
+                    <Minus size={16} /> 1
+                  </button>
                 </div>
               );
             })}
