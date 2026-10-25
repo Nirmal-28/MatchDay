@@ -72,7 +72,7 @@ vi.mock("./supabaseClient", () => ({
   },
 }));
 
-const { startMatch, scorePoint, retireMatch, undoLastGame, generateKnockoutFromGroups, forgetMatchFormat } = await import("./repository");
+const { startMatch, scorePoint, retireMatch, undoLastGame, generateKnockoutFromGroups, forgetMatchFormat, awardWalkover, awardWalkoversForNoShows } = await import("./repository");
 
 function seedMatch(patch = {}) {
   const m = {
@@ -275,5 +275,29 @@ describe("knockout from the top 8 of every stage added together", () => {
     const qf = db.matches.filter((m) => !m.group_label).sort((x, y) => x.match_number - y.match_number).slice(0, 4);
     expect(qf.map((m) => [m.entry_a, m.entry_b])).toEqual([["p1", "p8"], ["p4", "p5"], ["p2", "p7"], ["p3", "p6"]]);
     expect(qf.every((m) => m.status === "READY")).toBe(true);
+  });
+});
+
+describe("walkovers", () => {
+  it("gives the win to the pair that turned up", async () => {
+    const m = seedMatch({ group_label: "A", status: "READY" });
+    await awardWalkover(m.id, "A");
+    expect(db.matches[0]).toMatchObject({ status: "WALKOVER", winner_entry_id: "B" });
+  });
+
+  it("turns not-played matches into wins for the opponents of a pair that never played", async () => {
+    // N never turned up: both its matches were marked not played. P and Q played each other.
+    db.matches.push(
+      { id: "v1", event_id: "ev1", round: 1, match_number: 1, entry_a: "N", entry_b: "P", status: "WALKOVER", winner_entry_id: null, is_bye: false, group_label: "A" },
+      { id: "v2", event_id: "ev1", round: 2, match_number: 2, entry_a: "Q", entry_b: "N", status: "WALKOVER", winner_entry_id: null, is_bye: false, group_label: "A" },
+      { id: "p1", event_id: "ev1", round: 3, match_number: 3, entry_a: "P", entry_b: "Q", status: "COMPLETED", winner_entry_id: "P", is_bye: false, group_label: "A" },
+      // Both played elsewhere, so this one is ambiguous and is left alone.
+      { id: "v3", event_id: "ev1", round: 3, match_number: 4, entry_a: "P", entry_b: "Q", status: "WALKOVER", winner_entry_id: null, is_bye: false, group_label: "A" },
+    );
+    const res = await awardWalkoversForNoShows("ev1");
+    expect(res).toEqual({ fixed: 2, left: 1 });
+    expect(db.matches.find((m) => m.id === "v1").winner_entry_id).toBe("P");
+    expect(db.matches.find((m) => m.id === "v2").winner_entry_id).toBe("Q");
+    expect(db.matches.find((m) => m.id === "v3").winner_entry_id).toBeNull();
   });
 });

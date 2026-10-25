@@ -12,7 +12,7 @@ import {
   updateEntryStatus, removeEntry, recordOfflinePayment, markRefunded, addWalkInEntries,
   importEntries, promoteNextWaitlisted, updateEvent,
   generateDraw, generateRoundRobin, generateGroupStage, generateKnockoutFromGroups, reshuffleGroupStage, resetDraw, setSeeds, createCustomDraw,
-  startMatch, scorePoint, undoLastGame, retireMatch, recordResult, forgetMatchFormat, markNotPlayed,
+  startMatch, scorePoint, undoLastGame, retireMatch, recordResult, forgetMatchFormat, markNotPlayed, awardWalkover, awardWalkoversForNoShows,
   subscribeToEvent,
   setCheckInStatus, checkInByCode,
   getMyRole, listPayments, listMembers, listEntryDetails,
@@ -541,7 +541,28 @@ export default function TournamentControlCenter() {
                   </div>
                 )}
                 {(format === "ROUND_ROBIN" || format === "GROUP_KO") && (
-                  <StandingsPanel event={event} matches={eventMatches} entriesById={entriesById} />
+                  <>
+                    {isOwner && (() => {
+                      const voids = eventMatches.filter((m) => m.status === "WALKOVER" && !m.winner_entry_id && !m.is_bye).length;
+                      return voids > 0 && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-400/30 bg-amber-400/[0.07] px-3 py-2.5">
+                          <span className="text-xs text-amber-200">
+                            {voids} match{voids === 1 ? " is" : "es are"} marked not played. Under the walkover rule the pair that turned up wins.
+                            Fix automatically gives the win wherever one pair never played; for the rest, use the Win to buttons in the match lists below.
+                          </span>
+                          <Btn size="sm" onClick={() => guarded(async () => {
+                            const { fixed, left } = await awardWalkoversForNoShows(eventId);
+                            await loadAll();
+                            notify(`${fixed} walkover win${fixed === 1 ? "" : "s"} given.${left ? ` ${left} still need you to choose — use Win to below.` : ""}`);
+                          })}>
+                            Fix automatically
+                          </Btn>
+                        </div>
+                      );
+                    })()}
+                    <StandingsPanel event={event} matches={eventMatches} entriesById={entriesById}
+                      onAwardWalkover={isOwner ? (mid, absentId) => guarded(async () => { await awardWalkover(mid, absentId); await loadAll(); }, "Walkover recorded — the other pair wins.") : undefined} />
+                  </>
                 )}
                 {format !== "ROUND_ROBIN" && event.total_rounds && (
                   <BracketView
@@ -585,6 +606,10 @@ export default function TournamentControlCenter() {
                 onSave={async (mid, games) => {
                   try { await recordResult(mid, games); await loadEventData(events); notify("Result saved."); return true; }
                   catch (e) { notify(e.message, "error"); return false; }
+                }}
+                onWalkover={async (mid, absentId) => {
+                  try { await awardWalkover(mid, absentId); await loadEventData(events); notify("Walkover recorded — the other pair wins."); }
+                  catch (e) { notify(e.message, "error"); }
                 }}
                 onVoid={async (mid) => {
                   try { await markNotPlayed(mid); await loadEventData(events); notify("Marked as not played."); }

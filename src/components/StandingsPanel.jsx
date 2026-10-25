@@ -5,7 +5,7 @@ import { cx, entryShort, computeStandings, parseGroupLabel, groupDisplayName, is
 // One fixture line under a group table: who plays whom, in playing order,
 // with the score once it is in. Organizers asked "who should they play?" —
 // the table alone never said.
-function Fixture({ m, i, entriesById }) {
+function Fixture({ m, i, entriesById, onAwardWalkover }) {
   const done = m.status === "COMPLETED" || m.status === "WALKOVER";
   const score = isVoidMatch(m) ? "not played"
     : [...(m.games || [])].sort((x, y) => x.game_number - y.game_number).map((g) => `${g.score_a}–${g.score_b}`).join("  ");
@@ -19,15 +19,26 @@ function Fixture({ m, i, entriesById }) {
         <span className={cx(won(m.entry_b) ? "font-semibold text-ink" : "text-ink-2")}>{entryShort(entriesById[m.entry_b])}</span>
       </span>
       <span className={cx("shrink-0 font-mono text-xs", done ? "text-ink-2" : m.status === "LIVE" ? "text-red-300" : "text-ink-3")}>
-        {done ? score : m.status === "LIVE" ? "live" : "to play"}
+        {done ? (m.status === "WALKOVER" && m.winner_entry_id ? "walkover" : score) : m.status === "LIVE" ? "live" : "to play"}
       </span>
+      {isVoidMatch(m) && onAwardWalkover && (
+        <span className="flex shrink-0 gap-1">
+          {[[m.entry_a, m.entry_b], [m.entry_b, m.entry_a]].map(([winner, absent]) => (
+            <button key={winner} type="button"
+              className="rounded border border-accent-teal/40 px-1.5 py-0.5 text-[11px] text-accent-teal hover:bg-accent-teal/10"
+              onClick={() => { if (window.confirm(`Give the walkover win to ${entryShort(entriesById[winner])}?`)) onAwardWalkover(m.id, absent); }}>
+              Win to {entryShort(entriesById[winner]).split(" ")[0]}
+            </button>
+          ))}
+        </span>
+      )}
     </li>
   );
 }
 import { EmptyState, Badge } from "./ui/primitives";
 
 // Standings for a round robin ("RR") or for each group of a group stage.
-export default function StandingsPanel({ event, matches, entriesById, advancePerGroup }) {
+export default function StandingsPanel({ event, matches, entriesById, advancePerGroup, onAwardWalkover }) {
   const [byWinPct, setByWinPct] = useState(false);
   const grouped = matches.filter((m) => m.group_label);
   if (grouped.length === 0) {
@@ -163,7 +174,7 @@ export default function StandingsPanel({ event, matches, entriesById, advancePer
               <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-ink-2">Matches — who plays whom, in order</summary>
               <ol className="divide-y divide-line-soft border-t border-line-soft">
                 {[...gm].sort((x, y) => (x.match_number ?? 0) - (y.match_number ?? 0)).map((m, i) => (
-                  <Fixture key={m.id} m={m} i={i} entriesById={entriesById} />
+                  <Fixture key={m.id} m={m} i={i} entriesById={entriesById} onAwardWalkover={onAwardWalkover} />
                 ))}
               </ol>
             </details>

@@ -1,7 +1,7 @@
 import { supabase } from "./supabaseClient";
 import {
   nextPow2, bracketSeedOrder, roundRobinRounds, snakeIntoGroups, groupLetter, computeStandings,
-  latestGroupStage, stageFinishingOrder, reshuffleGroups, stageGroupLabel, validateResult, scoringFormat, overallStandings,
+  latestGroupStage, stageFinishingOrder, reshuffleGroups, stageGroupLabel, validateResult, scoringFormat, overallStandings, parseGroupLabel,
 } from "./engines";
 import * as SchedulingEngine from "./schedulingEngine";
 import { computeRatings } from "./rating";
@@ -1538,6 +1538,43 @@ export async function markNotPlayed(matchId) {
   must(await supabase.from("matches")
     .update({ status: "WALKOVER", winner_entry_id: null, completed_at: new Date().toISOString() })
     .eq("id", matchId));
+}
+
+// A walkover: the pair that didn't turn up loses, the pair that did wins —
+// the standard rule. Works on an unplayed match or one already marked "not
+// played", and goes through decideMatch so a knockout winner advances.
+export async function awardWalkover(matchId, absentEntryId) {
+  const match = must(await supabase.from("matches").select("*").eq("id", matchId).single());
+  if (match.status === "COMPLETED" || (match.status === "WALKOVER" && match.winner_entry_id)) {
+    throw new Error("This match already has a result.");
+  }
+  if (![match.entry_a, match.entry_b].includes(absentEntryId)) throw new Error("That pair isn't in this match.");
+  // Points a scorer may have tapped. Not on a walkover row: it has none, and
+  // the completed-score trigger refuses game edits on a finished match.
+  if (match.status !== "WALKOVER") must(await supabase.from("games").delete().eq("match_id", matchId));
+  const winner = absentEntryId === match.entry_a ? match.entry_b : match.entry_a;
+  await decideMatch(match, winner, { status: "WALKOVER" });
+}
+
+// Turns matches already marked "not played" into walkover wins wherever the
+// absent pair is clear: one side never stepped on court in that stage (no
+// played match, no walkover win). Returns how many were fixed and how many
+// still need the organizer to say who was missing.
+export async function awardWalkoversForNoShows(eventId) {
+  const matches = must(await supabase.from("matches").select("*").eq("event_id", eventId));
+  const stageOf = (m) => (m.group_label ? parseGroupLabel(m.group_label).stage : 0);
+  const voids = matches.filter((m) => m.status === "WALKOVER" && !m.winner_entry_id && !m.is_bye);
+  let fixed = 0, left = 0;
+  for (const m of voids) {
+    const inStage = matches.filter((x) => stageOf(x) === stageOf(m));
+    const showedUp = (id) => inStage.some((x) => (x.entry_a === id || x.entry_b === id) &&
+      (x.status === "COMPLETED" || (x.status === "WALKOVER" && x.winner_entry_id === id)));
+    const aIn = showedUp(m.entry_a), bIn = showedUp(m.entry_b);
+    if (aIn === bIn) { left++; continue; }
+    await awardWalkover(m.id, aIn ? m.entry_b : m.entry_a);
+    fixed++;
+  }
+  return { fixed, left };
 }
 
 // A finished match's whole score, typed in from the paper slip — for an

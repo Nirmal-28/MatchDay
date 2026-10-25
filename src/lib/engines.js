@@ -323,7 +323,7 @@ export function latestGroupStage(matches) {
 export function overallStandings(matches, { byWinPct = false } = {}) {
   const gm = (matches || []).filter((m) => m.group_label && m.group_label !== "RR");
   const ids = [...new Set(gm.flatMap((m) => [m.entry_a, m.entry_b]).filter(Boolean))];
-  const rows = computeStandings(ids, gm).filter((r) => r.played > 0)
+  const rows = computeStandings(ids, gm).filter(turnedUp)
     .map((r) => ({ ...r, winPct: (r.won / r.played) * 100, diffPerMatch: (r.pointsFor - r.pointsAgainst) / r.played }));
   if (!byWinPct) return rows;
   return [...rows].sort((x, y) => y.winPct - x.winPct || y.diffPerMatch - x.diffPerMatch || y.won - x.won);
@@ -336,7 +336,7 @@ export function stageFinishingOrder(stageMatches, labels) {
     const ids = [...new Set(gm.flatMap((m) => [m.entry_a, m.entry_b]).filter(Boolean))];
     // A pair with no match played in a finished stage withdrew: it is not
     // carried into the next stage or the knockout.
-    return computeStandings(ids, gm).filter((r) => r.played > 0).map((r) => r.entryId);
+    return computeStandings(ids, gm).filter(turnedUp).map((r) => r.entryId);
   });
 }
 
@@ -361,6 +361,11 @@ export function reshuffleGroups(finishingOrder) {
 
 /* ========================= STANDINGS ===================================== */
 
+// A pair that never stepped on court — every match a walkover loss or not
+// played — withdrew: it is not carried into the next stage, the overall
+// table or the knockout.
+const turnedUp = (r) => r.courtPlayed > 0 || r.won > 0;
+
 // A group match the organizer marked "not played" (a pair didn't turn up).
 // The matches table only allows its fixed statuses, so it is stored as a
 // WALKOVER with no winner: finished, so it never holds up the group, but it
@@ -375,7 +380,7 @@ export const isVoidMatch = (m) => m.status === "WALKOVER" && !m.winner_entry_id 
 export function computeStandings(entryIds, matches) {
   const rows = {};
   entryIds.forEach((id) => {
-    rows[id] = { entryId: id, played: 0, won: 0, lost: 0, gamesFor: 0, gamesAgainst: 0, pointsFor: 0, pointsAgainst: 0 };
+    rows[id] = { entryId: id, played: 0, won: 0, lost: 0, gamesFor: 0, gamesAgainst: 0, pointsFor: 0, pointsAgainst: 0, courtPlayed: 0 };
   });
 
   const done = matches.filter((m) => (m.status === "COMPLETED" || m.status === "WALKOVER") && !isVoidMatch(m));
@@ -383,6 +388,7 @@ export function computeStandings(entryIds, matches) {
     const a = rows[m.entry_a], b = rows[m.entry_b];
     if (!a || !b) continue;
     a.played++; b.played++;
+    if (m.status === "COMPLETED") { a.courtPlayed++; b.courtPlayed++; }
     if (m.winner_entry_id === m.entry_a) { a.won++; b.lost++; }
     else if (m.winner_entry_id === m.entry_b) { b.won++; a.lost++; }
 

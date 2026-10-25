@@ -23,7 +23,7 @@ const byKey = (a, b) => {
   return 0;
 };
 
-function ResultRow({ match, event, entriesById, onSave, onVoid }) {
+function ResultRow({ match, event, entriesById, onSave, onVoid, onWalkover }) {
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
   const a = entryShort(entriesById[match.entry_a]);
@@ -59,22 +59,34 @@ function ResultRow({ match, event, entriesById, onSave, onVoid }) {
       </div>
       <div className="flex gap-1.5">
         <Btn size="sm" disabled={!ok || saving} onClick={save}>{saving ? "Saving…" : "Save"}</Btn>
-        {match.group_label && onVoid && (
-          <Btn size="sm" variant="ghost" disabled={saving} title="A pair didn't turn up: the match counts for nobody"
-            onClick={async () => {
-              if (!window.confirm(`Mark ${a} vs ${b} as not played? It won't count for either pair.`)) return;
+        {onWalkover && (
+          <select
+            className={cx(inputCls, "w-auto py-1 text-xs")} disabled={saving} value="" aria-label={`Walkover in ${a} vs ${b}`}
+            onChange={async (e) => {
+              const v = e.target.value;
+              if (!v) return;
+              const msg = v === "none"
+                ? `Mark ${a} vs ${b} as not played? It won't count for either pair.`
+                : `${v === "A" ? a : b} didn't turn up — give the win to ${v === "A" ? b : a}?`;
+              if (!window.confirm(msg)) return;
               setSaving(true);
-              try { await onVoid(match.id); } finally { setSaving(false); }
+              try {
+                if (v === "none") await onVoid(match.id);
+                else await onWalkover(match.id, v === "A" ? match.entry_a : match.entry_b);
+              } finally { setSaving(false); }
             }}>
-            Not played
-          </Btn>
+            <option value="">Walkover…</option>
+            <option value="A">{a} didn't turn up</option>
+            <option value="B">{b} didn't turn up</option>
+            {match.group_label && onVoid && <option value="none">Neither played — no result</option>}
+          </select>
         )}
       </div>
     </div>
   );
 }
 
-export default function QuickResultsPanel({ matches, events, entriesById, live, onSave, onVoid }) {
+export default function QuickResultsPanel({ matches, events, entriesById, live, onSave, onVoid, onWalkover }) {
   const [q, setQ] = useState("");
   const eventById = useMemo(() => Object.fromEntries(events.map((e) => [e.id, e])), [events]);
 
@@ -116,7 +128,7 @@ export default function QuickResultsPanel({ matches, events, entriesById, live, 
           </div>
           <div className="max-h-[32rem] overflow-y-auto">
             {shown.map((m) => (
-              <ResultRow key={m.id} match={m} event={eventById[m.event_id]} entriesById={entriesById} onSave={onSave} onVoid={onVoid} />
+              <ResultRow key={m.id} match={m} event={eventById[m.event_id]} entriesById={entriesById} onSave={onSave} onVoid={onVoid} onWalkover={onWalkover} />
             ))}
             {shown.length === 0 && (
               <p className="px-3 py-4 text-sm text-ink-2">{open.length ? "No match matches that search." : "Every match with known players has a result."}</p>
