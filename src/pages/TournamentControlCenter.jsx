@@ -120,6 +120,7 @@ export default function TournamentControlCenter() {
   const [matchesByEvent, setMatchesByEvent] = useState({});
   const [tab, setTab] = useState("overview");
   const [eventId, setEventId] = useState(null);
+  const [koFrom, setKoFrom] = useState("winners");
   const [role, setRole] = useState(undefined); // undefined = still checking
   const [payments, setPayments] = useState([]);
   // Staff list, used by the health panel to decide whether "no official
@@ -521,10 +522,20 @@ export default function TournamentControlCenter() {
                     <span className="text-xs text-ink-2">
                       {groupsDone ? "All group matches are done — build the knockout." : "Knockout unlocks once every group match is played."}
                     </span>
-                    <Btn size="sm" disabled={!groupsDone}
-                      onClick={() => guarded(async () => { await generateKnockoutFromGroups(eventId); await loadAll(); }, "Knockout generated.")}>
-                      Generate knockout
-                    </Btn>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select className={cx(inputCls, "w-auto py-1.5 text-xs")} value={koFrom} onChange={(e) => setKoFrom(e.target.value)} aria-label="Who goes into the knockout">
+                        <option value="winners">Group winners (A v C, B v D)</option>
+                        <option value="top8">Top 8 overall, all stages added (quarterfinals)</option>
+                        <option value="top4">Top 4 overall, all stages added (semifinals)</option>
+                      </select>
+                      <Btn size="sm" disabled={!groupsDone}
+                        onClick={() => guarded(async () => {
+                          await generateKnockoutFromGroups(eventId, { overallTop: koFrom === "top8" ? 8 : koFrom === "top4" ? 4 : 0 });
+                          await loadAll();
+                        }, "Knockout generated.")}>
+                        Generate knockout
+                      </Btn>
+                    </div>
                   </div>
                 )}
                 {(format === "ROUND_ROBIN" || format === "GROUP_KO") && (

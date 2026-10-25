@@ -1,5 +1,5 @@
 import { ListOrdered } from "lucide-react";
-import { cx, entryShort, computeStandings, parseGroupLabel, groupDisplayName, isVoidMatch } from "../lib/engines";
+import { cx, entryShort, computeStandings, parseGroupLabel, groupDisplayName, isVoidMatch, overallStandings } from "../lib/engines";
 
 // One fixture line under a group table: who plays whom, in playing order,
 // with the score once it is in. Organizers asked "who should they play?" —
@@ -41,8 +41,53 @@ export default function StandingsPanel({ event, matches, entriesById, advancePer
   const latestStage = Math.max(...labels.map((l) => parseGroupLabel(l).stage));
   const advanceCount = event?.format === "GROUP_KO" ? (advancePerGroup ?? event?.advance_per_group ?? 2) : 0;
 
+  const overall = latestStage >= 2 ? overallStandings(grouped) : [];
+
   return (
     <div className="space-y-5">
+      {overall.length > 0 && (
+        <div>
+          <div className="mb-2 flex items-center gap-2">
+            <div className="md-eyebrow">Overall · all stages added together</div>
+            <Badge tone="teal">Top 8 highlighted</Badge>
+          </div>
+          <div className="overflow-x-auto rounded-md border border-line">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-surface-2 text-[11px] uppercase tracking-wide text-ink-2">
+                <tr>
+                  <th className="px-3 py-2 font-medium">#</th>
+                  <th className="px-3 py-2 font-medium">Pair</th>
+                  <th className="px-3 py-2 font-medium text-center">P</th>
+                  <th className="px-3 py-2 font-medium text-center">W</th>
+                  <th className="px-3 py-2 font-medium text-center">L</th>
+                  <th className="px-3 py-2 font-medium text-center">Pts</th>
+                  <th className="px-3 py-2 font-medium text-center">+/-</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line-soft">
+                {overall.map((r, i) => {
+                  const top = i < 8;
+                  const diff = r.pointsFor - r.pointsAgainst;
+                  return (
+                    <tr key={r.entryId} className={cx(top && "bg-accent-teal/10")}>
+                      <td className="px-3 py-2">
+                        <span className={cx("inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold", top ? "bg-accent-teal text-white" : "text-ink-3")}>{i + 1}</span>
+                      </td>
+                      <td className={cx("px-3 py-2", top ? "font-semibold text-accent-teal" : "text-ink")}>{entryShort(entriesById[r.entryId])}</td>
+                      <td className="px-3 py-2 text-center font-mono text-ink-2">{r.played}</td>
+                      <td className="px-3 py-2 text-center font-mono font-semibold text-ink">{r.won}</td>
+                      <td className="px-3 py-2 text-center font-mono text-ink-2">{r.lost}</td>
+                      <td className="px-3 py-2 text-center font-mono text-xs text-ink-2">{r.pointsFor}–{r.pointsAgainst}</td>
+                      <td className="px-3 py-2 text-center font-mono text-xs text-ink">{diff > 0 ? "+" : ""}{diff}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-1.5 text-[11px] text-ink-3">Ranked by wins, then point difference. Pairs who played fewer matches (a skipped match) have fewer chances to win.</p>
+        </div>
+      )}
       {labels.map((label) => {
         const gm = grouped.filter((m) => m.group_label === label);
         const ids = [...new Set(gm.flatMap((m) => [m.entry_a, m.entry_b]).filter(Boolean))];

@@ -314,6 +314,15 @@ export function latestGroupStage(matches) {
   return { stage, matches: inStage, labels };
 }
 
+// Every group stage added together (Stage 1 + Stage 2 ...): one table of all
+// pairs, ranked by the same rules as a group. A pair that never played is
+// left out. Organizers use it to pick a top 8 across the whole day.
+export function overallStandings(matches) {
+  const gm = (matches || []).filter((m) => m.group_label && m.group_label !== "RR");
+  const ids = [...new Set(gm.flatMap((m) => [m.entry_a, m.entry_b]).filter(Boolean))];
+  return computeStandings(ids, gm).filter((r) => r.played > 0);
+}
+
 // Finishing order of each group in a stage: [[1st, 2nd, ...] per group].
 export function stageFinishingOrder(stageMatches, labels) {
   return labels.map((label) => {

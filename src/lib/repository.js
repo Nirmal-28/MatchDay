@@ -1,7 +1,7 @@
 import { supabase } from "./supabaseClient";
 import {
   nextPow2, bracketSeedOrder, roundRobinRounds, snakeIntoGroups, groupLetter, computeStandings,
-  latestGroupStage, stageFinishingOrder, reshuffleGroups, stageGroupLabel, validateResult, scoringFormat,
+  latestGroupStage, stageFinishingOrder, reshuffleGroups, stageGroupLabel, validateResult, scoringFormat, overallStandings,
 } from "./engines";
 import * as SchedulingEngine from "./schedulingEngine";
 import { computeRatings } from "./rating";
@@ -848,8 +848,10 @@ export async function reshuffleGroupStage(eventId) {
   return { stage: stage + 1, matchCount: rows.length };
 }
 
-// After all group matches are done, seed the knockout from group standings.
-export async function generateKnockoutFromGroups(eventId) {
+// After all group matches are done, seed the knockout from group standings —
+// or, with overallTop, from the top N of every stage added together (seeded
+// 1 v N, so with 8: 1 v 8, 4 v 5, 3 v 6, 2 v 7).
+export async function generateKnockoutFromGroups(eventId, { overallTop = 0 } = {}) {
   const { data: event, error: evErr } = await supabase
     .from("tournament_events").select("*").eq("id", eventId).single();
   if (evErr) throw evErr;
@@ -886,7 +888,12 @@ export async function generateKnockoutFromGroups(eventId) {
   // convention — so the semifinal draw is the one organizers announce.
   const winners = qualifiersByGroup.map((q) => q[0]);
   const g = winners.length;
-  const halfway = advance === 1 && g >= 2 && (g & (g - 1)) === 0 && winners.every(Boolean);
+  const halfway = !overallTop && advance === 1 && g >= 2 && (g & (g - 1)) === 0 && winners.every(Boolean);
+  if (overallTop) {
+    const top = overallStandings(allGroupMatches).slice(0, overallTop).map((r) => r.entryId);
+    if (top.length < overallTop) throw new Error(`Only ${top.length} pairs have played — not enough for a top ${overallTop}.`);
+    ordered.splice(0, ordered.length, ...top);
+  }
   const { matches: koMatches, totalRounds } = halfway
     ? buildKnockoutFromSlots(eventId, winners.slice(0, g / 2).flatMap((w, i) => [w, winners[i + g / 2]]), startRound, startNumber)
     : buildKnockout(eventId, ordered, startRound, startNumber);

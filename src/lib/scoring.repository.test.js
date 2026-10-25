@@ -259,3 +259,21 @@ describe("games to 15", () => {
     expect(db.matches[0]).toMatchObject({ status: "COMPLETED", winner_entry_id: "B" });
   });
 });
+
+describe("knockout from the top 8 of every stage added together", () => {
+  it("seeds quarterfinals 1v8, 4v5, 2v7, 3v6 from the combined table", async () => {
+    db.tournament_events[0] = { ...db.tournament_events[0], advance_per_group: 1, status: "LIVE" };
+    // p1..p9 each win one match; p1 by the most points, p9 by the least.
+    // Half the matches are Stage 1, half Stage 2, across two groups.
+    for (let i = 1; i <= 9; i++) {
+      const id = "m" + i, label = (i % 2 ? "" : "S2-") + (i <= 5 ? "A" : "B");
+      db.matches.push({ id, event_id: "ev1", round: 1, match_number: i, entry_a: "p" + i, entry_b: "d" + i,
+        status: "COMPLETED", winner_entry_id: "p" + i, group_label: label });
+      db.games.push({ id: id + "g", match_id: id, game_number: 1, score_a: 15, score_b: i });
+    }
+    await generateKnockoutFromGroups("ev1", { overallTop: 8 });
+    const qf = db.matches.filter((m) => !m.group_label).sort((x, y) => x.match_number - y.match_number).slice(0, 4);
+    expect(qf.map((m) => [m.entry_a, m.entry_b])).toEqual([["p1", "p8"], ["p4", "p5"], ["p2", "p7"], ["p3", "p6"]]);
+    expect(qf.every((m) => m.status === "READY")).toBe(true);
+  });
+});
