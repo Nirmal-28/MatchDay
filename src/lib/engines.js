@@ -93,6 +93,10 @@ export const TONE_CLASSES = {
   teal: "bg-teal-400/10 text-teal-300 border-teal-400/30",
 };
 
+// Best of 3 by default; tournaments.settings.gamesPerMatch = 1 for clubs that
+// play one game per match.
+export const gamesToWin = (settings) => (Number(settings?.gamesPerMatch) === 1 ? 1 : 2);
+
 export const BadmintonScoringEngine = {
   POINTS_TO_WIN: 21,
   CAP: 30,

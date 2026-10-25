@@ -1,7 +1,7 @@
 import { supabase } from "./supabaseClient";
 import {
   nextPow2, bracketSeedOrder, roundRobinRounds, snakeIntoGroups, groupLetter, computeStandings,
-  latestGroupStage, stageFinishingOrder, reshuffleGroups, stageGroupLabel, validateResult,
+  latestGroupStage, stageFinishingOrder, reshuffleGroups, stageGroupLabel, validateResult, gamesToWin,
 } from "./engines";
 import * as SchedulingEngine from "./schedulingEngine";
 import { computeRatings } from "./rating";
@@ -196,8 +196,10 @@ export async function closeRegistration(tournamentId) {
 
 export async function startTournament(tournamentId) {
   must(await supabase.from("tournaments").update({ status: "LIVE" }).eq("id", tournamentId));
+  // DRAW_READY too: an organizer who never opens the Schedule tab still runs
+  // a real tournament, and its matches must reach scorers as Ready.
   must(await supabase.from("tournament_events").update({ status: "LIVE" })
-    .eq("tournament_id", tournamentId).eq("status", "SCHEDULED"));
+    .eq("tournament_id", tournamentId).in("status", ["SCHEDULED", "DRAW_READY"]));
   const events = must(await supabase.from("tournament_events")
     .select("id").eq("tournament_id", tournamentId).eq("status", "LIVE"));
   const eventIds = (events || []).map((e) => e.id);
@@ -853,7 +855,20 @@ export async function generateKnockoutFromGroups(eventId) {
 
   const startRound = Math.max(...allGroupMatches.map((m) => m.round)) + 1;
   const startNumber = Math.max(...matches.map((m) => m.match_number)) + 1;
-  const { matches: koMatches, totalRounds } = buildKnockout(eventId, ordered, startRound, startNumber);
+  // Winners only, from a power-of-two number of groups: pair each group with
+  // the one halfway round — with four groups, A v C and B v D, the club
+  // convention — so the semifinal draw is the one organizers announce.
+  const winners = qualifiersByGroup.map((q) => q[0]);
+  const g = winners.length;
+  const halfway = advance === 1 && g >= 2 && (g & (g - 1)) === 0 && winners.every(Boolean);
+  const { matches: koMatches, totalRounds } = halfway
+    ? buildKnockoutFromSlots(eventId, winners.slice(0, g / 2).flatMap((w, i) => [w, winners[i + g / 2]]), startRound, startNumber)
+    : buildKnockout(eventId, ordered, startRound, startNumber);
+  // An unscheduled tournament is still played: a first-round match with both
+  // sides known goes to Ready so scorers see it, as startTournament does.
+  if (event.status === "LIVE") {
+    koMatches.forEach((m) => { if (m.status === "PENDING" && m.entry_a && m.entry_b) m.status = "READY"; });
+  }
 
   const { error: insErr } = await supabase.from("matches").insert(koMatches);
   if (insErr) throw insErr;
@@ -1257,10 +1272,19 @@ export function subscribeToMyNotifications(userId, onChange) {
 
 function isGameOver(a, b) { return a >= 30 || b >= 30 || (Math.max(a, b) >= 21 && Math.abs(a - b) >= 2); }
 function gameWinnerSide(a, b) { if (!isGameOver(a, b)) return null; return a > b ? "A" : "B"; }
-function matchWinnerSide(games) {
+function matchWinnerSide(games, toWin = 2) {
   let wa = 0, wb = 0;
   games.forEach((g) => { const w = gameWinnerSide(g.score_a, g.score_b); if (w === "A") wa++; else if (w === "B") wb++; });
-  if (wa === 2) return "A"; if (wb === 2) return "B"; return null;
+  if (wa >= toWin) return "A"; if (wb >= toWin) return "B"; return null;
+}
+
+// Games needed to win a match in this event's tournament: best of 3 unless
+// the organizer chose single-game matches (tournaments.settings.gamesPerMatch).
+// Read fresh at each game end — rare, and a mid-day change must take effect.
+async function gamesToWinForEvent(eventId) {
+  const ev = must(await supabase.from("tournament_events").select("tournament_id").eq("id", eventId).single());
+  const t = must(await supabase.from("tournaments").select("settings").eq("id", ev.tournament_id).single());
+  return gamesToWin(t?.settings);
 }
 
 // 23505 = unique_violation. games is unique on (match_id, game_number), so this
@@ -1294,7 +1318,9 @@ async function decideMatch(match, winnerEntryId, extra = {}) {
   if (match.next_match_id) {
     const patch = match.next_slot === "A" ? { entry_a: winnerEntryId } : { entry_b: winnerEntryId };
     const next = must(await supabase.from("matches").update(patch).eq("id", match.next_match_id).select().single());
-    if (next?.entry_a && next?.entry_b && next?.scheduled_at && ["PENDING", "SCHEDULED"].includes(next.status)) {
+    // Both sides known = ready to play, scheduled or not (an unscheduled
+    // tournament is run court-side; its final must still reach the scorers).
+    if (next?.entry_a && next?.entry_b && ["PENDING", "SCHEDULED"].includes(next.status)) {
       must(await supabase.from("matches").update({ status: "READY" }).eq("id", next.id));
     }
   } else if (!match.group_label) {
@@ -1324,7 +1350,7 @@ async function decideMatch(match, winnerEntryId, extra = {}) {
 
 // After a game ends: open the next one, or decide the match.
 async function settleAfterGame(match, games) {
-  const winSide = matchWinnerSide(games);
+  const winSide = matchWinnerSide(games, await gamesToWinForEvent(match.event_id));
   if (!winSide) {
     const { error } = await supabase.from("games").insert({ match_id: match.id, game_number: games.length + 1, score_a: 0, score_b: 0 });
     if (error && !isDuplicate(error)) throw error;

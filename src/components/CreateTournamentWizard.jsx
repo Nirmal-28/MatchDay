@@ -90,7 +90,7 @@ export default function CreateTournamentWizard({ open, onClose, onSubmit }) {
   });
   const [selectedCats, setSelectedCats] = useState({ MS: true });
   const [catConfig, setCatConfig] = useState({ MS: { maxEntries: 16, feeINR: 300 } });
-  const [settings, setSettings] = useState({ courtsCount: 2, matchDurationMins: 40, startTime: "09:00", rules: "BWF rally-point scoring, best of 3 games to 21." });
+  const [settings, setSettings] = useState({ courtsCount: 2, matchDurationMins: 40, startTime: "09:00", gamesPerMatch: 3, rules: "BWF rally-point scoring, best of 3 games to 21." });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -266,6 +266,12 @@ export default function CreateTournamentWizard({ open, onClose, onSubmit }) {
             <input type="number" min={1} className={inputCls} value={settings.courtsCount} onChange={(e) => setSettings((s) => ({ ...s, courtsCount: Number(e.target.value) }))} />
           </Field>
           <Field label="Match duration (minutes)"><input type="number" min={15} className={inputCls} value={settings.matchDurationMins} onChange={(e) => setSettings((s) => ({ ...s, matchDurationMins: Number(e.target.value) }))} /></Field>
+          <Field label="Games per match" hint="Each game is to 21, win by 2, capped at 30.">
+            <select className={inputCls} value={settings.gamesPerMatch} onChange={(e) => setSettings((s) => ({ ...s, gamesPerMatch: Number(e.target.value) }))}>
+              <option value={3}>Best of 3 games</option>
+              <option value={1}>One game</option>
+            </select>
+          </Field>
           <Field label="Daily start time"><input type="time" className={inputCls} value={settings.startTime} onChange={(e) => setSettings((s) => ({ ...s, startTime: e.target.value }))} /></Field>
           <div className="col-span-2"><Field label="Rules / notes"><textarea className={cx(inputCls, "resize-none")} rows={2} value={settings.rules} onChange={(e) => setSettings((s) => ({ ...s, rules: e.target.value }))} /></Field></div>
           {/* Live feedback right where courts and duration are chosen — this

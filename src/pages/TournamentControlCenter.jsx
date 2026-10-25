@@ -600,6 +600,21 @@ export default function TournamentControlCenter() {
                 <Field label="Venue"><input className={inputCls} defaultValue={tournament.venue} onBlur={(e) => e.target.value !== tournament.venue && guarded(async () => { await updateTournament(tournament.id, { venue: e.target.value }); await loadAll(); })} /></Field>
                 <Field label="Contact email" hint="Shown publicly on your tournament page."><input className={inputCls} defaultValue={tournament.contact_email || ""} onBlur={(e) => e.target.value !== tournament.contact_email && guarded(async () => { await updateTournament(tournament.id, { contact_email: e.target.value }); await loadAll(); })} /></Field>
               </Card>
+              {/* Read by the scoring engine at the end of every game, so a
+                  change here applies to the next game that finishes. */}
+              <Card className="space-y-3 p-4">
+                <div className="md-eyebrow">Match format</div>
+                <Field label="Games per match" hint="Each game is to 21, win by 2, capped at 30. Applies from the next game that finishes.">
+                  <select className={inputCls} value={Number(tournament.settings?.gamesPerMatch) === 1 ? 1 : 3}
+                    onChange={(e) => guarded(async () => {
+                      await updateTournament(tournament.id, { settings: { ...(tournament.settings || {}), gamesPerMatch: Number(e.target.value) } });
+                      await loadAll();
+                    }, "Match format saved.")}>
+                    <option value={3}>Best of 3 games</option>
+                    <option value={1}>One game</option>
+                  </select>
+                </Field>
+              </Card>
               {/* Registration window. These two timestamps are what actually
                   gate public entry — the RLS insert policy checks them — so
                   registration opens and closes on its own. */}

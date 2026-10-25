@@ -10,7 +10,7 @@
 //      between games: every later tap returned early.
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const db = { matches: [], games: [], tournament_events: [] };
+const db = { matches: [], games: [], tournament_events: [], tournaments: [] };
 let failNext = null; // { table, op } -> the next matching call resolves with an error
 
 function makeQuery(table) {
@@ -72,7 +72,7 @@ vi.mock("./supabaseClient", () => ({
   },
 }));
 
-const { startMatch, scorePoint, retireMatch, undoLastGame } = await import("./repository");
+const { startMatch, scorePoint, retireMatch, undoLastGame, generateKnockoutFromGroups } = await import("./repository");
 
 function seedMatch(patch = {}) {
   const m = {
@@ -86,7 +86,8 @@ function seedMatch(patch = {}) {
 
 beforeEach(() => {
   db.matches = []; db.games = [];
-  db.tournament_events = [{ id: "ev1", status: "LIVE", champion_entry_id: null }];
+  db.tournament_events = [{ id: "ev1", tournament_id: "t1", status: "LIVE", champion_entry_id: null }];
+  db.tournaments = [{ id: "t1", settings: {} }];
   failNext = null;
 });
 
@@ -187,5 +188,50 @@ describe("scorePoint", () => {
     db.games.push({ id: "g2", match_id: m.id, game_number: 2, score_a: 20, score_b: 18 });
     await scorePoint(m.id, "A", 1);
     expect(db.matches[0]).toMatchObject({ status: "COMPLETED", winner_entry_id: "A" });
+  });
+});
+
+describe("games per match", () => {
+  const winGame = async (id, side) => { for (let i = 0; i < 21; i++) await scorePoint(id, side, 1); };
+
+  it("best of 3 by default: one game won opens game 2", async () => {
+    const m = seedMatch({ group_label: "A" });
+    await startMatch(m.id);
+    await winGame(m.id, "A");
+    expect(db.matches[0].status).not.toBe("COMPLETED");
+    expect(db.games.filter((g) => g.match_id === m.id)).toHaveLength(2);
+  });
+
+  it("one-game matches end after the first game", async () => {
+    db.tournaments[0].settings = { gamesPerMatch: 1 };
+    const m = seedMatch({ group_label: "A" });
+    await startMatch(m.id);
+    await winGame(m.id, "B");
+    expect(db.matches[0]).toMatchObject({ status: "COMPLETED", winner_entry_id: "B" });
+    expect(db.games.filter((g) => g.match_id === m.id)).toHaveLength(1);
+  });
+
+  it("a decided knockout match makes its filled next match Ready even unscheduled", async () => {
+    const next = seedMatch({ id: "final", round: 2, entry_a: "C", entry_b: null, status: "PENDING" });
+    const m = seedMatch({ status: "LIVE", next_match_id: next.id, next_slot: "B" });
+    await retireMatch(m.id, "A");
+    expect(db.matches.find((x) => x.id === "final")).toMatchObject({ entry_b: "B", status: "READY" });
+  });
+});
+
+describe("knockout from four group winners", () => {
+  it("draws the semifinals A v C and B v D, Ready to play", async () => {
+    db.tournament_events[0] = { ...db.tournament_events[0], advance_per_group: 1, status: "LIVE" };
+    ["A", "B", "C", "D"].forEach((g, i) => {
+      const id = "m" + g;
+      db.matches.push({ id, event_id: "ev1", round: 1, match_number: i + 1, entry_a: "win" + g, entry_b: "lose" + g,
+        status: "COMPLETED", winner_entry_id: "win" + g, group_label: g });
+      db.games.push({ id: id + "g1", match_id: id, game_number: 1, score_a: 21, score_b: 10 });
+    });
+    await generateKnockoutFromGroups("ev1");
+    const ko = db.matches.filter((m) => !m.group_label).sort((x, y) => x.match_number - y.match_number);
+    expect(ko.slice(0, 2).map((m) => [m.entry_a, m.entry_b])).toEqual([["winA", "winC"], ["winB", "winD"]]);
+    expect(ko.slice(0, 2).every((m) => m.status === "READY")).toBe(true);
+    expect(ko[2]).toMatchObject({ entry_a: null, entry_b: null });
   });
 });
