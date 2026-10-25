@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ListOrdered } from "lucide-react";
 import { cx, entryShort, computeStandings, parseGroupLabel, groupDisplayName, isVoidMatch, overallStandings } from "../lib/engines";
 
@@ -27,6 +28,7 @@ import { EmptyState, Badge } from "./ui/primitives";
 
 // Standings for a round robin ("RR") or for each group of a group stage.
 export default function StandingsPanel({ event, matches, entriesById, advancePerGroup }) {
+  const [byWinPct, setByWinPct] = useState(false);
   const grouped = matches.filter((m) => m.group_label);
   if (grouped.length === 0) {
     return <EmptyState icon={ListOrdered} title="No standings yet" hint="Standings appear once a round robin or group stage is generated." />;
@@ -41,7 +43,7 @@ export default function StandingsPanel({ event, matches, entriesById, advancePer
   const latestStage = Math.max(...labels.map((l) => parseGroupLabel(l).stage));
   const advanceCount = event?.format === "GROUP_KO" ? (advancePerGroup ?? event?.advance_per_group ?? 2) : 0;
 
-  const overall = latestStage >= 2 ? overallStandings(grouped) : [];
+  const overall = latestStage >= 2 ? overallStandings(grouped, { byWinPct }) : [];
 
   return (
     <div className="space-y-5">
@@ -50,6 +52,14 @@ export default function StandingsPanel({ event, matches, entriesById, advancePer
           <div className="mb-2 flex items-center gap-2">
             <div className="md-eyebrow">Overall · all stages added together</div>
             <Badge tone="teal">Top 8 highlighted</Badge>
+            <div className="ml-auto flex overflow-hidden rounded-md border border-line text-[11px]" role="group" aria-label="Rank the overall table by">
+              {[[false, "Rank by wins"], [true, "Rank by win %"]].map(([v, label]) => (
+                <button key={label} type="button" onClick={() => setByWinPct(v)}
+                  className={cx("px-2.5 py-1", byWinPct === v ? "bg-accent-teal/20 font-semibold text-accent-teal" : "text-ink-2 hover:bg-surface-2")}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="overflow-x-auto rounded-md border border-line">
             <table className="w-full text-left text-sm">
@@ -60,6 +70,7 @@ export default function StandingsPanel({ event, matches, entriesById, advancePer
                   <th className="px-3 py-2 font-medium text-center">P</th>
                   <th className="px-3 py-2 font-medium text-center">W</th>
                   <th className="px-3 py-2 font-medium text-center">L</th>
+                  <th className="px-3 py-2 font-medium text-center">Win %</th>
                   <th className="px-3 py-2 font-medium text-center">Pts</th>
                   <th className="px-3 py-2 font-medium text-center">+/-</th>
                 </tr>
@@ -77,6 +88,7 @@ export default function StandingsPanel({ event, matches, entriesById, advancePer
                       <td className="px-3 py-2 text-center font-mono text-ink-2">{r.played}</td>
                       <td className="px-3 py-2 text-center font-mono font-semibold text-ink">{r.won}</td>
                       <td className="px-3 py-2 text-center font-mono text-ink-2">{r.lost}</td>
+                      <td className="px-3 py-2 text-center font-mono font-semibold text-ink">{r.winPct.toFixed(1)}%</td>
                       <td className="px-3 py-2 text-center font-mono text-xs text-ink-2">{r.pointsFor}–{r.pointsAgainst}</td>
                       <td className="px-3 py-2 text-center font-mono text-xs text-ink">{diff > 0 ? "+" : ""}{diff}</td>
                     </tr>
@@ -85,7 +97,7 @@ export default function StandingsPanel({ event, matches, entriesById, advancePer
               </tbody>
             </table>
           </div>
-          <p className="mt-1.5 text-[11px] text-ink-3">Ranked by wins, then point difference. Pairs who played fewer matches (a skipped match) have fewer chances to win.</p>
+          <p className="mt-1.5 text-[11px] text-ink-3">{byWinPct ? "Ranked by win % (wins ÷ played), then average point difference per match." : "Ranked by wins, then point difference. Pairs who played fewer matches have fewer chances to win — switch to win % to even that out."}</p>
         </div>
       )}
       {labels.map((label) => {

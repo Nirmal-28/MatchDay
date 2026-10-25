@@ -110,3 +110,20 @@ describe("matches marked not played", () => {
     expect(stageFinishingOrder(ms, ["A"])).toEqual([["P", "Q", "R"]]);
   });
 });
+
+describe("overall table by win %", () => {
+  it("ranks a 5-of-6 pair above a 6-of-8 pair, and carries winPct", async () => {
+    const { overallStandings } = await import("./engines");
+    const w = (a, b, label) => ({ entry_a: a, entry_b: b, status: "COMPLETED", winner_entry_id: a, group_label: label, games: [{ game_number: 1, score_a: 15, score_b: 10 }] });
+    const ms = [];
+    for (let i = 0; i < 6; i++) ms.push(w("X", "o" + i, "A"));          // X: 6 wins
+    ms.push(w("o6", "X", "S2-A"), w("o7", "X", "S2-A"));                // X: 2 losses -> 6/8
+    for (let i = 0; i < 5; i++) ms.push(w("Y", "q" + i, "B"));          // Y: 5 wins
+    ms.push(w("q5", "Y", "S2-B"));                                      // Y: 1 loss -> 5/6
+    const byWins = overallStandings(ms).map((r) => r.entryId);
+    const byPct = overallStandings(ms, { byWinPct: true });
+    expect(byWins.indexOf("X")).toBeLessThan(byWins.indexOf("Y"));
+    expect(byPct.findIndex((r) => r.entryId === "Y")).toBeLessThan(byPct.findIndex((r) => r.entryId === "X"));
+    expect(Math.round(byPct.find((r) => r.entryId === "Y").winPct * 10) / 10).toBe(83.3);
+  });
+});

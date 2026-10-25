@@ -527,10 +527,12 @@ export default function TournamentControlCenter() {
                         <option value="winners">Group winners (A v C, B v D)</option>
                         <option value="top8">Top 8 overall, all stages added (quarterfinals)</option>
                         <option value="top4">Top 4 overall, all stages added (semifinals)</option>
+                        <option value="top8pct">Top 8 overall by win % (quarterfinals)</option>
+                        <option value="top4pct">Top 4 overall by win % (semifinals)</option>
                       </select>
                       <Btn size="sm" disabled={!groupsDone}
                         onClick={() => guarded(async () => {
-                          await generateKnockoutFromGroups(eventId, { overallTop: koFrom === "top8" ? 8 : koFrom === "top4" ? 4 : 0 });
+                          await generateKnockoutFromGroups(eventId, { overallTop: koFrom.startsWith("top8") ? 8 : koFrom.startsWith("top4") ? 4 : 0, byWinPct: koFrom.endsWith("pct") });
                           await loadAll();
                         }, "Knockout generated.")}>
                         Generate knockout

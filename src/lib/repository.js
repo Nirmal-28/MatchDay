@@ -851,7 +851,7 @@ export async function reshuffleGroupStage(eventId) {
 // After all group matches are done, seed the knockout from group standings —
 // or, with overallTop, from the top N of every stage added together (seeded
 // 1 v N, so with 8: 1 v 8, 4 v 5, 3 v 6, 2 v 7).
-export async function generateKnockoutFromGroups(eventId, { overallTop = 0 } = {}) {
+export async function generateKnockoutFromGroups(eventId, { overallTop = 0, byWinPct = false } = {}) {
   const { data: event, error: evErr } = await supabase
     .from("tournament_events").select("*").eq("id", eventId).single();
   if (evErr) throw evErr;
@@ -890,7 +890,7 @@ export async function generateKnockoutFromGroups(eventId, { overallTop = 0 } = {
   const g = winners.length;
   const halfway = !overallTop && advance === 1 && g >= 2 && (g & (g - 1)) === 0 && winners.every(Boolean);
   if (overallTop) {
-    const top = overallStandings(allGroupMatches).slice(0, overallTop).map((r) => r.entryId);
+    const top = overallStandings(allGroupMatches, { byWinPct }).slice(0, overallTop).map((r) => r.entryId);
     if (top.length < overallTop) throw new Error(`Only ${top.length} pairs have played — not enough for a top ${overallTop}.`);
     ordered.splice(0, ordered.length, ...top);
   }

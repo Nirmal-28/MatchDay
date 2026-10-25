@@ -317,10 +317,16 @@ export function latestGroupStage(matches) {
 // Every group stage added together (Stage 1 + Stage 2 ...): one table of all
 // pairs, ranked by the same rules as a group. A pair that never played is
 // left out. Organizers use it to pick a top 8 across the whole day.
-export function overallStandings(matches) {
+// byWinPct ranks by share of matches won, then average point difference per
+// match — fair when pairs played different numbers of matches (a skipped
+// match, a group of 4). Every row carries winPct either way.
+export function overallStandings(matches, { byWinPct = false } = {}) {
   const gm = (matches || []).filter((m) => m.group_label && m.group_label !== "RR");
   const ids = [...new Set(gm.flatMap((m) => [m.entry_a, m.entry_b]).filter(Boolean))];
-  return computeStandings(ids, gm).filter((r) => r.played > 0);
+  const rows = computeStandings(ids, gm).filter((r) => r.played > 0)
+    .map((r) => ({ ...r, winPct: (r.won / r.played) * 100, diffPerMatch: (r.pointsFor - r.pointsAgainst) / r.played }));
+  if (!byWinPct) return rows;
+  return [...rows].sort((x, y) => y.winPct - x.winPct || y.diffPerMatch - x.diffPerMatch || y.won - x.won);
 }
 
 // Finishing order of each group in a stage: [[1st, 2nd, ...] per group].
