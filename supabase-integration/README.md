@@ -334,6 +334,19 @@ screenshots exploit.
 Independent of every other migration except schema.sql. Guarded by
 `scripts/verify-migration-016.mjs`: 16 assertions on real Postgres.
 
+## Migration 018 — daily limit on the organizer chat box
+
+`api/assistant.js` calls Claude, which costs money per message, and signing up
+is free. `claim_assistant_request()` allows each signed-in user 40 requests a
+day. The limit is a constant inside the function, because the function can be
+called from any browser and a parameter would let the caller choose it. The
+endpoint refuses to run if this check fails, so the chat box stays off until
+this migration is applied.
+
+Apply it by pasting `018_assistant_usage.sql` into the SQL editor. It is
+independent of the other migrations. Guarded by
+`scripts/verify-migration-018.mjs`: 9 assertions on real Postgres.
+
 ## Applying 010, 011, 012, 013, 015 and 016 — exact procedure
 
 016 is independent and can be applied any time.

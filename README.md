@@ -15,6 +15,19 @@ cp supabase-integration/.env.example .env   # fill in the two VITE_SUPABASE_ val
 npm run dev
 ```
 
+## The organizer chat box
+
+The Organize page opens on a chat box: paste a player list, notes or a ChatGPT
+chat, check the preview, and create the tournament. `api/assistant.js` asks
+Claude for a structured draft and writes nothing; `src/lib/assistantPlan.js`
+builds the draw from that draft with the normal engines, and nothing is saved
+until the organizer confirms.
+
+It needs two things on the live site: `ANTHROPIC_API_KEY` in the Vercel project
+settings, and migration 018 applied. Until then it says it isn't switched on
+and points to Set up by hand. `npm run dev` doesn't serve `api/`, so use
+`vercel dev` to try the chat locally.
+
 ## Checks
 
 ```bash

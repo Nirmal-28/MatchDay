@@ -168,6 +168,65 @@ export async function createTournament(basics, categories, settings) {
   return tournament;
 }
 
+// Sends the conversation to api/assistant.js. The token ties the request to
+// this organizer's daily limit; the server keeps the Claude key.
+export async function askAssistant({ messages, draft, today }) {
+  const session = await getSession();
+  if (!session) throw new Error("Sign in to use the assistant.");
+  const res = await fetch("/api/assistant", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ messages, draft, today }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data) throw new Error(data?.error || "The assistant couldn't be reached. Your text is still in the box, so try again.");
+  return data;
+}
+
+// The confirmed preview from the chat box, as a real tournament: every step
+// the Draw and Schedule tabs would take, in the same order, through the same
+// functions. The order matters: a draw needs registration closed, and it is
+// the draw that puts the players in.
+//
+// Once createTournament has run, a tournament exists, so a later failure must
+// not throw (the organizer would retry and get a second one). It comes back as
+// `failed` and they carry on from the tournament page. A schedule failure is
+// only a warning: the draw is complete and can be played without one.
+export async function createTournamentFromPlan(plan) {
+  const t = plan.tournament;
+  const tournament = await createTournament({
+    name: t.name, venue: t.venue, location: t.location,
+    start_date: t.startDate, end_date: t.endDate, sport: "badminton",
+  }, plan.categories, {
+    courtsCount: t.courts, matchDurationMins: t.matchDurationMins,
+    startTime: t.startTime, endTime: t.endTime,
+    gamesPerMatch: t.gamesPerMatch, pointsPerGame: t.pointsPerGame,
+  });
+
+  try {
+    await publishTournament(tournament.id, t.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
+    await closeRegistration(tournament.id);
+    const events = await listEvents(tournament.id);
+    for (const [i, c] of plan.categories.entries()) {
+      await createCustomDraw(events[i].id, c.feeINR, c.format, c.drawPlan);
+    }
+  } catch (e) {
+    return { tournament, failed: e.message };
+  }
+
+  try {
+    // New courts default to 09:00-18:00, which would leave an evening
+    // tournament with nothing scheduled.
+    const courts = await listCourts(tournament.id);
+    await Promise.all(courts.map((c) => updateCourtAvailability(c.id, { availableStart: t.startTime, availableEnd: t.endTime })));
+    await optimizeSchedule(tournament.id);
+    await publishSchedule(tournament.id);
+  } catch (e) {
+    return { tournament, warning: `The draw is ready, but the schedule couldn't be made: ${e.message}` };
+  }
+  return { tournament };
+}
+
 export async function publishTournament(tournamentId, slugBase) {
   const slug = `${slugBase}-${Math.random().toString(36).slice(2, 6)}`;
   const { error: tErr } = await supabase.from("tournaments")

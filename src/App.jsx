@@ -29,6 +29,7 @@ import HostLanding from "./pages/HostLanding";
 const OrganizerDashboard = lazy(() => import("./pages/OrganizerDashboard"));
 const TournamentControlCenter = lazy(() => import("./pages/TournamentControlCenter"));
 const ScorerMode = lazy(() => import("./pages/ScorerMode"));
+const MatchSheetPage = lazy(() => import("./pages/MatchSheetPage"));
 const VenueDisplay = lazy(() => import("./pages/VenueDisplay"));
 const PlayerSettings = lazy(() => import("./pages/PlayerSettings"));
 const PulseShowcase = lazy(() => import("./pages/PulseShowcase"));
@@ -158,7 +159,8 @@ const GUIDE_SECTIONS = [
     title: "Organizer journey",
     intro: "Set up the competition, run the day, and publish the result.",
     steps: [
-      "Create a tournament with its name, venue, dates, sport, registration rules, categories, fees, and courts.",
+      "Go to Organize and paste your player list, rough notes, or a chat from ChatGPT or Claude. Check the groups and matches, then tap Create tournament. Print the match sheet if you want it on paper.",
+      "Prefer to do it step by step? Use Set up by hand for the name, venue, dates, sport, registration rules, categories, fees, and courts. All tools inside a tournament opens every option.",
       "Review entries in Participants. Approve or manage registration status, check players in, and assign seeds where needed.",
       "Create the draw using the category format. The draw determines rounds, pairings, and progression.",
       "Schedule matches across available courts. Resolve conflicts, move matches, and keep players informed.",
@@ -551,7 +553,8 @@ function Shell() {
 
 // Scorer Mode and the Venue Display live outside the normal Shell chrome —
 // full-bleed, no header/footer, since both are meant to run standalone on a
-// courtside phone or a venue TV rather than inside the site's frame.
+// courtside phone or a venue TV rather than inside the site's frame. The match
+// sheet is here too: site chrome has no place on a printed page.
 function BareRoutes() {
   return (
     // Both of these are lazy, and both run unattended (a venue TV, a scorer's
@@ -562,6 +565,7 @@ function BareRoutes() {
         <Routes>
           <Route path="/t/:slug/display" element={<VenueDisplay />} />
           <Route path="/organizer/:id/score" element={<RequireAuth><ScorerMode /></RequireAuth>} />
+          <Route path="/organizer/:id/sheet" element={<RequireAuth><MatchSheetPage /></RequireAuth>} />
           <Route path="/*" element={<Shell />} />
         </Routes>
       </Suspense>

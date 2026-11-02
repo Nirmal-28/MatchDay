@@ -708,3 +708,46 @@ html, body { overflow-x: hidden; }
 
 /* Only elements the sports background actually animates get promoted. */
 .sb-arc { will-change: stroke-dashoffset, opacity; }
+
+/* The printable match sheet. Fixed black on white rather than theme tokens: it
+   is designed for paper, and it must look the same in dark mode as it prints. */
+.md-sheet {
+  min-height: 100vh;
+  padding: 16px;
+  background: #fff;
+  color: #111;
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.md-sheet > * { max-width: 780px; margin-inline: auto; }
+.md-sheet-toolbar { display: flex; justify-content: space-between; margin-bottom: 16px; }
+.md-sheet-header { border-bottom: 2px solid #111; padding-bottom: 6px; margin-bottom: 14px; }
+.md-sheet-header h1 { font-size: 22px; font-weight: 700; }
+.md-sheet-header p { color: #444; }
+.md-sheet-category + .md-sheet-category { margin-top: 24px; }
+.md-sheet-category h2 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+.md-sheet-category h2 span { font-size: 12px; font-weight: 400; color: #555; }
+.md-sheet-section { margin-bottom: 16px; break-inside: avoid; }
+.md-sheet-section h3 { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.md-sheet-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+.md-sheet-table th, .md-sheet-table td { border: 1px solid #777; padding: 5px 6px; text-align: left; vertical-align: middle; }
+.md-sheet-table th { background: #eee; font-size: 11px; font-weight: 600; }
+.md-sheet-narrow { width: 52px; }
+.md-sheet-time { width: 74px; }
+.md-sheet-box { width: 52px; height: 28px; text-align: center !important; }
+.md-sheet-vs { color: #666; padding-inline: 2px; }
+.md-sheet-sub { font-size: 11px; color: #555; }
+
+@media (max-width: 640px) {
+  .md-sheet-narrow, .md-sheet-box { width: 40px; }
+  .md-sheet-table th, .md-sheet-table td { padding: 4px; }
+}
+
+@media print {
+  @page { size: A4; margin: 12mm; }
+  html, body { background: #fff !important; }
+  .md-sheet { padding: 0; min-height: 0; }
+  .md-sheet > * { max-width: none; }
+  .md-sheet-toolbar { display: none; }
+  .md-sheet-category + .md-sheet-category { break-before: page; margin-top: 0; }
+  .md-sheet-table th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

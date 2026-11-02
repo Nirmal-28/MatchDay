@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft, MapPin, Calendar, Home, Users, Swords, LayoutGrid, Radio, Trophy, Settings, Play, ArrowRight,
-  UserCheck, ClipboardList, ShieldAlert, Shield, IndianRupee, BarChart3, Download, Palette,
+  UserCheck, ClipboardList, ShieldAlert, Shield, IndianRupee, BarChart3, Download, Palette, Printer, SlidersHorizontal,
 } from "lucide-react";
 import { cx, fmtDateRange, inr, EVENT_STATUS_META, FORMAT_META, divisionLabel, latestGroupStage } from "../lib/engines";
 import {
@@ -35,6 +35,7 @@ import CheckInPanel from "../components/CheckInPanel";
 import AuditLogPanel from "../components/AuditLogPanel";
 import DisputesPanel from "../components/DisputesPanel";
 import CommandCenterPanel from "../components/CommandCenterPanel";
+import NextStepPanel from "../components/NextStepPanel";
 import RegistrationFieldsPanel from "../components/RegistrationFieldsPanel";
 import ScrollFade from "../components/ui/ScrollFade";
 import StaffPanel from "../components/StaffPanel";
@@ -109,9 +110,23 @@ const ORG_TABS = [
   { key: "settings", label: "Settings", icon: Settings, roles: ["OWNER"] },
 ];
 
+// What someone running a tournament from the chat box needs. The rest are one
+// tap away under "All tools", and a link from the command center to a hidden
+// tab opens them rather than doing nothing. Staff roles keep their own short
+// tab lists: for a volunteer, Check-in is the whole job, not an extra.
+const SIMPLE_TABS = ["overview", "draw", "live", "results"];
+const SIMPLE_ROLES = ["OWNER", "ORGANIZER", "ADMIN"];
+const ALL_TOOLS_KEY = "matchday-all-tools";
+
+function initialAllTools() {
+  try { return window.localStorage.getItem(ALL_TOOLS_KEY) === "on"; } catch { return false; }
+}
+
 export default function TournamentControlCenter() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const createdNote = useLocation().state?.createdNote;
+  const [allTools, setAllTools] = useState(initialAllTools);
   const [tournament, setTournament] = useState(null);
   const [events, setEvents] = useState([]);
   const [courts, setCourts] = useState([]);
@@ -209,8 +224,19 @@ export default function TournamentControlCenter() {
   // Derived from tournament status + event statuses + schedule_published, so
   // DRAW_READY and SCHEDULE_PUBLISHED never become a second source of truth.
   const stage = tournamentStage(tournament, events);
-  const visibleTabs = ORG_TABS.filter((t) => !t.roles || t.roles.includes(role));
+  const canSimplify = SIMPLE_ROLES.includes(role);
+  const simple = canSimplify && !allTools;
+  const visibleTabs = ORG_TABS.filter((t) => (!t.roles || t.roles.includes(role)) && (!simple || SIMPLE_TABS.includes(t.key)));
   const activeTab = visibleTabs.some((t) => t.key === tab) ? tab : "overview";
+
+  const showAllTools = (on) => {
+    setAllTools(on);
+    try { window.localStorage.setItem(ALL_TOOLS_KEY, on ? "on" : "off"); } catch { /* no-op */ }
+  };
+  const goToTab = (key) => {
+    if (!SIMPLE_TABS.includes(key)) showAllTools(true);
+    setTab(key);
+  };
 
   return (
     <div>
@@ -245,6 +271,9 @@ export default function TournamentControlCenter() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            {allMatches.length > 0 && (
+              <Btn size="sm" variant="secondary" icon={Printer} onClick={() => navigate(`/organizer/${tournament.id}/sheet`)}>Print match sheet</Btn>
+            )}
             {tournament.status === "DRAFT" && (
               <Btn size="sm" icon={ArrowRight} onClick={() => guarded(async () => {
                 await publishTournament(tournament.id, tournament.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
@@ -265,7 +294,7 @@ export default function TournamentControlCenter() {
             })()}
           </div>
         </div>
-        <div className="relative mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {!simple && <div className="relative mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
             { label: "Entries", value: Object.values(entriesByEvent).flat().length },
             { label: "Matches", value: allMatches.length },
@@ -283,8 +312,14 @@ export default function TournamentControlCenter() {
               <div className="md-score mt-1.5 text-3xl text-ink" style={s.tone ? { color: s.tone } : undefined}>{s.value}</div>
             </div>
           ))}
-        </div>
+        </div>}
       </div>
+
+      {createdNote && (
+        <div className="mb-4 flex gap-2 rounded-md border border-amber-400/30 bg-amber-400/[0.07] px-3 py-2.5 text-xs text-amber-200">
+          <ShieldAlert size={13} className="mt-px shrink-0" /><span>{createdNote}</span>
+        </div>
+      )}
 
       <div className="flex flex-col gap-5 lg:flex-row">
         {/* Horizontal rail on a phone, vertical sidebar from lg up. Below lg
@@ -314,9 +349,17 @@ export default function TournamentControlCenter() {
               {activeTab === t.key && (
                 <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-accent-teal max-lg:inset-x-3 max-lg:inset-y-auto max-lg:bottom-0 max-lg:top-auto max-lg:h-0.5 max-lg:w-auto" />
               )}
-              <t.icon size={16} />{t.label}
+              <t.icon size={16} />{simple && t.key === "overview" ? "Home" : t.label}
             </button>
           ))}
+          {canSimplify && (
+            <button
+              onClick={() => showAllTools(!allTools)}
+              className="flex flex-shrink-0 items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-ink-3 transition-colors hover:bg-surface-2/60 hover:text-ink-2"
+            >
+              <SlidersHorizontal size={16} />{allTools ? "Fewer tools" : "All tools"}
+            </button>
+          )}
         </ScrollFade>
 
         <div className="min-w-0 flex-1">
@@ -330,12 +373,16 @@ export default function TournamentControlCenter() {
             </div>
           )}
 
-          {activeTab === "overview" && (
+          {activeTab === "overview" && simple && (
+            <NextStepPanel tournament={tournament} events={events} matches={allMatches} entriesById={entriesById} onGoToTab={goToTab} />
+          )}
+
+          {activeTab === "overview" && !simple && (
             <div className="space-y-5">
               <CommandCenterPanel
                 tournament={tournament} events={events} courts={courts}
                 entries={allEntries} matches={allMatches} entriesById={entriesById}
-                members={members} onGoToTab={setTab}
+                members={members} onGoToTab={goToTab}
               />
               <div>
                 <div className="mb-2 md-eyebrow">Categories</div>

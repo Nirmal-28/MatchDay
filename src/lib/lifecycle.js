@@ -11,6 +11,8 @@
 // migration 009 — this module decides what to SHOW and what to OFFER; it is
 // not the security boundary.
 
+import { divisionLabel, latestGroupStage } from "./engines";
+
 export const STAGES = {
   DRAFT: { key: "DRAFT", label: "Draft", tone: "slate", order: 0, hint: "Only you can see this tournament." },
   REGISTRATION_OPEN: { key: "REGISTRATION_OPEN", label: "Registration open", tone: "emerald", order: 1 },
@@ -85,6 +87,42 @@ export function tournamentRegistrationState(tournament, events = [], now = Date.
   return events
     .map((e) => registrationState(tournament, e, e.taken ?? 0, now))
     .sort((a, b) => rank[a.key] - rank[b.key])[0];
+}
+
+/* ------------------------------- NEXT STEP ------------------------------- */
+
+// The one thing the organizer should do now, in plain words. `tab` is where
+// the action lives; without one, the button is in the page header.
+export function nextStep({ tournament, events = [], matches = [] }) {
+  const s = tournament?.status;
+  const finished = (m) => m.status === "COMPLETED" || m.status === "WALKOVER";
+
+  if (["COMPLETED", "ARCHIVED"].includes(s)) {
+    return { title: "This tournament is finished", body: "The results stay on the public page.", tab: "results", action: "See the results" };
+  }
+  if (s === "CANCELLED") return { title: "This tournament was cancelled", body: "There's nothing more to do here." };
+  if (s === "DRAFT") return { title: "Publish your tournament", body: "Only you can see it for now. Tap Publish at the top to open it." };
+  if (s === "REGISTRATION_OPEN") {
+    return { title: "Registration is open", body: "When you have everyone, tap Close registration at the top. Then you can make the draw." };
+  }
+  if (matches.length === 0) return { title: "Make the draw", body: "Decide who plays who.", tab: "draw", action: "Go to the draw" };
+  if (s === "REGISTRATION_CLOSED") {
+    return { title: "Ready to start", body: "Print the match sheet if you want it on paper. When the players arrive, tap Start tournament at the top." };
+  }
+
+  const groupsDone = events.find((e) => {
+    if (e.format !== "GROUP_KO") return false;
+    const own = matches.filter((m) => m.event_id === e.id);
+    const groups = latestGroupStage(own).matches;
+    return groups.length > 0 && groups.every(finished) && !own.some((m) => !m.group_label);
+  });
+  if (groupsDone) {
+    return { title: "The groups are finished", body: `Build the knockout for ${divisionLabel(groupsDone)}.`, tab: "draw", action: "Build the knockout" };
+  }
+  if (events.length > 0 && events.every((e) => e.status === "COMPLETED")) {
+    return { title: "All matches are played", body: "Mark the tournament completed in Settings to close it.", tab: "settings", action: "Go to Settings" };
+  }
+  return { title: "Enter results as matches finish", body: "Type each score from the slip or the sheet. Standings and the next round update on their own.", tab: "live", action: "Enter results" };
 }
 
 /* ------------------------------ ACTION GUARDS ---------------------------- */
