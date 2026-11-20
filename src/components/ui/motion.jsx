@@ -1,5 +1,4 @@
 import { motion, useReducedMotion } from "motion/react";
-import logo from "../../assets/logo-256.webp";
 
 /* Scroll-reveal helpers.
 
@@ -98,61 +97,6 @@ export function BrandLoader({ label = "Loading…" }) {
         transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
       >Match<span className="wordmark-accent">day</span></motion.div>
       <div className="text-sm text-ink-3">{label}</div>
-    </div>
-  );
-}
-
-// The signature MatchDay animation: six colored people-dots (the logo's
-// palette) converge from a scattered ring into formation, the real emblem
-// crossfades in on top, then one soft radial pulse releases — "individual
-// people, coming together, one competition."
-const ASSEMBLY_DOTS = [
-  { color: "var(--color-accent-yellow)", angle: -90 },
-  { color: "var(--color-accent-orange)", angle: -30 },
-  { color: "var(--color-accent-pink)", angle: 30 },
-  { color: "var(--color-accent-purple)", angle: 90 },
-  { color: "var(--color-accent-blue)", angle: 150 },
-  { color: "var(--color-accent-teal)", angle: -150 },
-];
-
-export function LogoAssembly({ size = 160, className = "" }) {
-  const radius = size * 0.42;
-  const dot = Math.max(size * 0.16, 6);
-  return (
-    <div className={`relative ${className}`} style={{ width: size, height: size }}>
-      {ASSEMBLY_DOTS.map((d, i) => {
-        const rad = (d.angle * Math.PI) / 180;
-        const x = Math.cos(rad) * radius;
-        const y = Math.sin(rad) * radius;
-        return (
-          <motion.span
-            key={i}
-            className="absolute rounded-full"
-            style={{
-              width: dot, height: dot, backgroundColor: d.color,
-              left: "50%", top: "50%", marginLeft: -dot / 2, marginTop: -dot / 2,
-            }}
-            initial={{ x: x * 2.6, y: y * 2.6, opacity: 0, scale: 0.5 }}
-            animate={{ x: [x * 2.6, x, x * 0.15], y: [y * 2.6, y, y * 0.15], opacity: [0, 1, 0], scale: [0.5, 1, 0.6] }}
-            transition={{ duration: 1.1, times: [0, 0.65, 1], delay: i * 0.05, ease: "easeInOut" }}
-          />
-        );
-      })}
-      <motion.img
-        src={logo}
-        alt="MatchDay"
-        className="absolute inset-0 h-full w-full rounded-2xl"
-        initial={{ opacity: 0, scale: 0.85 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5, delay: 0.85 }}
-      />
-      <motion.span
-        className="absolute inset-0 rounded-full border-2"
-        style={{ borderColor: "var(--color-accent-teal)" }}
-        initial={{ opacity: 0.7, scale: 0.9 }}
-        animate={{ opacity: 0, scale: 1.7 }}
-        transition={{ duration: 0.9, delay: 1.15, ease: "easeOut" }}
-      />
     </div>
   );
 }

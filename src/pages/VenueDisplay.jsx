@@ -11,7 +11,6 @@ import { matchWinProbability, rallyProbabilityFor, stateFromGames } from "../lib
 import { courtBoard } from "../lib/analytics";
 import { BrandLoader } from "../components/ui/motion";
 import { EmptyState } from "../components/ui/primitives";
-import logo from "../assets/logo-256.webp";
 
 /* Public, no-login TV/projector view. Optimised for being read across a hall:
    very large type, high contrast, no interaction, no chrome. It rotates
@@ -276,9 +275,7 @@ export default function VenueDisplay() {
       {/* ── Header: organizer branding, MatchDay stays the platform mark ── */}
       <header className="mb-[1.5vw] flex items-center justify-between gap-[2vw]">
         <div className="flex min-w-0 items-center gap-[1.2vw]">
-          {tournament.logo_url
-            ? <img src={tournament.logo_url} alt="" className="h-[5vw] w-[5vw] shrink-0 rounded-[0.8vw] object-cover" />
-            : <img src={logo} alt="" className="h-[5vw] w-[5vw] shrink-0 rounded-[0.8vw]" />}
+          {tournament.logo_url && <img src={tournament.logo_url} alt="" className="h-[5vw] w-[5vw] shrink-0 rounded-[0.8vw] object-cover" />}
           <div className="min-w-0">
             {/* Display casing only — the stored name is untouched. This is a
                 broadcast surface read across a hall, where "chennai premier
@@ -451,7 +448,6 @@ export default function VenueDisplay() {
           ))}
         </div>
         <div className="flex shrink-0 items-center gap-[0.6vw] opacity-60">
-          <img src={logo} alt="" className="h-[2vw] w-[2vw] rounded" />
           <span className="wordmark text-[1.4vw] uppercase leading-none">
             Match<span className="wordmark-accent">day</span>
           </span>
